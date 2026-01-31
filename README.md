@@ -1,6 +1,6 @@
-# ALEX - Global Economist at NAVADA VC
+# ALEX - Global Economist at NAVADA
 
-A full-featured AI agent that runs 24/7 on your Raspberry Pi, serving as the Global Economist for NAVADA VC.
+A full-featured AI agent that runs 24/7 on your Raspberry Pi, serving as the Global Economist for NAVADA.
 
 ## What It Does
 
@@ -164,7 +164,7 @@ All emails are automatically CC'd to `lee@navada.info`. Emails support file atta
 
 ALEX can generate styled PDF reports using the `generate_pdf` tool:
 
-- Professional styling with NAVADA VC branding
+- Professional styling with NAVADA branding
 - Sections with headings, paragraph content, and data tables
 - Alternating row colors, styled headers
 - Custom title, subtitle, and footer
@@ -444,7 +444,7 @@ rm ~/.alex/conversations/*.json
 
 ## License
 
-MIT License - Built for NAVADA VC
+MIT License - Built for NAVADA
 
 ---
 

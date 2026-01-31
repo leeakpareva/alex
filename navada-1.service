@@ -1,5 +1,5 @@
 [Unit]
-Description=ALEX - Global Economist at NAVADA VC
+Description=ALEX - Global Economist at NAVADA
 After=network-online.target
 Wants=network-online.target
 

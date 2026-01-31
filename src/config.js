@@ -9,16 +9,18 @@ import os from 'os';
 export const CONFIG_PATH = process.env.ALEX_CONFIG || path.join(os.homedir(), '.alex/config.json');
 export const WORKSPACE_PATH = process.env.ALEX_WORKSPACE || path.join(os.homedir(), '.alex');
 
-// Allowed directories for file writes (security)
+// Allowed directories for file writes
 export const ALLOWED_WRITE_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
+    '/home/head',
 ];
 
-// Allowed directories for email attachments (security)
+// Allowed directories for email attachments
 export const ALLOWED_ATTACHMENT_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
+    '/home/head',
 ];
 
 const REQUIRED_KEYS = ['anthropic_api_key', 'telegram_bot_token'];

@@ -1,11 +1,84 @@
 /**
- * Heartbeat system — scheduled tasks, cron loading, daily heartbeats
+ * Heartbeat system — task definitions and execution helpers
+ * Scheduling is handled by system cron (/etc/cron.d/alex), not node-cron.
  */
 
-import cron from 'node-cron';
 import fs from 'fs/promises';
 import path from 'path';
+import http from 'http';
 import { WORKSPACE_PATH } from './config.js';
+
+// Quick dashboard POST helper (fire-and-forget)
+function dashPost(action, payload) {
+    const body = JSON.stringify({ action, ...payload });
+    const req = http.request({
+        hostname: '127.0.0.1', port: 8080, path: '/api/update',
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, (res) => { res.resume(); });
+    req.on('error', () => {});
+    req.end(body);
+}
+
+/**
+ * Built-in heartbeat task definitions — looked up by the /api/trigger endpoint
+ */
+export const BUILTIN_TASKS = new Map([
+    ['morning-briefing', {
+        name: 'morning-briefing',
+        task_description: `Good morning Lee! Provide a morning briefing covering:
+1. Any overnight developments in AI/robotics/African tech
+2. Key economic indicators or market movements
+3. Any tasks or deadlines coming up
+4. Proactive suggestions based on recent conversations
+5. Weather and any relevant news
+
+Keep it concise but comprehensive. This is a daily routine.`
+    }],
+    ['midmorning-checkin', {
+        name: 'midmorning-checkin',
+        task_description: `Hey Lee, checking in — anything you need me to look into today? I'll share one quick update from my morning scan and flag anything worth your attention. If you have tasks, emails to draft, or research topics, just let me know.`
+    }],
+    ['midday-research', {
+        name: 'midday-research',
+        task_description: `Midday economic research for NAVADA:
+1. Search for any new AI or robotics startup funding announcements
+2. Check for African tech ecosystem news
+3. Look for any regulatory or policy updates affecting tech investment
+4. Monitor key economic indicators and currency movements
+5. Identify 1-2 interesting startups worth deeper analysis
+
+Save key findings to memory and provide a summary.`
+    }],
+    ['afternoon-checkin', {
+        name: 'afternoon-checkin',
+        task_description: `Afternoon check-in. Quick summary of what I've covered today and anything still in progress. Any emails to draft, research to kick off for tomorrow, or things to follow up on before end of day? I'm here.`
+    }],
+    ['evening-summary', {
+        name: 'evening-summary',
+        task_description: `Evening summary for Lee:
+1. Key economic and market developments from today
+2. Any action items that need attention
+3. Tomorrow's priorities based on what we discussed
+4. Any interesting opportunities or risks identified
+5. Brief strategic reflection on portfolio and pipeline
+
+End with a brief strategic reflection.`
+    }],
+    ['weekly-self-review', {
+        name: 'weekly-self-review',
+        task_description: `Weekly self-improvement review. Analyse your own performance this week:
+
+1. Read your token logs from the past 7 days — are you using the right models? Could you route more queries to Haiku to save costs?
+2. Review your memory files — is knowledge growing? Are there stale entries to clean up?
+3. Check your skills — should any new skills be created based on recurring requests?
+4. Review dashboard data quality — are all sections being updated properly?
+5. Check for any errors in gateway.log from the past week
+6. Suggest 2-3 concrete improvements you could make to yourself
+
+Save your findings to memory under 'knowledge' and send a summary to Lee.
+This is your chance to evolve and get better each week.`
+    }],
+]);
 
 /**
  * Handle a scheduled task by calling the AI and optionally notifying via Telegram
@@ -27,7 +100,16 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
 
         const finalText = await processResponse(response, null, true, systemPrompt, 'claude-sonnet-4-20250514');
 
-        if (config.telegram_notify_tasks && config.telegram_owner_id && finalText.trim()) {
+        // Update dashboard with task result
+        dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'completed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
+        dashPost('add_activity', { entry: `Heartbeat: ${task.name} completed` });
+
+        // Post findings as news if substantive
+        if (finalText.length > 100) {
+            dashPost('add_news', { item: { headline: task.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), summary: finalText.substring(0, 200), severity: 'info', source: 'heartbeat' } });
+        }
+
+        if (config.telegram_notify_tasks && config.telegram_owner_id && finalText.trim() && bot) {
             await bot.sendMessage(
                 config.telegram_owner_id,
                 `*${task.name}*\n\n${finalText.substring(0, 3500)}`,
@@ -36,173 +118,67 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         }
     } catch (error) {
         console.error(`[CRON] Task '${task.name}' failed:`, error.message);
+        dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'failed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
     }
 }
 
 /**
- * Load saved scheduled tasks from disk
+ * Hourly dashboard metrics sync (non-AI, lightweight)
  */
-export async function loadScheduledTasks(scheduledTasks, deps) {
-    const tasksDir = path.join(WORKSPACE_PATH, 'tasks');
+export async function runDashboardSync() {
+    console.log('[HEARTBEAT] Dashboard sync');
     try {
-        await fs.mkdir(tasksDir, { recursive: true });
-        const files = await fs.readdir(tasksDir);
+        const { exec: execCb } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(execCb);
 
-        for (const file of files) {
-            if (file.endsWith('.json')) {
-                const taskData = JSON.parse(
-                    await fs.readFile(path.join(tasksDir, file), 'utf-8')
-                );
+        // Services check
+        const alexActive = await execAsync('systemctl is-active alex.service').then(() => 'online').catch(() => 'offline');
+        const dashActive = await execAsync('systemctl is-active dashboard.service').then(() => 'online').catch(() => 'offline');
+        dashPost('update_services', { services: [
+            { name: 'ALEX Gateway', port: 'systemd', status: alexActive },
+            { name: 'Dashboard Server', port: '8080', status: dashActive },
+            { name: 'Telegram Bot', port: 'polling', status: alexActive },
+        ]});
+        dashPost('set_status', { status: alexActive });
 
-                const job = cron.schedule(taskData.cron_expression, async () => {
-                    console.log(`[CRON] Running: ${taskData.name}`);
-                    await handleScheduledTask(taskData, deps);
-                });
-
-                scheduledTasks.set(taskData.name, job);
-                console.log(`[CRON] Loaded task: ${taskData.name}`);
+        // Token metrics from today's log
+        const date = new Date().toISOString().split('T')[0];
+        const logFile = path.join(WORKSPACE_PATH, 'logs', `tokens_${date}.jsonl`);
+        let totalTokens = 0, totalCalls = 0, totalCost = 0;
+        try {
+            const content = await fs.readFile(logFile, 'utf-8');
+            for (const line of content.split('\n')) {
+                if (!line.trim()) continue;
+                const e = JSON.parse(line);
+                totalTokens += (e.input_tokens || 0) + (e.output_tokens || 0);
+                totalCalls++;
+                // Rough cost estimate
+                const inp = e.input_tokens || 0, out = e.output_tokens || 0;
+                if (e.model?.includes('haiku')) totalCost += inp / 1e6 * 0.8 + out / 1e6 * 4;
+                else if (e.model?.includes('deepseek')) totalCost += inp / 1e6 * 0.14 + out / 1e6 * 0.28;
+                else totalCost += inp / 1e6 * 3 + out / 1e6 * 15;
             }
-        }
-    } catch (error) {
-        console.error('[CRON] Error loading tasks:', error.message);
+        } catch {}
+        dashPost('update_metrics', { metrics: {
+            total_tokens: totalTokens,
+            total_api_calls: totalCalls,
+            est_session_cost: `£${(totalCost * 0.79).toFixed(4)}`,
+            avg_tokens_per_task: totalCalls ? Math.round(totalTokens / totalCalls) : 0,
+        }});
+    } catch (err) {
+        console.error('[HEARTBEAT] Dashboard sync failed:', err.message);
     }
 }
 
 /**
- * Setup built-in heartbeat cron jobs
+ * Memory cleanup — clean up old conversations
  */
-export function setupHeartbeat(deps) {
-    const { memory } = deps;
-
-    // 8am — Morning briefing
-    cron.schedule('0 8 * * *', async () => {
-        console.log('[HEARTBEAT] Morning briefing');
-        await handleScheduledTask({
-            name: 'morning-briefing',
-            task_description: `Good morning Lee! Provide a morning briefing covering:
-1. Any overnight developments in AI/robotics/African tech
-2. Key economic indicators or market movements
-3. Any tasks or deadlines coming up
-4. Proactive suggestions based on recent conversations
-5. Weather and any relevant news
-
-Keep it concise but comprehensive. This is a daily routine.`
-        }, deps);
-    });
-
-    // 11am + 4pm — Proactive scans
-    cron.schedule('0 11,16 * * *', async () => {
-        console.log('[HEARTBEAT] Proactive scan');
-        try {
-            const recentResearch = await memory.getMemory('research');
-            const recentLines = recentResearch.split('\n').slice(-20).join('\n');
-
-            await handleScheduledTask({
-                name: 'proactive-scan',
-                task_description: `Quick proactive scan — search for breaking news in AI, robotics, African tech, or global macro that Lee should know about RIGHT NOW.
-
-Recent research context (avoid repeating):
-${recentLines}
-
-Rules:
-- ONLY notify Lee if you find something genuinely new and important
-- If nothing notable, just save a brief note to memory and do NOT send a Telegram message
-- If you do find something, send a short, punchy update — 1-3 sentences max`
-            }, deps);
-        } catch (error) {
-            console.error('[HEARTBEAT] Proactive scan failed:', error.message);
-        }
-    });
-
-    // 1pm — Midday research
-    cron.schedule('0 13 * * *', async () => {
-        console.log('[HEARTBEAT] Midday research');
-        await handleScheduledTask({
-            name: 'midday-research',
-            task_description: `Midday economic research for NAVADA VC:
-1. Search for any new AI or robotics startup funding announcements
-2. Check for African tech ecosystem news
-3. Look for any regulatory or policy updates affecting tech investment
-4. Monitor key economic indicators and currency movements
-5. Identify 1-2 interesting startups worth deeper analysis
-
-Save key findings to memory and provide a summary.`
-        }, deps);
-    });
-
-    // 6pm — Evening summary
-    cron.schedule('0 18 * * *', async () => {
-        console.log('[HEARTBEAT] Evening summary');
-        await handleScheduledTask({
-            name: 'evening-summary',
-            task_description: `Evening summary for Lee:
-1. Key economic and market developments from today
-2. Any action items that need attention
-3. Tomorrow's priorities based on what we discussed
-4. Any interesting opportunities or risks identified
-5. Brief strategic reflection on portfolio and pipeline
-
-End with a brief strategic reflection.`
-        }, deps);
-    });
-
-    // 9pm — Daily wrap-up summary + email
-    cron.schedule('0 21 * * *', async () => {
-        console.log('[HEARTBEAT] Daily wrap-up (9pm)');
-        await handleScheduledTask({
-            name: 'daily-wrapup',
-            task_description: `Daily wrap-up for NAVADA VC. Please:
-1. Summarize today's key activities, findings, and market developments
-2. List any outstanding action items or follow-ups
-3. Highlight the most important insight or opportunity from today
-4. Send a wrap-up email to Lee using the send_email tool with a clean HTML summary of the day
-5. Keep the Telegram summary concise (5-10 bullet points max)
-
-This is the end-of-day summary — make it comprehensive but scannable.`
-        }, deps);
-    });
-
-    // 10am — Morning check-in
-    cron.schedule('0 10 * * *', async () => {
-        console.log('[HEARTBEAT] Morning check-in');
-        const { bot, config } = deps;
-        if (config.telegram_owner_id) {
-            try {
-                await bot.sendMessage(config.telegram_owner_id,
-                    'Morning, Lee. Just checking in — anything you need me to look into or work on today? I\'m here and ready.');
-            } catch (err) {
-                console.error('[HEARTBEAT] Check-in failed:', err.message);
-            }
-        }
-    });
-
-    // 3pm — Afternoon check-in
-    cron.schedule('0 15 * * *', async () => {
-        console.log('[HEARTBEAT] Afternoon check-in');
-        const { bot, config } = deps;
-        if (config.telegram_owner_id) {
-            try {
-                await bot.sendMessage(config.telegram_owner_id,
-                    'Afternoon check-in. How\'s the day going? Let me know if there\'s anything you need — research, reports, emails, anything at all.');
-            } catch (err) {
-                console.error('[HEARTBEAT] Check-in failed:', err.message);
-            }
-        }
-    });
-
-    // 8pm — Evening check-in
-    cron.schedule('0 20 * * *', async () => {
-        console.log('[HEARTBEAT] Evening check-in');
-        const { bot, config } = deps;
-        if (config.telegram_owner_id) {
-            try {
-                await bot.sendMessage(config.telegram_owner_id,
-                    'Evening, Lee. Wrapping up for the day soon — anything else you need before I send the daily summary at 9pm?');
-            } catch (err) {
-                console.error('[HEARTBEAT] Check-in failed:', err.message);
-            }
-        }
-    });
-
-    console.log('[HEARTBEAT] Scheduled: 8am briefing, 10am/3pm/8pm check-ins, 11am/4pm scans, 1pm research, 6pm summary, 9pm wrap-up (9 daily)');
+export async function runCleanup(memory) {
+    console.log('[CLEANUP] Running conversation cleanup');
+    try {
+        await memory.cleanupOldConversations();
+    } catch (err) {
+        console.error('[CLEANUP]', err.message);
+    }
 }

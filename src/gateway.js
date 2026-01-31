@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * ALEX - Global Economist at NAVADA VC
+ * ALEX - Global Economist at NAVADA
  * Main entry point — bot setup, init, message routing
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import TelegramBot from 'node-telegram-bot-api';
-import cron from 'node-cron';
 import os from 'os';
 import path from 'path';
 import http from 'http';
@@ -16,12 +15,30 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Download a file from a URL into a Buffer
+function downloadFile(url) {
+    return new Promise((resolve, reject) => {
+        const mod = url.startsWith('https') ? https : http;
+        mod.get(url, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                return downloadFile(res.headers.location).then(resolve).catch(reject);
+            }
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+            res.on('error', reject);
+        }).on('error', reject);
+    });
+}
+
 import { WORKSPACE_PATH, loadConfig } from './config.js';
-import { appendFile, mkdir } from 'fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import https from 'https';
 import { MemorySystem } from './memory.js';
 import { SkillsSystem } from './skills.js';
 import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable } from './tools.js';
-import { handleScheduledTask, loadScheduledTasks, setupHeartbeat } from './heartbeat.js';
+import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup } from './heartbeat.js';
 import { createChatSystem, getDailyTokenStats, smartSplit } from './chat.js';
 
 // ============================================================================
@@ -55,11 +72,12 @@ async function execToolWithDeps(name, input) {
         scheduledTasks,
         handleScheduledTask: (task) => handleScheduledTask(task, heartbeatDeps()),
         openaiClient,
-        cron,
     });
-    // Queue chart images for sending after response completes
+    // Queue files for sending after response completes
     if (result && result.send_photo && result.path) {
-        pendingCharts.push({ path: result.path, caption: result.caption || '' });
+        pendingCharts.push({ type: 'photo', path: result.path, caption: result.caption || '' });
+    } else if (result && result.send_document && result.path) {
+        pendingCharts.push({ type: 'document', path: result.path, caption: result.caption || '' });
     }
     return result;
 }
@@ -70,7 +88,7 @@ function heartbeatDeps() {
         processResponse: chatSystem.processResponse,
         buildSystemPrompt: chatSystem.buildSystemPrompt,
         config,
-        bot,
+        get bot() { return bot; },
         TOOLS,
         memory,
     };
@@ -115,11 +133,11 @@ function setupTelegram() {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        const welcome = `*ALEX - Global Economist at NAVADA VC*
+        const welcome = `*ALEX - Global Economist at NAVADA*
 
-Welcome! I'm ALEX, your AI economist and colleague at NAVADA VC.
+Welcome! I'm ALEX, your AI economist and colleague at NAVADA.
 
-I have full access to this Raspberry Pi and can:
+I can:
 • Research global markets, startups, and economic trends
 • Manage files and run code
 • Draft and send emails
@@ -127,8 +145,6 @@ I have full access to this Raspberry Pi and can:
 • Schedule tasks and reminders
 • Remember everything we discuss
 • Create new skills to extend my abilities
-
-Your Telegram ID: \`${userId}\`
 
 Just message me naturally - I'm here to help!`;
 
@@ -279,17 +295,68 @@ Just message me naturally - I'm here to help!`;
 
         try {
             let userMessage = '';
+            let contentBlocks = null; // multimodal content for images/docs
+
             if (msg.text) {
                 userMessage = msg.text;
-            } else if (msg.document) {
-                userMessage = `[User sent a file: ${msg.document.file_name}]`;
             } else if (msg.photo) {
-                userMessage = '[User sent a photo]';
+                // Get highest resolution photo
+                const photo = msg.photo[msg.photo.length - 1];
+                try {
+                    const fileLink = await bot.getFileLink(photo.file_id);
+                    const imgBuffer = await downloadFile(fileLink);
+                    const base64 = imgBuffer.toString('base64');
+                    const caption = msg.caption || 'What is this image? Describe and analyse it.';
+                    contentBlocks = [
+                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+                        { type: 'text', text: caption }
+                    ];
+                    userMessage = caption;
+                } catch (dlErr) {
+                    console.error('[PHOTO] Download failed:', dlErr.message);
+                    userMessage = `[User sent a photo but download failed: ${dlErr.message}]`;
+                }
+            } else if (msg.document) {
+                try {
+                    const fileLink = await bot.getFileLink(msg.document.file_id);
+                    const fileBuffer = await downloadFile(fileLink);
+                    const fileName = msg.document.file_name || 'unknown';
+                    const ext = path.extname(fileName).toLowerCase();
+                    const caption = msg.caption || `Analyse this file: ${fileName}`;
+                    const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+
+                    if (imageExts.includes(ext)) {
+                        // Image sent as document
+                        const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp' };
+                        const base64 = fileBuffer.toString('base64');
+                        contentBlocks = [
+                            { type: 'image', source: { type: 'base64', media_type: mimeMap[ext] || 'image/jpeg', data: base64 } },
+                            { type: 'text', text: caption }
+                        ];
+                    } else if (ext === '.pdf') {
+                        // PDF — send as document to Claude
+                        const base64 = fileBuffer.toString('base64');
+                        contentBlocks = [
+                            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                            { type: 'text', text: caption }
+                        ];
+                    } else {
+                        // Text-based files — read as text
+                        const textContent = fileBuffer.toString('utf-8').substring(0, 50000);
+                        contentBlocks = [
+                            { type: 'text', text: `[File: ${fileName}]\n\n${textContent}\n\n${caption}` }
+                        ];
+                    }
+                    userMessage = caption;
+                } catch (dlErr) {
+                    console.error('[DOCUMENT] Download failed:', dlErr.message);
+                    userMessage = `[User sent ${msg.document.file_name} but download failed: ${dlErr.message}]`;
+                }
             } else if (msg.voice) {
                 userMessage = '[User sent a voice message]';
             }
 
-            if (!userMessage) return;
+            if (!userMessage && !contentBlocks) return;
 
             const timestamp = new Date().toISOString();
             console.log(`[INPUT] ${timestamp} | User: ${msg.from.first_name} (${userId}) | Message: ${userMessage.substring(0, 200)}`);
@@ -317,7 +384,7 @@ Just message me naturally - I'm here to help!`;
 
             let response;
             try {
-                response = await chatSystem.chat(chatId, userMessage, msg.from);
+                response = await chatSystem.chat(chatId, contentBlocks || userMessage, msg.from);
             } finally {
                 clearInterval(typingInterval);
             }
@@ -331,15 +398,30 @@ Just message me naturally - I'm here to help!`;
             });
             postDashboard('add_activity', { entry: `Alex responded to ${msg.from.first_name} (${response.length} chars)` });
 
-            // Send any generated charts as photos
-            const charts = pendingCharts.splice(0);
-            for (const chart of charts) {
+            // Log task to dashboard
+            const taskSummary = userMessage.substring(0, 80);
+            postDashboard('add_task', { task: {
+                name: taskSummary,
+                category: 'user-request',
+                status: 'completed',
+                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT',
+            }});
+
+            // Send any queued files (photos + documents)
+            const files = pendingCharts.splice(0);
+            for (const file of files) {
                 try {
-                    await bot.sendPhoto(chatId, chart.path, {
-                        caption: chart.caption || undefined,
-                    });
-                } catch (photoErr) {
-                    console.error('[CHART] Failed to send photo:', photoErr.message);
+                    if (file.type === 'document') {
+                        await bot.sendDocument(chatId, file.path, {
+                            caption: file.caption || undefined,
+                        });
+                    } else {
+                        await bot.sendPhoto(chatId, file.path, {
+                            caption: file.caption || undefined,
+                        });
+                    }
+                } catch (fileErr) {
+                    console.error('[FILE] Failed to send:', fileErr.message);
                 }
             }
 
@@ -375,13 +457,277 @@ Just message me naturally - I'm here to help!`;
 }
 
 // ============================================================================
+// CONTROL API (port 9090) — allows Claude Code to send commands to ALEX
+// ============================================================================
+
+function setupControlAPI() {
+    const CONTROL_PORT = 9090;
+    const controlChatId = 'control-api';
+
+    const server = http.createServer(async (req, res) => {
+        // CORS
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+        if (req.method === 'POST' && req.url === '/api/command') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const { message, image_path, send_to_telegram } = JSON.parse(body);
+                    if (!message) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'message required' }));
+                        return;
+                    }
+
+                    console.log(`[CONTROL] Command: ${message.substring(0, 100)}`);
+                    postDashboard('add_activity', { entry: `Control API: ${message.substring(0, 80)}` });
+
+                    // Build user message — include image reference if provided
+                    let userMessage = message;
+                    if (image_path) {
+                        userMessage += `\n\n[Image attached at: ${image_path}]`;
+                    }
+
+                    // Process through chat system
+                    const response = await chatSystem.chat(controlChatId, userMessage, { first_name: 'Claude Code', username: 'claude_code' });
+
+                    // Send queued files
+                    const files = pendingCharts.splice(0);
+
+                    // Optionally forward response + files to Telegram
+                    if (send_to_telegram !== false && config.telegram_owner_id) {
+                        const { smartSplit } = await import('./chat.js');
+                        const parts = smartSplit(response, 4000);
+                        for (const part of parts) {
+                            await bot.sendMessage(config.telegram_owner_id, part, { parse_mode: 'Markdown' }).catch(() => {});
+                        }
+                        for (const file of files) {
+                            try {
+                                if (file.type === 'document') {
+                                    await bot.sendDocument(config.telegram_owner_id, file.path, { caption: file.caption || undefined });
+                                } else {
+                                    await bot.sendPhoto(config.telegram_owner_id, file.path, { caption: file.caption || undefined });
+                                }
+                            } catch {}
+                        }
+                    }
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, response, files_sent: files.length }));
+
+                } catch (err) {
+                    console.error('[CONTROL] Error:', err.message);
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+        } else if (req.method === 'POST' && req.url === '/api/send') {
+            // Send a direct message to a specific Telegram user
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const { chat_id, message, image_path, document_path, parse_mode } = JSON.parse(body);
+                    if (!chat_id || (!message && !image_path && !document_path)) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'chat_id and (message or image_path or document_path) required' }));
+                        return;
+                    }
+
+                    console.log(`[CONTROL] Send to ${chat_id}: ${(message || '').substring(0, 80)}`);
+                    const results = [];
+
+                    if (message) {
+                        await bot.sendMessage(chat_id, message, { parse_mode: parse_mode || undefined });
+                        results.push('message_sent');
+                    }
+                    if (image_path) {
+                        await bot.sendPhoto(chat_id, image_path, { caption: message ? undefined : 'Image from ALEX' });
+                        results.push('photo_sent');
+                    }
+                    if (document_path) {
+                        await bot.sendDocument(chat_id, document_path, { caption: message ? undefined : 'File from ALEX' });
+                        results.push('document_sent');
+                    }
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, results }));
+                } catch (err) {
+                    console.error('[CONTROL] Send error:', err.message);
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+
+        } else if (req.method === 'GET' && req.url === '/api/users') {
+            // List known Telegram users from audit logs
+            try {
+                const logsDir = path.join(WORKSPACE_PATH, 'logs');
+                const files = await import('fs/promises').then(f => f.default?.readdir?.(logsDir) || f.readdir(logsDir));
+                const users = new Map();
+
+                for (const file of files) {
+                    if (!file.startsWith('audit_')) continue;
+                    const content = await import('fs/promises').then(f => f.readFile(path.join(logsDir, file), 'utf-8'));
+                    for (const line of content.split('\n')) {
+                        if (!line.trim()) continue;
+                        try {
+                            const entry = JSON.parse(line);
+                            if (entry.user_id && entry.type === 'user_message') {
+                                users.set(entry.user_id, {
+                                    user_id: entry.user_id,
+                                    username: entry.username || null,
+                                    first_name: entry.first_name || null,
+                                    last_name: entry.last_name || null,
+                                    chat_id: entry.chat_id,
+                                    last_seen: entry.timestamp,
+                                });
+                            }
+                        } catch {}
+                    }
+                }
+
+                const userList = [...users.values()].sort((a, b) => (b.last_seen || '').localeCompare(a.last_seen || ''));
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, users: userList, count: userList.length }));
+            } catch (err) {
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+
+        } else if (req.method === 'POST' && req.url === '/api/broadcast') {
+            // Send a message to ALL known users
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const { message, image_path } = JSON.parse(body);
+                    if (!message && !image_path) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'message or image_path required' }));
+                        return;
+                    }
+
+                    // Get all known chat IDs from audit logs
+                    const logsDir = path.join(WORKSPACE_PATH, 'logs');
+                    const files = await import('fs/promises').then(f => f.default?.readdir?.(logsDir) || f.readdir(logsDir));
+                    const chatIds = new Set();
+                    for (const file of files) {
+                        if (!file.startsWith('audit_')) continue;
+                        const content = await import('fs/promises').then(f => f.readFile(path.join(logsDir, file), 'utf-8'));
+                        for (const line of content.split('\n')) {
+                            if (!line.trim()) continue;
+                            try {
+                                const entry = JSON.parse(line);
+                                if (entry.chat_id) chatIds.add(entry.chat_id);
+                            } catch {}
+                        }
+                    }
+
+                    let sent = 0;
+                    for (const cid of chatIds) {
+                        try {
+                            if (message) await bot.sendMessage(cid, message);
+                            if (image_path) await bot.sendPhoto(cid, image_path);
+                            sent++;
+                        } catch {}
+                    }
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, sent, total_users: chatIds.size }));
+                } catch (err) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+
+        } else if (req.method === 'POST' && req.url === '/api/trigger') {
+            // Trigger a scheduled task by name (called by system cron)
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const { task: taskName } = JSON.parse(body);
+                    if (!taskName) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'task name required' }));
+                        return;
+                    }
+
+                    console.log(`[TRIGGER] ${taskName}`);
+
+                    // Special cases (non-AI)
+                    if (taskName === 'dashboard-sync') {
+                        await runDashboardSync();
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, task: taskName }));
+                        return;
+                    }
+                    if (taskName === 'cleanup') {
+                        await runCleanup(memory);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, task: taskName }));
+                        return;
+                    }
+
+                    // Look up task definition: built-in first, then user tasks on disk
+                    let taskDef = BUILTIN_TASKS.get(taskName);
+                    if (!taskDef) {
+                        try {
+                            const taskFile = path.join(WORKSPACE_PATH, 'tasks', `${taskName}.json`);
+                            taskDef = JSON.parse(await import('fs/promises').then(f => f.readFile(taskFile, 'utf-8')));
+                        } catch {
+                            res.writeHead(404);
+                            res.end(JSON.stringify({ error: `Unknown task: ${taskName}` }));
+                            return;
+                        }
+                    }
+
+                    // Run asynchronously so we can respond immediately
+                    handleScheduledTask(taskDef, heartbeatDeps()).catch(err => {
+                        console.error(`[TRIGGER] ${taskName} failed:`, err.message);
+                    });
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, task: taskName }));
+                } catch (err) {
+                    console.error('[TRIGGER] Error:', err.message);
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+
+        } else {
+            res.writeHead(404);
+            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger' }));
+        }
+    });
+
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.warn(`[CONTROL] Port ${CONTROL_PORT} already in use — skipping control API`);
+        } else {
+            console.error(`[CONTROL] Server error:`, err.message);
+        }
+    });
+
+    server.listen(CONTROL_PORT, '127.0.0.1', () => {
+        console.log(`[CONTROL] API listening on http://127.0.0.1:${CONTROL_PORT}`);
+    });
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 async function init() {
     console.log('╔════════════════════════════════════════╗');
     console.log('║     ALEX - Global Economist            ║');
-    console.log('║     NAVADA VC | Starting up...         ║');
+    console.log('║     NAVADA | Starting up...             ║');
     console.log('╚════════════════════════════════════════╝');
 
     // Load configuration (with schema validation)
@@ -431,19 +777,20 @@ async function init() {
         TOOLS,
     });
 
-    // Load scheduled tasks
-    await loadScheduledTasks(scheduledTasks, heartbeatDeps());
-
-    // Setup heartbeat (includes 9pm wrap-up)
-    setupHeartbeat(heartbeatDeps());
-
-    // Periodic conversation cleanup (daily at 3am)
-    cron.schedule('0 3 * * *', () => {
-        memory.cleanupOldConversations().catch(err => console.error('[CLEANUP]', err.message));
-    });
-
     // Setup Telegram
     setupTelegram();
+
+    // Setup Control API on port 9090
+    setupControlAPI();
+
+    // Notify dashboard that ALEX is online
+    postDashboard('set_status', { status: 'online' });
+    postDashboard('add_activity', { entry: 'ALEX started and online' });
+    postDashboard('update_services', { services: [
+        { name: 'ALEX Gateway', port: 'systemd', status: 'online' },
+        { name: 'Dashboard Server', port: '8080', status: 'online' },
+        { name: 'Telegram Bot', port: 'polling', status: 'online' },
+    ]});
 
     console.log('');
     console.log('ALEX is now online and ready!');

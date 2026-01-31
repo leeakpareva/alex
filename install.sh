@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# ALEX - Global Economist at NAVADA VC - Installer
+# ALEX - Global Economist at NAVADA - Installer
 #
 
 set -e
@@ -8,7 +8,7 @@ set -e
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║                                                            ║"
-echo "║            ALEX - Global Economist at NAVADA VC            ║"
+echo "║            ALEX - Global Economist at NAVADA            ║"
 echo "║                        Installer                           ║"
 echo "║                                                            ║"
 echo "╚════════════════════════════════════════════════════════════╝"
@@ -60,7 +60,7 @@ if [ ! -f "$INSTALL_DIR/package.json" ]; then
 {
   "name": "alex",
   "version": "1.0.0",
-  "description": "ALEX - Global Economist at NAVADA VC",
+  "description": "ALEX - Global Economist at NAVADA",
   "main": "src/gateway.js",
   "type": "module",
   "bin": {

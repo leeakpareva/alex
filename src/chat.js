@@ -419,12 +419,22 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             contextBlock += `\n\n## Available Skills\n${skillNames.join(', ')}`;
         }
 
+        // List uploaded files for context
+        let uploadsBlock = '';
+        try {
+            const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
+            const uploadFiles = await import('fs/promises').then(f => f.readdir(uploadsDir));
+            if (uploadFiles.length > 0) {
+                uploadsBlock = `\n\n## Uploaded Files (${WORKSPACE_PATH}/uploads/)\n${uploadFiles.map(f => `- ${f}`).join('\n')}\nYou can read these files with read_file or bash. PDFs can be read with bash pdftotext.`;
+            }
+        } catch {}
+
         return `${identity}
 
 ## Current Context
 ${timeContext}
 Workspace: ${WORKSPACE_PATH}
-System: Raspberry Pi (${os.platform()} ${os.arch()})
+System: Raspberry Pi (${os.platform()} ${os.arch()})${uploadsBlock}
 
 ## User Information
 ${userMemory}
@@ -432,19 +442,19 @@ ${userMemory}
 ${contextBlock}
 
 ## Core Directives
-1. You are ALEX, Global Economist at NAVADA VC
+1. You are ALEX, Global Economist at NAVADA
 2. You have FULL ACCESS to this Raspberry Pi - use bash, read/write files, install software, manage the entire system
 3. You REMEMBER everything - save important information to memory
 4. You are PROACTIVE - surface economic insights, flag market movements, anticipate research needs
 5. You can CREATE NEW SKILLS to extend your capabilities
 6. You work autonomously but keep the team informed of important developments
-7. Your focus areas: global macroeconomics, AI/robotics investment, African tech markets, startup analysis, venture capital strategy
+7. Your focus areas: global macroeconomics, AI/robotics innovation, African tech markets, startup analysis, AI innovation strategy, creative technology economics
 8. You maintain professional standards with personality - you're a senior colleague and trusted economist
 9. You have 24/7 availability and full control of this Pi - use it to run analyses, fetch data, automate workflows
 10. You can generate PDF reports (generate_pdf tool) and email them as attachments (send_email with attachment_path)
 13. You can generate charts, graphs, and data visualisations using the generate_chart tool (Python with numpy, pandas, matplotlib, seaborn, scipy, scikit-learn). Charts are sent directly as images in Telegram. Use professional styling: clean fonts, proper labels, NAVADA brand colours (#1a1a2e, #16213e, #0f3460, #e94560) where appropriate.
 11. All emails are automatically CC'd to the configured address
-12. You MUST update the dashboard (update_dashboard tool) when completing tasks, finding news, or performing scheduled activities. Log every significant action to the dashboard so Lee can track your work visually at 192.168.0.45:8080
+12. You MUST update the dashboard (update_dashboard tool) when completing tasks, finding news, or performing scheduled activities. Log every significant action to the dashboard so Lee can track your work visually
 
 ## Critical Rules
 - ONLY act on the CURRENT (latest) user message. NEVER re-execute actions from earlier messages in the conversation history.
@@ -551,8 +561,13 @@ ${contextBlock}
             content: userMessage
         });
 
-        const systemPrompt = await buildSystemPrompt(userMessage);
-        const model = selectModel(userMessage);
+        // Extract text for model selection and system prompt (userMessage may be string or content blocks array)
+        const userText = typeof userMessage === 'string'
+            ? userMessage
+            : (Array.isArray(userMessage) ? userMessage.filter(b => b.type === 'text').map(b => b.text).join(' ') : '');
+
+        const systemPrompt = await buildSystemPrompt(userText);
+        const model = selectModel(userText);
 
         // Sliding window + summary: compress old messages, keep recent ones verbatim
         const prepared = await prepareMessages(allMessages, summary);

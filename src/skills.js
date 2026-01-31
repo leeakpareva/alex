@@ -12,7 +12,7 @@ import path from 'path';
 const SKILL_ECONOMIC_RESEARCH = `# Economic Research Skill
 
 ## Purpose
-Conduct comprehensive economic research for NAVADA VC investment decisions.
+Conduct comprehensive economic research for NAVADA strategic decisions.
 
 ## Capabilities
 - Search for macroeconomic data and trends
@@ -94,7 +94,7 @@ const SKILL_EMAIL_DRAFTING = `# Email Drafting Skill
 Compose professional emails on behalf of NAVADA.
 
 ## Email Types
-- Investment inquiries
+- Partnership and collaboration inquiries
 - Partnership outreach
 - Founder communications
 - Research requests
@@ -128,14 +128,14 @@ Help manage schedules and deadlines.
 const SKILL_STARTUP_ANALYSIS = `# Startup Analysis Skill
 
 ## Purpose
-Evaluate startups for potential NAVADA investment.
+Evaluate startups and projects for potential NAVADA partnership or collaboration.
 
 ## Analysis Framework
 1. **Team**: Founders, experience, track record
 2. **Market**: Size, growth, competition
 3. **Product**: Technology, differentiation, traction
 4. **Financials**: Revenue, burn, runway
-5. **Fit**: Alignment with NAVADA thesis
+5. **Fit**: Alignment with NAVADA mission and focus areas
 
 ## Research Process
 1. Search for company information and news

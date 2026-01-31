@@ -110,7 +110,7 @@ async function main() {
         case 'help':
         default:
             console.log(`
-ALEX - Global Economist at NAVADA VC
+ALEX - Global Economist at NAVADA
 
 Usage: alex <command>
 

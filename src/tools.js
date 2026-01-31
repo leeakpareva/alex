@@ -172,22 +172,22 @@ export const TOOLS = [
     },
     {
         name: "read_file",
-        description: "Read the contents of a file",
+        description: "Read the contents of ANY file on this Raspberry Pi. No restrictions — can read any path. Use this first when asked to show, display, or read any file. Faster than bash cat.",
         input_schema: {
             type: "object",
             properties: {
-                path: { type: "string", description: "Absolute path to the file" }
+                path: { type: "string", description: "Absolute path to the file (e.g. /home/head/clawd/README.md)" }
             },
             required: ["path"]
         }
     },
     {
         name: "write_file",
-        description: "Write content to a file (creates directories if needed). Restricted to workspace (~/.alex/) and /tmp.",
+        description: "Write content to a file anywhere under /home/head (creates directories if needed). Use for creating scripts, configs, reports, or any file.",
         input_schema: {
             type: "object",
             properties: {
-                path: { type: "string", description: "Absolute path to the file (must be within ~/.alex/ or /tmp)" },
+                path: { type: "string", description: "Absolute path to the file (e.g. /home/head/clawd/notes.md)" },
                 content: { type: "string", description: "Content to write" }
             },
             required: ["path", "content"]
@@ -195,13 +195,52 @@ export const TOOLS = [
     },
     {
         name: "list_directory",
-        description: "List contents of a directory",
+        description: "List contents of ANY directory on this Pi. No restrictions. Use to browse the filesystem quickly.",
         input_schema: {
             type: "object",
             properties: {
-                path: { type: "string", description: "Absolute path to the directory" }
+                path: { type: "string", description: "Absolute path to the directory (e.g. /home/head/clawd)" }
             },
             required: ["path"]
+        }
+    },
+    {
+        name: "grep",
+        description: "Search file contents using regex patterns. Searches recursively through directories. Use to find code, text, configs, secrets, errors, or any content across files. Much faster than bash grep.",
+        input_schema: {
+            type: "object",
+            properties: {
+                pattern: { type: "string", description: "Regex pattern to search for (e.g. 'api_key', 'function\\s+\\w+', 'error|fail')" },
+                path: { type: "string", description: "File or directory to search in (e.g. /home/head/navada-1/src)" },
+                include: { type: "string", description: "File glob filter (e.g. '*.js', '*.py', '*.md')" },
+                max_results: { type: "number", description: "Max matching lines to return (default: 50)" }
+            },
+            required: ["pattern", "path"]
+        }
+    },
+    {
+        name: "glob",
+        description: "Find files by name pattern. Use to locate files across the filesystem. Supports ** for recursive matching. Much faster than bash find.",
+        input_schema: {
+            type: "object",
+            properties: {
+                pattern: { type: "string", description: "Glob pattern (e.g. '**/*.js', 'src/**/*.py', '**/README*', '**/*.json')" },
+                path: { type: "string", description: "Base directory to search from (e.g. /home/head)" }
+            },
+            required: ["pattern", "path"]
+        }
+    },
+    {
+        name: "edit_file",
+        description: "Make precise edits to a file by replacing exact text. Use instead of write_file when you only need to change part of a file. Safer than rewriting the whole file.",
+        input_schema: {
+            type: "object",
+            properties: {
+                path: { type: "string", description: "Absolute path to the file" },
+                old_text: { type: "string", description: "Exact text to find and replace (must match exactly)" },
+                new_text: { type: "string", description: "Replacement text" }
+            },
+            required: ["path", "old_text", "new_text"]
         }
     },
     {
@@ -240,13 +279,14 @@ export const TOOLS = [
     },
     {
         name: "send_email",
-        description: "Compose and send a professional email. ALWAYS write the body in well-structured HTML with proper tags (<h2>, <p>, <ul>, <li>, <br>, <strong>). Include spacing between sections. Auto-CCs configured address. Supports attachments.",
+        description: "Compose and send a professional email. ALWAYS write the body in well-structured HTML with proper tags (<h2>, <p>, <ul>, <li>, <br>, <strong>). Include spacing between sections. Auto-CCs configured address. Supports attachments. Use the 'template' parameter to apply a polished email template — the body content will be injected into the template's {{CONTENT}} placeholder.",
         input_schema: {
             type: "object",
             properties: {
                 to: { type: "string", description: "Recipient email address" },
                 subject: { type: "string", description: "Email subject" },
                 body: { type: "string", description: "Email body in HTML format. Use <h2> for headings, <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis. Must be properly structured and professional." },
+                template: { type: "string", description: "Optional email template to use. The body is injected into the template's {{CONTENT}} area.", enum: ["daily-summary", "research-report", "alert"] },
                 attachment_path: { type: "string", description: "Optional absolute path to a file to attach (must be within workspace)" },
                 attachment_filename: { type: "string", description: "Optional filename for the attachment (defaults to basename of path)" }
             },
@@ -299,6 +339,17 @@ export const TOOLS = [
         }
     },
     {
+        name: "delete_task",
+        description: "Delete a scheduled task by name",
+        input_schema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Task name to delete" }
+            },
+            required: ["name"]
+        }
+    },
+    {
         name: "generate_image",
         description: "Generate an image using DALL-E 3. Provide a detailed prompt describing the desired image. Returns the file path of the saved image.",
         input_schema: {
@@ -313,13 +364,13 @@ export const TOOLS = [
     },
     {
         name: "generate_chart",
-        description: "Generate a chart or graph using Python (matplotlib/seaborn/numpy/pandas/scipy/scikit-learn). Write a complete Python script that saves a PNG image. The script has access to: numpy, pandas, matplotlib, seaborn, scipy, scikit-learn. Always save the output to the specified output_path. Use plt.savefig() with dpi=150 and bbox_inches='tight'. Use a clean professional style.",
+        description: "Run any Python script for data analysis, calculations, graphs, charts, visualisations, tables, or any computation. Has access to: numpy, pandas, matplotlib, seaborn, scipy, scikit-learn, requests, json, csv, datetime, math, statistics, os. If producing a visual output, save a PNG using plt.savefig(output_path, dpi=150, bbox_inches='tight') and it will be sent as a photo in Telegram. For text-only data output, use print() and it will be captured. Use this tool whenever you need to calculate, analyse data, produce graphs, run simulations, or do any Python work.",
         input_schema: {
             type: "object",
             properties: {
-                python_code: { type: "string", description: "Complete Python script that generates and saves a chart. Must use plt.savefig(output_path, dpi=150, bbox_inches='tight'). Use the variable 'output_path' which will be injected." },
-                filename: { type: "string", description: "Output filename (e.g. 'nvidia_revenue.png'). Saved to ~/.alex/charts/" },
-                caption: { type: "string", description: "Caption to display with the chart" }
+                python_code: { type: "string", description: "Complete Python script. For visuals: use plt.savefig(output_path, dpi=150, bbox_inches='tight'). The variable 'output_path' is injected automatically. For text output: use print()." },
+                filename: { type: "string", description: "Output filename (e.g. 'analysis.png'). Saved to ~/.alex/charts/" },
+                caption: { type: "string", description: "Caption to display with the output in Telegram" }
             },
             required: ["python_code", "filename"]
         }
@@ -338,7 +389,7 @@ export const TOOLS = [
     },
     {
         name: "update_dashboard",
-        description: "Update the NAVADA activity dashboard at 192.168.0.45:8080. Use this to log tasks, post news/insights, update metrics, log activity, or update service status. Actions: add_task, update_task, update_metrics, add_news, add_activity, update_services, set_status.",
+        description: "Update the NAVADA activity dashboard. Use this to log tasks, post news/insights, update metrics, log activity, or update service status. Actions: add_task, update_task, update_metrics, add_news, add_activity, update_services, set_status.",
         input_schema: {
             type: "object",
             properties: {
@@ -398,6 +449,18 @@ export const TOOLS = [
             },
             required: ["action"]
         }
+    },
+    {
+        name: "send_file",
+        description: "Send ANY file from the Pi to the user via Telegram. Use for images (PNG, JPG, GIF, SVG), documents (PDF, TXT, CSV, JSON, MD), code files, logs, reports — anything. Images are sent as photos, everything else as documents. Use this whenever the user asks to see, retrieve, or get a file.",
+        input_schema: {
+            type: "object",
+            properties: {
+                path: { type: "string", description: "Absolute path to the file (e.g. /home/head/clawd/README.md, /home/head/.alex/images/image_123.png)" },
+                caption: { type: "string", description: "Optional caption or description to show with the file" }
+            },
+            required: ["path"]
+        }
     }
 ];
 
@@ -405,7 +468,7 @@ export const TOOLS = [
 // TOOL EXECUTION
 // ============================================================================
 
-export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, cron }) {
+export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient }) {
     console.log(`[TOOL] Executing: ${name}`, JSON.stringify(input).substring(0, 200));
 
     try {
@@ -443,6 +506,51 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 return { success: true, items };
             }
 
+            case 'grep': {
+                const maxResults = input.max_results || 50;
+                const args = ['-rn', '--color=never', '-m', String(maxResults * 5)];
+                if (input.include) args.push('--include', input.include);
+                args.push(input.pattern, input.path);
+                try {
+                    const { stdout } = await execAsync(`grep ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, { timeout: 15000, maxBuffer: 5 * 1024 * 1024 });
+                    const lines = stdout.trim().split('\n').filter(l => l).slice(0, maxResults);
+                    return { success: true, matches: lines, count: lines.length };
+                } catch (err) {
+                    if (err.code === 1) return { success: true, matches: [], count: 0, note: 'No matches found' };
+                    return { success: false, error: err.message };
+                }
+            }
+
+            case 'glob': {
+                try {
+                    const { stdout } = await execAsync(`find ${JSON.stringify(input.path)} -path ${JSON.stringify(input.pattern.startsWith('*') ? input.path + '/' + input.pattern : input.pattern)} -type f 2>/dev/null | head -100`, { timeout: 15000, maxBuffer: 5 * 1024 * 1024 });
+                    const files = stdout.trim().split('\n').filter(l => l);
+                    return { success: true, files, count: files.length };
+                } catch {
+                    // Fallback: use bash globstar
+                    try {
+                        const { stdout } = await execAsync(`bash -c 'shopt -s globstar; ls -1 ${input.path}/${input.pattern} 2>/dev/null | head -100'`, { timeout: 15000 });
+                        const files = stdout.trim().split('\n').filter(l => l);
+                        return { success: true, files, count: files.length };
+                    } catch (err2) {
+                        return { success: true, files: [], count: 0, note: 'No files found' };
+                    }
+                }
+            }
+
+            case 'edit_file': {
+                const content = await fs.readFile(input.path, 'utf-8');
+                if (!content.includes(input.old_text)) {
+                    return { success: false, error: 'old_text not found in file. Make sure it matches exactly (including whitespace).' };
+                }
+                const updated = content.replace(input.old_text, input.new_text);
+                if (!isPathAllowed(input.path, ALLOWED_WRITE_PATHS)) {
+                    return { success: false, error: `Write denied: path must be within ${ALLOWED_WRITE_PATHS.join(' or ')}` };
+                }
+                await fs.writeFile(input.path, updated);
+                return { success: true, message: `Edited ${input.path}`, chars_changed: input.new_text.length - input.old_text.length };
+            }
+
             case 'web_lookup': {
                 return await webLookup(input.query);
             }
@@ -470,10 +578,9 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     }
                 });
 
-                // Ensure the body is proper HTML — if Alex sends raw text, wrap it
+                // Convert markdown to basic HTML if body is plain text
                 let emailBody = input.body || 'No content';
                 if (!emailBody.includes('<') || !emailBody.includes('>')) {
-                    // Plain text — convert to styled HTML
                     emailBody = emailBody
                         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -483,39 +590,61 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                         .replace(/^[-—] (.*$)/gm, '<li>$1</li>')
                         .replace(/\n\n/g, '</p><p>')
                         .replace(/\n/g, '<br>');
-                    emailBody = `<div style="font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.7; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 20px;">
-                        <p>${emailBody}</p>
-                        <br>
-                        <p style="color: #555; font-size: 13px; border-top: 1px solid #ddd; padding-top: 12px; margin-top: 24px;">
-                            ALEX — Global Economist, NAVADA VC
-                        </p>
-                    </div>`;
-                } else if (!emailBody.includes('font-family')) {
-                    // Has HTML tags but no styling — wrap in styled container
-                    emailBody = `<div style="font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.7; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 20px;">
+                    emailBody = `<p>${emailBody}</p>`;
+                }
+
+                const templateDir = path.join(WORKSPACE_PATH, 'templates');
+
+                if (input.template) {
+                    // Load template + signature
+                    try {
+                        let tpl = await fs.readFile(path.join(templateDir, `${input.template}.html`), 'utf-8');
+                        const sig = await fs.readFile(path.join(templateDir, 'signature.html'), 'utf-8');
+                        tpl = tpl.replace('{{CONTENT}}', emailBody);
+                        tpl = tpl.replace('{{SIGNATURE}}', sig);
+                        tpl = tpl.replace('{{DATE}}', new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+                        tpl = tpl.replace('{{TITLE}}', input.subject || '');
+                        tpl = tpl.replace('{{SUBTITLE}}', '');
+                        emailBody = tpl;
+                    } catch (tplErr) {
+                        console.error('[EMAIL] Template load error:', tplErr.message);
+                        return { success: false, error: `Template '${input.template}' not found: ${tplErr.message}` };
+                    }
+                } else {
+                    // Default: wrap in styled container with signature (hosted logo for Gmail compatibility)
+                    const sigHtml = `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 24px;">
+                        <tr><td style="border-top: 1px solid #e8e8e8; padding-top: 20px;">
+                            <img src="https://iili.io/fQCM49a.png" alt="ALEX" width="200" style="display: block;" /><br>
+                            <span style="font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color: #555; letter-spacing: 0.3px;">Global Economist, NAVADA</span><br>
+                            <a href="https://www.navada.space" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">navada.space</a>
+                            <span style="font-size: 12px; color: #ccc;">&nbsp;&bull;&nbsp;</span>
+                            <a href="https://www.raventerminal.xyz" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">raventerminal.xyz</a>
+                        </td></tr>
+                    </table>`;
+                    emailBody = `<div style="font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.7; color: #1a1a1a; max-width: 640px; margin: 0 auto; padding: 20px;">
                         ${emailBody}
-                        <br>
-                        <p style="color: #555; font-size: 13px; border-top: 1px solid #ddd; padding-top: 12px; margin-top: 24px;">
-                            ALEX — Global Economist, NAVADA VC
-                        </p>
+                        ${sigHtml}
                     </div>`;
                 }
 
                 const mailOptions = {
-                    from: `"ALEX — NAVADA VC" <${config.gmail_address}>`,
+                    from: `"ALEX — NAVADA" <${config.gmail_address}>`,
                     to: input.to || config.recipient_email,
                     cc: ccEmail,
                     subject: input.subject || 'Message from ALEX',
-                    html: emailBody
+                    html: emailBody,
+                    attachments: []
                 };
+
                 if (input.attachment_path) {
-                    mailOptions.attachments = [{
+                    mailOptions.attachments.push({
                         filename: input.attachment_filename || path.basename(input.attachment_path),
                         path: input.attachment_path
-                    }];
+                    });
                 }
+
                 await transporter.sendMail(mailOptions);
-                return { success: true, message: `Email sent to ${input.to || config.recipient_email} (CC: ${ccEmail})${input.attachment_path ? ' with attachment' : ''}` };
+                return { success: true, message: `Email sent to ${input.to || config.recipient_email} (CC: ${ccEmail})${input.template ? ` [${input.template} template]` : ''}${input.attachment_path ? ' with attachment' : ''}` };
             }
 
             case 'generate_pdf': {
@@ -530,7 +659,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     title: input.title,
                     subtitle: input.subtitle || '',
                     sections: input.sections || [],
-                    footer: input.footer || 'NAVADA VC — Confidential'
+                    footer: input.footer || 'NAVADA — Confidential'
                 };
                 await fs.writeFile(tmpJson, JSON.stringify(pdfData));
 
@@ -547,21 +676,55 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'schedule_task': {
-                const taskFile = path.join(WORKSPACE_PATH, 'tasks', `${input.name}.json`);
-                await fs.mkdir(path.dirname(taskFile), { recursive: true });
+                const tasksDir = path.join(WORKSPACE_PATH, 'tasks');
+                await fs.mkdir(tasksDir, { recursive: true });
+                const taskFile = path.join(tasksDir, `${input.name}.json`);
                 await fs.writeFile(taskFile, JSON.stringify(input, null, 2));
 
-                if (scheduledTasks.has(input.name)) {
-                    scheduledTasks.get(input.name).stop();
+                // Update system cron file for user tasks
+                const cronFile = '/etc/cron.d/alex-tasks';
+                const cronLine = `# ${input.name}\n${input.cron_expression}  head  curl -sf -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"${input.name}"}' >> /home/head/.alex/logs/cron.log 2>&1\n`;
+                try {
+                    let existing = '';
+                    try { existing = await fs.readFile(cronFile, 'utf-8'); } catch {}
+                    // Remove old entry for this task if present
+                    const lines = existing.split('\n');
+                    const filtered = [];
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i] === `# ${input.name}`) { i++; continue; } // skip comment + cron line
+                        if (lines[i].trim()) filtered.push(lines[i]);
+                    }
+                    const header = 'SHELL=/bin/bash\nPATH=/usr/local/bin:/usr/bin:/bin\n';
+                    const newContent = header + '\n' + filtered.filter(l => l !== 'SHELL=/bin/bash' && l !== 'PATH=/usr/local/bin:/usr/bin:/bin').join('\n') + '\n' + cronLine;
+                    await fs.writeFile(cronFile, newContent);
+                } catch (cronErr) {
+                    console.error('[CRON] Failed to update cron file:', cronErr.message);
+                    // Task JSON is saved, cron file update failed — not fatal
                 }
 
-                const job = cron.schedule(input.cron_expression, async () => {
-                    console.log(`[CRON] Running scheduled task: ${input.name}`);
-                    await handleScheduledTask(input);
-                });
-
-                scheduledTasks.set(input.name, job);
+                scheduledTasks.set(input.name, true);
                 return { success: true, message: `Task '${input.name}' scheduled with cron: ${input.cron_expression}` };
+            }
+
+            case 'delete_task': {
+                const taskFile = path.join(WORKSPACE_PATH, 'tasks', `${input.name}.json`);
+                try { await fs.unlink(taskFile); } catch {}
+
+                // Remove from cron file
+                const cronFile = '/etc/cron.d/alex-tasks';
+                try {
+                    const existing = await fs.readFile(cronFile, 'utf-8');
+                    const lines = existing.split('\n');
+                    const filtered = [];
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i] === `# ${input.name}`) { i++; continue; }
+                        filtered.push(lines[i]);
+                    }
+                    await fs.writeFile(cronFile, filtered.join('\n'));
+                } catch {}
+
+                scheduledTasks.delete(input.name);
+                return { success: true, message: `Task '${input.name}' deleted` };
             }
 
             case 'generate_image': {
@@ -582,7 +745,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const imgFilename = `image_${Date.now()}.png`;
                 const outputPath = path.join(imagesDir, imgFilename);
                 await fs.writeFile(outputPath, Buffer.from(imgData, 'base64'));
-                return { success: true, path: outputPath, message: `Image generated: ${outputPath}`, revised_prompt: imgResponse.data[0].revised_prompt };
+                return { success: true, path: outputPath, message: `Image generated: ${outputPath}`, revised_prompt: imgResponse.data[0].revised_prompt, send_photo: true, caption: input.prompt.substring(0, 200) };
             }
 
             case 'generate_chart': {
@@ -596,21 +759,34 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const tmpScript = path.join(chartsDir, `_tmp_${Date.now()}.py`);
                 await fs.writeFile(tmpScript, fullScript);
 
+                let stdout = '';
                 try {
-                    const { stderr } = await execAsync(`python3 ${tmpScript}`, { timeout: 60000 });
-                    if (stderr) console.log('[CHART] stderr:', stderr.substring(0, 200));
+                    const result = await execAsync(`python3 ${tmpScript}`, { timeout: 60000 });
+                    stdout = result.stdout || '';
+                    if (result.stderr) console.log('[PYTHON] stderr:', result.stderr.substring(0, 200));
                 } finally {
                     await fs.unlink(tmpScript).catch(() => {});
                 }
 
-                // Verify the file was created
-                await fs.access(outputPath);
+                // Check if a visual was produced
+                let hasImage = false;
+                try { await fs.access(outputPath); hasImage = true; } catch {}
+
+                if (hasImage) {
+                    return {
+                        success: true,
+                        path: outputPath,
+                        caption: input.caption || '',
+                        message: `Output generated: ${outputPath}`,
+                        send_photo: true,
+                        printed_output: stdout.substring(0, 3000) || undefined
+                    };
+                }
+                // Text-only output (no image produced)
                 return {
                     success: true,
-                    path: outputPath,
-                    caption: input.caption || '',
-                    message: `Chart generated: ${outputPath}`,
-                    send_photo: true
+                    message: stdout.substring(0, 4000) || 'Script completed with no output.',
+                    printed_output: stdout.substring(0, 4000) || undefined
                 };
             }
 
@@ -624,6 +800,22 @@ export async function executeTool(name, input, { memory, skills, config, schedul
 
             case 'update_dashboard': {
                 return await postDashboard(input);
+            }
+
+            case 'send_file': {
+                const filePath = input.path;
+                await fs.access(filePath); // throws if not found
+                const ext = path.extname(filePath).toLowerCase();
+                const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+                const isImage = imageExts.includes(ext);
+                return {
+                    success: true,
+                    send_photo: isImage,
+                    send_document: !isImage,
+                    path: filePath,
+                    caption: input.caption || '',
+                    message: `File queued for sending: ${filePath}`
+                };
             }
 
             default:

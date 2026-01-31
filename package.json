@@ -1,7 +1,7 @@
 {
   "name": "alex",
   "version": "1.0.0",
-  "description": "ALEX - Global Economist at NAVADA VC, a full-featured AI agent",
+  "description": "ALEX - Global Economist at NAVADA, a full-featured AI agent",
   "main": "src/gateway.js",
   "type": "module",
   "bin": {
@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "node-cron": "^3.0.3",
     "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^6.9.0",
     "openai": "^4.104.0"
@@ -31,6 +30,6 @@
     "automation",
     "economist"
   ],
-  "author": "NAVADA VC",
+  "author": "NAVADA",
   "license": "MIT"
 }

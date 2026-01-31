@@ -66,7 +66,7 @@ async function main() {
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║                                                            ║');
     console.log('║            ALEX - Global Economist Setup                   ║');
-    console.log('║            NAVADA VC                                       ║');
+    console.log('║            NAVADA                                       ║');
     console.log('║                                                            ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('');
@@ -218,7 +218,7 @@ try {
 
     if (installService.toLowerCase() !== 'n') {
         const serviceContent = `[Unit]
-Description=ALEX - Global Economist at NAVADA VC
+Description=ALEX - Global Economist at NAVADA
 After=network-online.target
 Wants=network-online.target
 
