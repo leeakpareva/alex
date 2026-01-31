@@ -364,7 +364,7 @@ export const TOOLS = [
     },
     {
         name: "generate_chart",
-        description: "Run any Python script for data analysis, calculations, graphs, charts, visualisations, tables, or any computation. Has access to: numpy, pandas, matplotlib, seaborn, scipy, scikit-learn, requests, json, csv, datetime, math, statistics, os. If producing a visual output, save a PNG using plt.savefig(output_path, dpi=150, bbox_inches='tight') and it will be sent as a photo in Telegram. For text-only data output, use print() and it will be captured. Use this tool whenever you need to calculate, analyse data, produce graphs, run simulations, or do any Python work.",
+        description: "Run any Python script for data analysis, calculations, graphs, charts, visualisations, tables, or any computation. Has access to: numpy, pandas, matplotlib, seaborn, plotly, altair, scipy, scikit-learn, requests, json, csv, datetime, math, statistics, os. For matplotlib/seaborn: save PNG using plt.savefig(output_path, dpi=150, bbox_inches='tight'). For plotly: use fig.write_image(output_path). For altair: use chart.save(output_path). All produce images sent as photos in Telegram. For text-only data output, use print(). Use this tool whenever you need to calculate, analyse data, produce graphs, run simulations, or do any Python work.",
         input_schema: {
             type: "object",
             properties: {
