@@ -97,14 +97,34 @@ const DEEPSEEK_PATTERNS = [
     /\bdetailed (research|analysis)\b/i,
 ];
 
+// Explicit model override patterns — checked first, highest priority
+const EXPLICIT_OVERRIDES = [
+    { pattern: /\buse (openai|gpt|gpt-?4o?)\b/i, model: 'gpt-4o', label: 'gpt-4o (explicit)' },
+    { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
+    { pattern: /\buse (claude|sonnet)\b/i, model: 'claude-sonnet-4-20250514', label: 'claude-sonnet-4 (explicit)' },
+    { pattern: /\buse haiku\b/i, model: 'claude-3-5-haiku-20241022', label: 'claude-3.5-haiku (explicit)' },
+];
+
 function selectModel(userMessage) {
     const msg = (userMessage || '').trim();
+
+    // 1. Explicit user overrides — always respected
+    for (const { pattern, model, label } of EXPLICIT_OVERRIDES) {
+        if (pattern.test(msg)) {
+            console.log(`[MODEL] Selected ${label} for: "${msg.substring(0, 50)}"`);
+            return model;
+        }
+    }
+
+    // 2. DeepSeek patterns (deep research, thorough analysis, etc.)
     for (const pattern of DEEPSEEK_PATTERNS) {
         if (pattern.test(msg)) {
             console.log(`[MODEL] Selected deepseek-chat for: "${msg.substring(0, 50)}"`);
             return 'deepseek-chat';
         }
     }
+
+    // 3. Haiku for short simple messages
     if (msg.length < 80) {
         for (const pattern of HAIKU_PATTERNS) {
             if (pattern.test(msg)) {
@@ -113,12 +133,15 @@ function selectModel(userMessage) {
             }
         }
     }
+
+    // 4. Sonnet for complex tasks
     for (const pattern of SONNET_PATTERNS) {
         if (pattern.test(msg)) {
             console.log(`[MODEL] Selected claude-sonnet-4 for: "${msg.substring(0, 50)}"`);
             return 'claude-sonnet-4-20250514';
         }
     }
+
     return 'claude-sonnet-4-20250514';
 }
 
@@ -338,6 +361,11 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             openaiMessages.unshift({ role: 'system', content: typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt) });
         }
         console.log('[DEEPSEEK] Calling deepseek-chat...');
+        // Append instruction to prevent tool_use JSON in output
+        openaiMessages.push({
+            role: 'user',
+            content: 'IMPORTANT: Respond with plain text only. Do NOT output any JSON, tool_use blocks, or function calls. Write your research findings as readable prose.'
+        });
         const dsResponse = await deepseekClient.chat.completions.create({
             model: 'deepseek-chat',
             messages: openaiMessages,
@@ -534,7 +562,34 @@ ${contextBlock}
         // DeepSeek routing — text-only research, no tool loop
         if (model === 'deepseek-chat' && deepseekClient) {
             const dsResponse = await callDeepSeek(apiMessages, systemPrompt);
-            const text = dsResponse.content[0].text;
+            let text = dsResponse.content[0].text;
+            // DeepSeek sometimes emits raw JSON tool_use blocks as text — strip them
+            text = text.replace(/\{"type"\s*:\s*"tool_use"[\s\S]*?\}\s*\}?/g, '').trim();
+            text = text.replace(/```json\s*\{[\s\S]*?"tool_use"[\s\S]*?```/g, '').trim();
+            if (!text) text = 'I completed my research but the response was malformed. Please try rephrasing your request.';
+            allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
+            await memory.saveConversation(chatId, allMessages, summary);
+            return text;
+        }
+
+        // GPT-4o routing — text-only, no tool loop
+        if (model === 'gpt-4o' && openaiClient) {
+            console.log('[OPENAI] Calling gpt-4o (explicit request)...');
+            const openaiMessages = apiMessages.map(m => {
+                if (typeof m.content === 'string') return { role: m.role, content: m.content };
+                const textParts = (Array.isArray(m.content) ? m.content : []).filter(b => b.type === 'text').map(b => b.text);
+                return { role: m.role, content: textParts.join('\n') || JSON.stringify(m.content) };
+            });
+            openaiMessages.unshift({ role: 'system', content: typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt) });
+            const gptResponse = await openaiClient.chat.completions.create({
+                model: 'gpt-4o',
+                messages: openaiMessages,
+                max_tokens: 8192,
+            });
+            const text = gptResponse.choices?.[0]?.message?.content || '';
+            const usage = { input_tokens: gptResponse.usage?.prompt_tokens || 0, output_tokens: gptResponse.usage?.completion_tokens || 0 };
+            logTokenUsage('gpt-4o', usage);
+            console.log('[OPENAI] gpt-4o response received');
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;

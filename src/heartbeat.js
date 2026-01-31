@@ -162,5 +162,47 @@ This is the end-of-day summary — make it comprehensive but scannable.`
         }, deps);
     });
 
-    console.log('[HEARTBEAT] Scheduled: 8am briefing, 11am/4pm scans, 1pm research, 6pm summary, 9pm wrap-up (6 daily)');
+    // 10am — Morning check-in
+    cron.schedule('0 10 * * *', async () => {
+        console.log('[HEARTBEAT] Morning check-in');
+        const { bot, config } = deps;
+        if (config.telegram_owner_id) {
+            try {
+                await bot.sendMessage(config.telegram_owner_id,
+                    'Morning, Lee. Just checking in — anything you need me to look into or work on today? I\'m here and ready.');
+            } catch (err) {
+                console.error('[HEARTBEAT] Check-in failed:', err.message);
+            }
+        }
+    });
+
+    // 3pm — Afternoon check-in
+    cron.schedule('0 15 * * *', async () => {
+        console.log('[HEARTBEAT] Afternoon check-in');
+        const { bot, config } = deps;
+        if (config.telegram_owner_id) {
+            try {
+                await bot.sendMessage(config.telegram_owner_id,
+                    'Afternoon check-in. How\'s the day going? Let me know if there\'s anything you need — research, reports, emails, anything at all.');
+            } catch (err) {
+                console.error('[HEARTBEAT] Check-in failed:', err.message);
+            }
+        }
+    });
+
+    // 8pm — Evening check-in
+    cron.schedule('0 20 * * *', async () => {
+        console.log('[HEARTBEAT] Evening check-in');
+        const { bot, config } = deps;
+        if (config.telegram_owner_id) {
+            try {
+                await bot.sendMessage(config.telegram_owner_id,
+                    'Evening, Lee. Wrapping up for the day soon — anything else you need before I send the daily summary at 9pm?');
+            } catch (err) {
+                console.error('[HEARTBEAT] Check-in failed:', err.message);
+            }
+        }
+    });
+
+    console.log('[HEARTBEAT] Scheduled: 8am briefing, 10am/3pm/8pm check-ins, 11am/4pm scans, 1pm research, 6pm summary, 9pm wrap-up (9 daily)');
 }
