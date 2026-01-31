@@ -295,20 +295,20 @@ export const TOOLS = [
     },
     {
         name: "generate_pdf",
-        description: "Generate a styled PDF report. Provide structured data (title, subtitle, sections with headings/content/tables, footer). Returns the file path of the generated PDF.",
+        description: "Generate a professionally formatted PDF document. IMPORTANT formatting rules for the 'content' field: use \\n for line breaks between paragraphs, use • or - at the start of a line for bullet points (each on its own line), use **text** for bold. Break each major topic into its own section object with a heading. Never concatenate unrelated content into a single paragraph — use separate lines. Example content: \"Overview paragraph here.\\n\\n**Key Highlights:**\\n• First point with detail\\n• Second point with detail\\n\\nConclusion paragraph.\"",
         input_schema: {
             type: "object",
             properties: {
-                title: { type: "string", description: "Report title" },
-                subtitle: { type: "string", description: "Optional subtitle" },
+                title: { type: "string", description: "Document title" },
+                subtitle: { type: "string", description: "Optional subtitle (defaults to date)" },
                 sections: {
                     type: "array",
-                    description: "Array of sections, each with optional heading, content, and table",
+                    description: "Array of sections. Use MANY sections with clear headings rather than few dense ones. Each section has optional heading, content (with \\n line breaks, • bullets, **bold**), and table.",
                     items: {
                         type: "object",
                         properties: {
-                            heading: { type: "string" },
-                            content: { type: "string" },
+                            heading: { type: "string", description: "Section heading" },
+                            content: { type: "string", description: "Section content. Use \\n between lines. Start bullet lines with • or -. Use **bold** for emphasis. Each bullet point must be on its own line." },
                             table: {
                                 type: "object",
                                 properties: {
@@ -484,8 +484,15 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'read_file': {
+                const ext = path.extname(input.path).toLowerCase();
+                if (ext === '.pdf') {
+                    // Extract text from PDF instead of reading raw binary
+                    const { stdout } = await execAsync(`pdftotext "${input.path}" -`, { maxBuffer: 5 * 1024 * 1024, timeout: 15000 });
+                    const text = stdout.substring(0, 50000); // cap at 50k chars
+                    return { success: true, content: text, note: text.length >= 50000 ? 'Truncated to 50,000 characters' : undefined };
+                }
                 const content = await fs.readFile(input.path, 'utf-8');
-                return { success: true, content };
+                return { success: true, content: content.substring(0, 100000) };
             }
 
             case 'write_file': {
@@ -619,6 +626,8 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                             <a href="https://www.navada.space" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">navada.space</a>
                             <span style="font-size: 12px; color: #ccc;">&nbsp;&bull;&nbsp;</span>
                             <a href="https://www.raventerminal.xyz" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">raventerminal.xyz</a>
+                            <span style="font-size: 12px; color: #ccc;">&nbsp;&bull;&nbsp;</span>
+                            <a href="https://www.navadarobotics.com" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">navadarobotics.com</a>
                         </td></tr>
                     </table>`;
                     emailBody = `<div style="font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.7; color: #1a1a1a; max-width: 640px; margin: 0 auto; padding: 20px;">
@@ -683,7 +692,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
 
                 // Update system cron file for user tasks
                 const cronFile = '/etc/cron.d/alex-tasks';
-                const cronLine = `# ${input.name}\n${input.cron_expression}  head  curl -sf -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"${input.name}"}' >> /home/head/.alex/logs/cron.log 2>&1\n`;
+                const cronLine = `# ${input.name}\n${input.cron_expression}  head  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"${input.name}"}' >> /home/head/.alex/logs/cron.log 2>&1\n`;
                 try {
                     let existing = '';
                     try { existing = await fs.readFile(cronFile, 'utf-8'); } catch {}

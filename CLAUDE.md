@@ -98,3 +98,23 @@ Fire-and-forget POSTs to `http://127.0.0.1:8080/api/update`. Dashboard server is
 - **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, and last 8 messages verbatim.
 - **Queue priority**: User messages = priority 10, scheduled tasks = priority 1. Higher number = processed first.
 - **Email signature**: Uses publicly hosted images (freeimage.host) for Gmail compatibility. Both template and non-template paths must be updated when changing the signature.
+
+## Cron Job Reliability
+
+Scheduled tasks use system cron (`/etc/cron.d/alex` and `/etc/cron.d/alex-tasks`) calling ALEX's `/api/trigger` endpoint. Three layers of resilience ensure tasks don't get lost:
+
+### 1. Curl retry (immediate)
+All cron entries use `curl --retry 3 --retry-delay 30 --retry-connrefused`. If ALEX is briefly restarting, curl retries 3 times at 30-second intervals (~90s window).
+
+### 2. Startup catch-up (on recovery)
+`catchUpMissedTasks()` in gateway.js runs on startup. It compares the current time against `~/.alex/logs/.last-alive` (written every 60s while running). Any built-in heartbeat tasks whose scheduled hour falls in the gap are automatically fired with 5s stagger.
+
+### 3. systemd restart (service level)
+The `alex.service` unit has `Restart=always` and `RestartSec=5`, so Node crashes auto-recover within seconds.
+
+### Operational notes
+- Cron logs: `~/.alex/logs/cron.log`
+- Alive marker: `~/.alex/logs/.last-alive`
+- To manually fire a missed task: `curl -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"task-name"}'`
+- After editing cron files in `cron/`, copy to `/etc/cron.d/`: `sudo cp cron/alex /etc/cron.d/alex && sudo cp cron/alex-tasks /etc/cron.d/alex-tasks`
+- Cron files MUST have a trailing newline and be owned by root (`sudo chown root:root /etc/cron.d/alex*`)

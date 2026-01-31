@@ -721,6 +721,83 @@ function setupControlAPI() {
 }
 
 // ============================================================================
+// MISSED TASK CATCH-UP — fires tasks that were missed during downtime
+// ============================================================================
+
+async function catchUpMissedTasks() {
+    try {
+        const markerFile = path.join(WORKSPACE_PATH, 'logs', '.last-alive');
+        let lastAlive = null;
+        try {
+            const raw = await readFile(markerFile, 'utf-8');
+            lastAlive = new Date(raw.trim());
+        } catch {
+            // No marker — first run or marker deleted, skip catch-up
+        }
+
+        // Update marker to now
+        const logDir = path.join(WORKSPACE_PATH, 'logs');
+        await mkdir(logDir, { recursive: true });
+        await writeFile(markerFile, new Date().toISOString());
+
+        if (!lastAlive || isNaN(lastAlive.getTime())) {
+            console.log('[CATCHUP] No previous marker — skipping catch-up');
+            return;
+        }
+
+        const now = new Date();
+        const downMinutes = (now - lastAlive) / 60000;
+        if (downMinutes < 3) {
+            console.log('[CATCHUP] Downtime < 3 min — no catch-up needed');
+            return;
+        }
+
+        console.log(`[CATCHUP] ALEX was down for ~${Math.round(downMinutes)} min. Checking for missed tasks...`);
+
+        // Built-in task schedule (hour, days: 0=Sun..6=Sat, '*'=all)
+        const schedule = [
+            { task: 'morning-briefing',   hour: 8,  days: '*' },
+            { task: 'midmorning-checkin',  hour: 11, days: '*' },
+            { task: 'midday-research',     hour: 13, days: '*' },
+            { task: 'afternoon-checkin',   hour: 16, days: '*' },
+            { task: 'evening-summary',     hour: 18, days: '*' },
+            { task: 'weekly-self-review',  hour: 22, days: [0] },
+        ];
+
+        const missed = [];
+        for (const s of schedule) {
+            // Check if the scheduled hour falls between lastAlive and now
+            const scheduledToday = new Date(now);
+            scheduledToday.setHours(s.hour, 0, 0, 0);
+
+            if (scheduledToday > lastAlive && scheduledToday <= now) {
+                const dayOk = s.days === '*' || s.days.includes(now.getDay());
+                if (dayOk) missed.push(s.task);
+            }
+        }
+
+        if (missed.length === 0) {
+            console.log('[CATCHUP] No tasks missed during downtime');
+            return;
+        }
+
+        console.log(`[CATCHUP] Firing ${missed.length} missed task(s): ${missed.join(', ')}`);
+        for (const taskName of missed) {
+            const taskDef = BUILTIN_TASKS.get(taskName);
+            if (taskDef) {
+                handleScheduledTask(taskDef, heartbeatDeps()).catch(err => {
+                    console.error(`[CATCHUP] ${taskName} failed:`, err.message);
+                });
+                // Stagger by 5s to avoid flooding the API
+                await new Promise(r => setTimeout(r, 5000));
+            }
+        }
+    } catch (err) {
+        console.error('[CATCHUP] Error:', err.message);
+    }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -783,6 +860,9 @@ async function init() {
     // Setup Control API on port 9090
     setupControlAPI();
 
+    // Check for missed scheduled tasks during downtime
+    await catchUpMissedTasks();
+
     // Notify dashboard that ALEX is online
     postDashboard('set_status', { status: 'online' });
     postDashboard('add_activity', { entry: 'ALEX started and online' });
@@ -791,6 +871,13 @@ async function init() {
         { name: 'Dashboard Server', port: '8080', status: 'online' },
         { name: 'Telegram Bot', port: 'polling', status: 'online' },
     ]});
+
+    // Write alive marker every 60s so catch-up knows when we were last running
+    setInterval(async () => {
+        try {
+            await writeFile(path.join(WORKSPACE_PATH, 'logs', '.last-alive'), new Date().toISOString());
+        } catch {}
+    }, 60000);
 
     console.log('');
     console.log('ALEX is now online and ready!');
