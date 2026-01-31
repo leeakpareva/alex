@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import TelegramBot from 'node-telegram-bot-api';
 import cron from 'node-cron';
 import os from 'os';
+import path from 'path';
+import http from 'http';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -88,6 +90,18 @@ async function auditLog(entry) {
     } catch (err) {
         console.error('[AUDIT] Log error:', err.message);
     }
+}
+
+async function postDashboard(action, payload) {
+    const body = JSON.stringify({ action, ...payload });
+    return new Promise((resolve) => {
+        const req = http.request({
+            hostname: '127.0.0.1', port: 8080, path: '/api/update',
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        }, (res) => { res.resume(); resolve(); });
+        req.on('error', () => resolve());
+        req.end(body);
+    });
 }
 
 // ============================================================================
@@ -288,6 +302,7 @@ Just message me naturally - I'm here to help!`;
                 chat_id: chatId,
                 message: userMessage,
             });
+            postDashboard('add_activity', { entry: `${msg.from.first_name}: ${userMessage.substring(0, 120)}` });
 
             // Natural acknowledgement
             const acks = ['On it.', 'Give me a moment.', 'Looking into it.', 'One sec.'];
@@ -314,6 +329,7 @@ Just message me naturally - I'm here to help!`;
                 response: response.substring(0, 5000),
                 response_length: response.length,
             });
+            postDashboard('add_activity', { entry: `Alex responded to ${msg.from.first_name} (${response.length} chars)` });
 
             // Send any generated charts as photos
             const charts = pendingCharts.splice(0);
