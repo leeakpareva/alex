@@ -295,7 +295,7 @@ export const TOOLS = [
     },
     {
         name: "generate_pdf",
-        description: "Generate a professionally formatted PDF document. IMPORTANT formatting rules for the 'content' field: use \\n for line breaks between paragraphs, use • or - at the start of a line for bullet points (each on its own line), use **text** for bold. Break each major topic into its own section object with a heading. Never concatenate unrelated content into a single paragraph — use separate lines. Example content: \"Overview paragraph here.\\n\\n**Key Highlights:**\\n• First point with detail\\n• Second point with detail\\n\\nConclusion paragraph.\"",
+        description: "Generate a professionally formatted PDF document. IMPORTANT formatting rules for the 'content' field: use \\n for line breaks between paragraphs, use • or - at the start of a line for bullet points (each on its own line). Do NOT use ** or any markdown bold — write naturally clean text. Break each major topic into its own section object with a heading. Never concatenate unrelated content into a single paragraph — use separate lines. Example content: \"Overview paragraph here.\\n\\nKey Highlights:\\n• First point with detail\\n• Second point with detail\\n\\nConclusion paragraph.\"",
         input_schema: {
             type: "object",
             properties: {
@@ -308,7 +308,7 @@ export const TOOLS = [
                         type: "object",
                         properties: {
                             heading: { type: "string", description: "Section heading" },
-                            content: { type: "string", description: "Section content. Use \\n between lines. Start bullet lines with • or -. Use **bold** for emphasis. Each bullet point must be on its own line." },
+                            content: { type: "string", description: "Section content. Use \\n between lines. Start bullet lines with • or -. No markdown formatting — write clean natural text. Each bullet point must be on its own line." },
                             table: {
                                 type: "object",
                                 properties: {
@@ -461,6 +461,17 @@ export const TOOLS = [
             },
             required: ["path"]
         }
+    },
+    {
+        name: "send_voice_message",
+        description: "Convert text to speech and send as a Telegram voice message. Use when user asks to 'talk to me', wants a voice response, or asks for audio.",
+        input_schema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "The text to convert to speech" }
+            },
+            required: ["text"]
+        }
     }
 ];
 
@@ -468,7 +479,7 @@ export const TOOLS = [
 // TOOL EXECUTION
 // ============================================================================
 
-export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient }) {
+export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot }) {
     console.log(`[TOOL] Executing: ${name}`, JSON.stringify(input).substring(0, 200));
 
     try {
@@ -825,6 +836,20 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     caption: input.caption || '',
                     message: `File queued for sending: ${filePath}`
                 };
+            }
+
+            case 'send_voice_message': {
+                if (!openaiClient) return { success: false, error: 'OpenAI not configured' };
+                const speech = await openaiClient.audio.speech.create({
+                    model: 'tts-1',
+                    voice: 'onyx',
+                    input: input.text,
+                    response_format: 'opus',
+                });
+                const buffer = Buffer.from(await speech.arrayBuffer());
+                const voicePath = path.join(WORKSPACE_PATH, `voice_${Date.now()}.ogg`);
+                await fs.writeFile(voicePath, buffer);
+                return { success: true, path: voicePath, send_voice: true, message: 'Voice message generated' };
             }
 
             default:

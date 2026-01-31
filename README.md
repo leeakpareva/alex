@@ -1,451 +1,423 @@
-# ALEX - Global Economist at NAVADA
+# NAVADA AI Agent Framework
 
-A full-featured AI agent that runs 24/7 on your Raspberry Pi, serving as the Global Economist for NAVADA.
+A production-ready autonomous AI agent that runs 24/7 on a Raspberry Pi 5. Originally built as **ALEX**, the Global Economist at NAVADA — but designed to be cloned and re-personalised into any AI agent role.
 
 ## What It Does
 
-ALEX is your AI economist colleague that can:
+Your agent operates via Telegram as a persistent AI colleague that can:
 
 | Capability | Description |
 |------------|-------------|
-| **Research** | Web search, market analysis, startup due diligence |
-| **System Access** | Full terminal access, file management, code execution |
-| **Memory** | Remembers everything across all conversations (500 messages on disk, last 20 sent to API) |
-| **Email** | Draft and send emails with auto-CC to lee@navada.info and file attachment support |
-| **PDF Reports** | Generate styled PDF reports with tables, sections, and headings (via reportlab) |
-| **Scheduling** | Create tasks, reminders, recurring jobs |
-| **Skills** | Extensible plugin system, can create its own tools |
-| **Proactive** | Morning briefings, research updates, evening summaries (5 daily heartbeats) |
-| **Smart Routing** | Uses Haiku for simple queries, Sonnet for complex tasks — 80% cheaper on greetings |
-| **RAG** | ChromaDB vector search over knowledge base and skills for relevant context retrieval |
-| **Token Logging** | Per-call token tracking with `/tokens` command for daily usage stats |
+| **Research** | Web search, market analysis, data gathering |
+| **System Access** | Full terminal, file management, code execution |
+| **Memory** | Persistent memory across all conversations with rolling summaries |
+| **Email** | Draft and send HTML emails with attachments via Gmail |
+| **PDF Reports** | Styled PDF reports with tables, charts, and branding (via reportlab) |
+| **Voice** | Receive voice notes (Whisper transcription) and send voice responses (TTS) |
+| **Charts** | Generate interactive charts and visualisations (via Plotly) |
+| **Scheduling** | Cron-based tasks, reminders, recurring jobs |
+| **Skills** | Extensible plugin system — agent can create its own tools |
+| **Proactive** | Morning briefings, research updates, evening summaries (8 daily heartbeats) |
+| **Smart Routing** | Haiku for simple queries, Sonnet for complex tasks, DeepSeek for deep research |
+| **RAG** | ChromaDB vector search over knowledge base for relevant context |
+| **Dashboard** | Live dashboard deployed on Vercel with real-time metrics |
+| **Token Logging** | Per-call token tracking with daily usage stats and cost breakdown |
+| **File Understanding** | Accepts photos, PDFs, and documents via Telegram with multimodal analysis |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      ALEX Gateway                        │
-├──────────┬──────────┬──────────┬──────────┬─────────────┤
-│ Telegram │  Memory  │  Skills  │   Cron   │   Request   │
-│   Bot    │  System  │  System  │ Scheduler│    Queue    │
-├──────────┴──────────┴──────────┴──────────┴─────────────┤
-│              Claude API (Sonnet 4 / Haiku 4)            │
-│           Web Search + Tools + Model Selection          │
-├──────────────────────┬──────────────────────────────────┤
-│   ChromaDB (RAG)     │   reportlab (PDF Generation)    │
-├──────────────────────┴──────────────────────────────────┤
-│                   Raspberry Pi 5                         │
-│        (Full system access: bash, files, network)       │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        Agent Gateway                         │
+│                      (src/gateway.js)                        │
+├──────────┬──────────┬──────────┬──────────┬────────────────┤
+│ Telegram │  Memory  │  Skills  │  System  │    Request     │
+│   Bot    │  System  │  System  │   Cron   │     Queue      │
+├──────────┴──────────┴──────────┴──────────┴────────────────┤
+│         Claude API (Sonnet 4 / Haiku 3.5 / DeepSeek)       │
+│        OpenAI (Whisper STT / TTS) + Web Search + Tools     │
+├────────────────────┬───────────────────────────────────────┤
+│  ChromaDB (RAG)    │  reportlab (PDF) + Plotly (Charts)    │
+├────────────────────┴───────────────────────────────────────┤
+│                    Raspberry Pi 5 (8GB)                      │
+│         24/7 systemd service + system cron scheduling       │
+├─────────────────────────────────────────────────────────────┤
+│    Dashboard: Local Python server → Vercel + Upstash Redis  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Token Optimization Pipeline
+### Message Flow
 
 ```
-User message
-    │
-    ├─► selectModel() ─── simple greeting? → Haiku ($0.0015)
-    │                 ─── complex task?    → Sonnet ($0.096)
-    │
-    ├─► buildSystemPrompt(userQuery)
-    │       ├── Identity + User memory (always included)
-    │       ├── RAG query → top 3 relevant chunks (not full knowledge dump)
-    │       └── Skill names only (not full SKILL.md content)
-    │
-    ├─► Conversation: send last 20 messages (not all 500)
-    │
-    ├─► RequestQueue: 1s min between calls, 60s cooldown on 429
-    │       └── User priority 10, background tasks priority 1
-    │
-    └─► System prompt cached per request (not rebuilt per tool call)
-
-Result: ~32k input tokens → ~5-8k per call
+Telegram message → gateway.js (dedup + auth)
+  → downloads photos/docs/voice as content blocks
+  → voice notes: saved to ~/.alex/voice/ + Whisper transcription
+  → chat.js chat() → selectModel() routes to Haiku/Sonnet/DeepSeek/GPT-4o
+  → buildSystemPrompt() includes identity, memory, RAG context
+  → prepareMessages() summarizes old messages, keeps last 8 verbatim
+  → callAnthropicQueued() via queue.js (priority queue with circuit breaker)
+  → processResponse() loops on tool_use blocks
+    → tools.js executeTool() with dependency injection
+  → smartSplit() response at paragraph boundaries → send via Telegram
 ```
 
-## Quick Start
+### Model Routing
 
-### Prerequisites
+| Trigger | Model | Approx Cost/Call |
+|---------|-------|-----------------|
+| Greetings, status checks, short messages (<80 chars) | Haiku 3.5 | ~$0.002 |
+| Research, analysis, reports, emails, tools | Sonnet 4 | ~$0.10 |
+| "use deepseek", deep research, thorough analysis | DeepSeek | ~$0.001 |
+| "use gpt", explicit GPT request | GPT-4o | ~$0.05 |
 
-- Raspberry Pi 5 (8GB RAM recommended)
-- Node.js 22+
-- Python 3.13+ with reportlab (`pip3 install reportlab`)
-- ChromaDB (`pip3 install --break-system-packages chromadb`)
-- Anthropic API key
-- Telegram account
+### Source Modules
 
-### Installation
+| Module | Purpose |
+|--------|---------|
+| `src/gateway.js` | Entry point. Telegram bot, control API (port 9090), tool execution with dependency injection, startup catch-up for missed cron tasks |
+| `src/chat.js` | Chat system factory. Model selection, token logging, conversation summarisation, API calls with retry |
+| `src/tools.js` | Tool definitions array + `executeTool()` switch. All tools receive deps via object destructuring |
+| `src/heartbeat.js` | Built-in task definitions map, scheduled task execution through AI, dashboard sync, cleanup |
+| `src/memory.js` | `MemorySystem` class. Conversations, categories, identity, user info, rolling summaries |
+| `src/skills.js` | `SkillsSystem` class. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
+| `src/config.js` | Config loader. Workspace paths, allowed write/attachment paths, path validation |
+| `src/queue.js` | Priority request queue with circuit breaker, rate limiting, cooldown on 429s |
+
+---
+
+## Cloning This Agent (Creating a New AI)
+
+This framework is designed for reuse. To create a new AI agent with a different personality and role:
+
+### Step 1: Clone the Repository
 
 ```bash
-# Clone the repository
-cd ~/navada-1
-
-# Install Node dependencies
+git clone https://github.com/YOUR_USER/navada-1.git ~/my-agent
+cd ~/my-agent
 npm install
-
-# Install Python dependencies
-pip3 install --break-system-packages reportlab chromadb
-
-# Run setup wizard
-npm run setup
 ```
 
-The setup wizard will guide you through:
-1. Anthropic API key configuration
-2. Telegram bot creation
-3. Gmail setup for sending emails
-4. System service installation
+### Step 2: Install Python Dependencies
 
-### Manual Configuration
+```bash
+pip3 install --break-system-packages reportlab chromadb plotly kaleido
+```
 
-If you prefer manual setup, create `~/.alex/config.json`:
+### Step 3: Create the Workspace
+
+```bash
+mkdir -p ~/.alex/{memory,conversations,skills,tasks,reports,research,data,logs,charts,images,uploads,voice,templates}
+chmod 700 ~/.alex
+```
+
+### Step 4: Create Config (`~/.alex/config.json`)
 
 ```json
 {
   "anthropic_api_key": "sk-ant-...",
-  "telegram_bot_token": "123456789:ABC...",
-  "telegram_owner_id": 123456789,
-  "telegram_authorized_users": [123456789],
+  "telegram_bot_token": "BOT_TOKEN_FROM_BOTFATHER",
+  "telegram_owner_id": YOUR_TELEGRAM_USER_ID,
+  "telegram_authorized_users": [YOUR_TELEGRAM_USER_ID],
   "telegram_notify_tasks": true,
   "gmail_address": "your.email@gmail.com",
   "gmail_app_password": "xxxx xxxx xxxx xxxx",
-  "recipient_email": "lee@navada.info"
+  "recipient_email": "default@recipient.com",
+  "openai_api_key": "sk-..."
 }
 ```
 
-## Usage
+Set permissions: `chmod 600 ~/.alex/config.json`
 
-### Telegram Commands
+**How to get each key:**
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message and overview |
-| `/status` | System status (uptime, temp, memory) |
-| `/memory` | View memory summary |
-| `/skills` | List available skills |
-| `/tasks` | List scheduled tasks |
-| `/tokens` | Daily token usage stats (by model) |
-| `/clear` | Clear conversation history |
-| `/help` | Show help message |
+| Key | Where to Get It |
+|-----|----------------|
+| `anthropic_api_key` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| `telegram_bot_token` | Telegram → @BotFather → /newbot |
+| `telegram_owner_id` | Telegram → @userinfobot → send any message |
+| `gmail_app_password` | Google Account → Security → 2FA → App Passwords |
+| `openai_api_key` | [platform.openai.com](https://platform.openai.com) → API Keys (for voice/TTS) |
 
-### Natural Language
+### Step 5: Define the Agent's Identity (`~/.alex/IDENTITY.md`)
 
-Just message ALEX naturally:
+This is the file that defines **who** your agent is. Change this to create a completely different AI:
 
-- "Research the latest AI funding rounds in Africa"
-- "Create a PDF report on Nigerian fintech startups"
-- "Generate a report and email it to investor@example.com"
-- "Schedule a daily research task for 9am"
-- "Remember that our next board meeting is Feb 15"
-- "Draft an email to potential LP about our fund"
-- "What do you remember about Project Alpha?"
+```markdown
+# Agent Name
 
-### CLI Commands
+You are [NAME], [ROLE] at [COMPANY].
+
+## Personality
+- [trait 1]
+- [trait 2]
+
+## Responsibilities
+- [what the agent does]
+
+## Communication Style
+- [how it talks]
+```
+
+Example for ALEX:
+```markdown
+# ALEX
+
+You are ALEX, the Global Economist at NAVADA.
+You provide economic research, market analysis, and strategic intelligence.
+```
+
+Example for a different agent:
+```markdown
+# MAYA
+
+You are MAYA, the Head of Engineering at Acme Corp.
+You review code, manage deployments, and mentor the dev team.
+```
+
+### Step 6: Define User Info (`~/.alex/USER.md`)
+
+```markdown
+# User
+
+- Name: [Your Name]
+- Role: [Your Role]
+- Preferences: [communication preferences]
+```
+
+### Step 7: Install the systemd Service
 
 ```bash
-alex start       # Start in foreground
-alex status      # Check service status
-alex restart     # Restart service
-alex stop        # Stop service
-alex logs        # View logs
-alex logs -f     # Follow logs
-alex config      # Show configuration
-alex memory      # List memory categories
-alex skills      # List installed skills
-alex tasks       # List scheduled tasks
+# Edit the service file to match your paths if needed
+sudo cp navada-1.service /etc/systemd/system/alex.service
+sudo systemctl daemon-reload
+sudo systemctl enable alex
+sudo systemctl start alex
 ```
 
-## Features
+The service file (`navada-1.service`):
+- Runs as your user
+- Auto-restarts on crash (`Restart=always`, `RestartSec=10`)
+- Memory cap: 1GB, CPU cap: 80%
+- Logs to `~/.alex/logs/gateway.log`
 
-### Email System
+### Step 8: Install Cron Jobs
 
-All emails are automatically CC'd to `lee@navada.info`. Emails support file attachments — use with `generate_pdf` to create and email reports in one workflow.
-
-### PDF Report Generation
-
-ALEX can generate styled PDF reports using the `generate_pdf` tool:
-
-- Professional styling with NAVADA branding
-- Sections with headings, paragraph content, and data tables
-- Alternating row colors, styled headers
-- Custom title, subtitle, and footer
-- Output saved to `~/.alex/reports/`
-
-**Workflow:** Ask ALEX to generate a report and email it:
-```
-"Create a PDF report on Q1 AI funding trends and email it to investor@example.com"
-```
-ALEX will: generate PDF → get file path → send email with attachment + auto-CC.
-
-**Script:** `~/.alex/scripts/generate_pdf.py` (uses reportlab)
-
-### Smart Model Selection
-
-ALEX automatically routes requests to the cheapest appropriate model:
-
-| Pattern | Model | Cost |
-|---------|-------|------|
-| Greetings, status checks, simple replies | Haiku 4 | ~$0.0015/call |
-| Research, analysis, reports, strategy | Sonnet 4 | ~$0.096/call |
-
-### RAG Context Retrieval (ChromaDB)
-
-Instead of stuffing the entire knowledge base and all skill definitions into every prompt, ALEX uses vector search:
-
-1. On startup, indexes all knowledge, skills, identity, and user memory into ChromaDB
-2. On each user message, queries for the top 3 most relevant chunks
-3. Only those chunks are included in the system prompt
-4. Falls back to truncated knowledge (2000 chars) + skill names if RAG is unavailable
-5. Auto-reindexes when knowledge or skills change
-
-**Script:** `~/.alex/scripts/rag_manager.py`
-
-### Request Queue
-
-All API calls go through a priority queue:
-
-- **User messages:** Priority 10 (never blocked by background tasks)
-- **Heartbeats/scheduled tasks:** Priority 1
-- **Rate limit handling:** On 429, enters 60s cooldown — requests queue silently and retry
-- **Minimum interval:** 1s between API calls
-
-### Token Usage Logging
-
-Every API call is logged to `~/.alex/logs/tokens_YYYY-MM-DD.jsonl`:
-
-```json
-{"timestamp":"2026-01-30T19:00:00.000Z","model":"claude-sonnet-4-20250514","input_tokens":5200,"output_tokens":800}
+```bash
+# Copy built-in heartbeat schedule
+sudo cp cron/alex /etc/cron.d/alex
+sudo cp cron/alex-tasks /etc/cron.d/alex-tasks
+sudo chown root:root /etc/cron.d/alex*
 ```
 
-Use `/tokens` in Telegram to see daily stats broken down by model.
+Cron files **must** have a trailing newline and be owned by root.
 
-### Memory System
-
-ALEX maintains persistent memory across all conversations:
-
-- **User Memory** (`~/.alex/USER.md`) - Information about you
-- **Knowledge Base** (`~/.alex/KNOWLEDGE.md`) - Learned facts (auto-trimmed at 10,000 lines)
-- **Category Memory** (`~/.alex/memory/*.md`) - Organized by topic
-- **Conversations** (`~/.alex/conversations/*.json`) - Chat history (500 messages stored, last 20 sent to API)
-
-Ask ALEX to remember things:
-- "Remember that I prefer concise reports"
-- "Save this research to the Africa category"
-- "What do you know about my investment preferences?"
-
-### Skills System
-
-Skills extend ALEX's capabilities. Built-in skills:
-
-| Skill | Purpose |
-|-------|---------|
-| `economic-research` | Market and economic analysis |
-| `web-browsing` | Web research and data gathering |
-| `file-management` | File operations and organization |
-| `code-execution` | Running scripts and automation |
-| `email-drafting` | Professional email composition |
-| `calendar-management` | Scheduling and reminders |
-| `startup-analysis` | Due diligence framework |
-
-Create custom skills:
-```
-"Create a skill for analyzing pitch decks"
-```
-
-Skills are stored in `~/.alex/skills/<name>/SKILL.md`
-
-### Scheduled Tasks & Heartbeats
-
-ALEX runs 5 proactive daily tasks:
+Built-in schedule:
 
 | Time | Task | Description |
 |------|------|-------------|
-| 8:00 AM | Morning briefing | Overnight developments, market movements, today's agenda |
-| 11:00 AM | Proactive scan | Breaking news check (notify only if noteworthy) |
-| 1:00 PM | Midday research | AI/robotics funding, African tech, economic indicators |
-| 4:00 PM | Proactive scan | Afternoon breaking news check |
-| 6:00 PM | Evening summary | Day recap, action items, strategic reflection |
+| 3:00 AM | `cleanup` | Conversation memory pruning |
+| 8:00 AM | `morning-briefing` | Overnight developments, agenda |
+| 11:00 AM | `midmorning-checkin` | Proactive news scan |
+| 1:00 PM | `midday-research` | Deep research session |
+| 4:00 PM | `afternoon-checkin` | Afternoon news scan |
+| 6:00 PM | `evening-summary` | Day recap, action items |
+| Hourly | `dashboard-sync` | Metrics push to dashboard |
+| Sun 10 PM | `weekly-self-review` | Weekly reflection |
 
-**Custom Tasks:**
+Edit `cron/alex` to change the schedule, or ask the agent to create tasks via `schedule_task`.
+
+### Step 9: Verify
+
+```bash
+sudo systemctl status alex          # Should show active (running)
+journalctl -u alex -f               # Watch live logs
+curl http://127.0.0.1:9090/api/users # Should return JSON
 ```
-"Schedule a daily task at 10am to check for new AI funding announcements"
-"Create a weekly task on Mondays to summarize African tech news"
+
+Send a message to your bot on Telegram — it should respond.
+
+---
+
+## Control API (Port 9090)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/command` | POST | Run a message through the chat system |
+| `/api/send` | POST | Send a direct Telegram message to a user |
+| `/api/trigger` | POST | Trigger a scheduled task by name |
+| `/api/users` | GET | List known Telegram users |
+| `/api/broadcast` | POST | Message all known users |
+
+Examples:
+```bash
+# Trigger a task manually
+curl -X POST http://127.0.0.1:9090/api/trigger \
+  -H 'Content-Type: application/json' \
+  -d '{"task":"morning-briefing"}'
+
+# Send a message to a user
+curl -X POST http://127.0.0.1:9090/api/send \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":"123456789","message":"Hello from the API"}'
 ```
 
-Tasks are stored in `~/.alex/tasks/*.json`
+## Telegram Commands
 
-### Tool Access
+| Command | Description |
+|---------|-------------|
+| `/start` | Welcome message |
+| `/status` | System status (uptime, temp, memory, disk) |
+| `/memory` | View memory summary |
+| `/skills` | List available skills |
+| `/tasks` | List scheduled tasks |
+| `/tokens` | Daily token usage stats by model |
+| `/clear` | Clear conversation history |
+| `/help` | Show help |
 
-ALEX has full access to:
+## Dashboard
 
-| Tool | Capabilities |
-|------|--------------|
-| `bash` | Execute any shell command |
-| `read_file` | Read file contents |
-| `write_file` | Create/modify files |
-| `list_directory` | Browse filesystem |
-| `web_search` | Search the internet |
-| `memory_save` | Store information |
-| `memory_recall` | Retrieve information |
-| `send_email` | Send emails via Gmail (auto-CC lee@navada.info, supports attachments) |
-| `generate_pdf` | Create styled PDF reports with tables and sections |
-| `schedule_task` | Create scheduled jobs |
-| `create_skill` | Build new capabilities |
+The agent includes a live dashboard system with two components:
 
-## Directory Structure
+### Local Dashboard Server
+A Python server (`/home/head/clawd/dashboard/server.py`) on port 8080 that:
+- Receives real-time updates from the agent (tasks, activity, news, metrics)
+- Calculates token costs by model
+- Tracks git commits
+- Stores data in `dashboard_data.json`
+
+### Vercel Dashboard
+A serverless frontend (`/home/head/clawd/dashboard-vercel/`) deployed on Vercel:
+- Static HTML dashboard fetching data from Upstash Redis
+- API routes: `/api/data`, `/api/tokens`, `/api/commits`, `/api/push`
+- Auto-refreshes every 15 seconds
+- `push_to_vercel.sh` syncs local data to Vercel every 30 seconds via cron
+
+To set up the Vercel dashboard for a clone:
+1. Deploy `dashboard-vercel/` to Vercel
+2. Create an Upstash Redis database and add env vars (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `PUSH_SECRET`)
+3. Update `push_to_vercel.sh` with your Vercel URL and secret
+4. Add cron entry: `* * * * * /path/to/push_to_vercel.sh`
+
+## Workspace Layout
 
 ```
 ~/.alex/
-├── config.json           # Configuration (API keys, etc.)
-├── IDENTITY.md           # ALEX's identity and personality
-├── USER.md               # Information about you
-├── KNOWLEDGE.md          # Learned knowledge base (auto-trimmed)
-├── chromadb/             # ChromaDB vector store for RAG
-├── memory/               # Categorized memories
-│   ├── user.md
-│   ├── projects.md
-│   ├── research.md
-│   └── tasks.md
-├── conversations/        # Chat history by ID
-├── skills/               # Installed skills
-│   ├── economic-research/
-│   ├── startup-analysis/
-│   └── ...
-├── tasks/                # Scheduled task definitions
-├── scripts/              # Utility scripts
-│   ├── generate_pdf.py   # PDF report generator (reportlab)
-│   └── rag_manager.py    # ChromaDB index/query manager
-├── reports/              # Generated PDF reports
-├── research/             # Research outputs
-├── data/                 # Data files
-└── logs/                 # Application logs
-    ├── gateway.log       # Main application log
-    └── tokens_*.jsonl    # Daily token usage logs
+├── config.json          # API keys (chmod 600)
+├── IDENTITY.md          # Agent personality and role definition
+├── USER.md              # User information
+├── KNOWLEDGE.md         # Accumulated knowledge (auto-trimmed at 10,000 lines)
+├── conversations/       # Per-chat JSON with messages + rolling summaries
+├── memory/              # Categorized memory (user.md, projects.md, research.md, tasks.md)
+├── skills/              # Skill plugins (SKILL.md per skill)
+├── tasks/               # Scheduled task JSON definitions
+├── templates/           # Email templates (signature.html, daily-summary.html)
+├── uploads/             # Files received via Taildrop
+├── voice/               # Saved voice notes (.ogg) + transcriptions (.txt)
+├── reports/             # Generated PDF reports
+├── charts/              # Generated Plotly charts
+├── images/              # Generated images (DALL-E)
+├── chromadb/            # RAG vector store
+├── scripts/             # Utility scripts (generate_pdf.py, rag_manager.py)
+├── research/            # Research outputs
+├── data/                # Data files
+└── logs/
+    ├── gateway.log      # Main application log
+    ├── tokens_*.jsonl   # Daily token usage (one file per day)
+    ├── cron.log         # Cron job execution log
+    └── .last-alive      # Heartbeat marker for missed-task catch-up
 ```
 
-## Performance
+## Tools Available to the Agent
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Input tokens/call | ~32,000 | ~5,000-8,000 |
-| API calls/day (heartbeats) | ~13 | 5 |
-| Rate limit UX | Error messages shown | Queued + retried silently |
-| Simple query cost | $0.096 (Sonnet) | $0.0015 (Haiku) |
-| Email CC | None | Always lee@navada.info |
-| PDF reports | Not possible | Full support + email attachment |
+| Tool | Description |
+|------|-------------|
+| `bash` | Execute any shell command |
+| `read_file` / `write_file` | Read and write files |
+| `list_directory` | Browse filesystem |
+| `web_search` | Search the internet |
+| `memory_save` / `memory_recall` | Store and retrieve memories |
+| `send_email` | Send emails via Gmail with attachments |
+| `generate_pdf` | Create styled PDF reports |
+| `generate_chart` | Create Plotly charts and visualisations |
+| `generate_image` | Create images via DALL-E |
+| `send_voice_message` | Text-to-speech voice notes via OpenAI TTS |
+| `schedule_task` | Create cron-based scheduled jobs |
+| `create_skill` | Build new agent capabilities |
+| `update_dashboard` | Push updates to the live dashboard |
 
-## Service Management
+## Cron Resilience
 
-ALEX runs as a systemd service:
+Three layers ensure scheduled tasks never get lost:
+
+1. **Curl retry** — All cron entries use `curl --retry 3 --retry-delay 30 --retry-connrefused` (~90s retry window)
+2. **Startup catch-up** — `catchUpMissedTasks()` runs on boot, checks `.last-alive` marker, fires any tasks whose scheduled hour was missed during downtime
+3. **systemd restart** — `Restart=always` with `RestartSec=10` auto-recovers from crashes
+
+## Key Design Patterns
+
+- **Dependency injection**: `executeTool()` receives all deps as a single object — never imports globals. When adding tools, add deps to `execToolWithDeps()` in gateway.js
+- **Multimodal content**: `chat()` accepts string or array of Claude content blocks (text/image/document)
+- **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, last 8 messages verbatim
+- **Queue priority**: User messages = priority 10, scheduled tasks = priority 1. Higher = processed first
+- **Fire-and-forget dashboard**: Dashboard POSTs never block the main response flow
+
+## Cost to Run
+
+Based on real production data (Jan 2026):
+
+| Component | Daily | Monthly | Annual |
+|-----------|-------|---------|--------|
+| API tokens (Claude + OpenAI) | ~£8 | ~£244 | ~£2,964 |
+| Raspberry Pi electricity (12W) | £0.07 | £2.15 | £25.75 |
+| **Total** | **~£8** | **~£246** | **~£2,990** |
+
+For comparison, a human doing the same job costs ~£50,000/year (UK mid-level + employer NI/pension/overhead). The agent delivers **94% cost savings**.
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Bot not responding | `sudo systemctl status alex` then `journalctl -u alex -f` |
+| API errors | Check API key has credits, check `~/.alex/config.json`, check `/tokens` |
+| Email not sending | Verify Gmail App Password (not regular password), ensure 2FA is on |
+| PDF generation failing | `python3 -c "import reportlab; print('OK')"` — install if missing |
+| Voice not working | Check `openai_api_key` is set in config. Check `~/.alex/voice/` for saved files |
+| RAG/ChromaDB issues | `python3 -c "import chromadb; print('OK')"` — agent falls back gracefully if unavailable |
+| Cron not firing | Check `/etc/cron.d/alex` has trailing newline, owned by root. Check `~/.alex/logs/cron.log` |
+| Dashboard not updating | Check local server: `curl http://127.0.0.1:8080/`. Check `/tmp/vercel-push.log` |
+| High token usage | Use `/tokens` in Telegram. Check Haiku is routing correctly in logs (`[MODEL]` entries) |
+| Memory issues on Pi | `free -m` — clear old conversations if needed: `rm ~/.alex/conversations/*.json` |
+
+## Quick Reference
 
 ```bash
-# Status
-sudo systemctl status alex
-
-# Start/Stop/Restart
+# Start / stop / restart
 sudo systemctl start alex
 sudo systemctl stop alex
 sudo systemctl restart alex
 
-# Enable/Disable auto-start
-sudo systemctl enable alex
-sudo systemctl disable alex
-
 # View logs
 journalctl -u alex -f
-# or
 tail -f ~/.alex/logs/gateway.log
-```
 
-## Security Considerations
+# Syntax check after code changes
+node --check src/gateway.js src/chat.js src/tools.js src/heartbeat.js
 
-ALEX has full system access. This is powerful but requires care:
+# Manually trigger a task
+curl -X POST http://127.0.0.1:9090/api/trigger \
+  -H 'Content-Type: application/json' -d '{"task":"morning-briefing"}'
 
-1. **API Key Security**: Keep `config.json` permissions restricted (600)
-2. **Telegram Authorization**: Only allow your user ID
-3. **Network**: Consider using Tailscale for secure remote access
-4. **Backups**: Important data should be backed up regularly
+# Check today's token usage
+cat ~/.alex/logs/tokens_$(date +%Y-%m-%d).jsonl | wc -l
 
-## Customization
-
-### Identity
-
-Edit `~/.alex/IDENTITY.md` to customize ALEX's personality and role.
-
-### Skills
-
-Create new skills in `~/.alex/skills/<name>/SKILL.md`:
-
-```markdown
-# My Custom Skill
-
-## Purpose
-What this skill does.
-
-## Capabilities
-- Capability 1
-- Capability 2
-
-## Usage
-How to use this skill.
-```
-
-### Scheduled Tasks
-
-Create tasks in `~/.alex/tasks/<name>.json`:
-
-```json
-{
-  "name": "my-task",
-  "cron_expression": "0 9 * * *",
-  "task_description": "What to do when this runs"
-}
-```
-
-## Troubleshooting
-
-### Bot not responding
-```bash
-sudo systemctl status alex
-tail -50 ~/.alex/logs/gateway.log
-```
-
-### API errors
-- Check your Anthropic API key has credits
-- Verify the key in `~/.alex/config.json`
-- Check `/tokens` for usage stats — may be hitting rate limits
-
-### Email not sending
-- Verify Gmail App Password (not regular password)
-- Check 2FA is enabled on Gmail account
-- Test: `node ~/.alex/scripts/send_email.js test@email.com "Test" "Body"`
-
-### PDF generation failing
-- Verify reportlab is installed: `python3 -c "import reportlab; print('OK')"`
-- Install if missing: `pip3 install --break-system-packages reportlab`
-
-### RAG/ChromaDB issues
-- Check if installed: `python3 -c "import chromadb; print('OK')"`
-- Re-index manually: `python3 ~/.alex/scripts/rag_manager.py index`
-- ALEX falls back gracefully if ChromaDB is unavailable
-
-### High token usage
-- Check `/tokens` for daily breakdown
-- Verify Haiku is being used for simple queries (check `[MODEL]` entries in logs)
-- Clear old conversation history: `/clear`
-
-### Memory issues on Pi
-```bash
-# Check memory usage
-free -m
-
-# Clear conversation history if needed
-rm ~/.alex/conversations/*.json
+# Deploy cron changes
+sudo cp cron/alex /etc/cron.d/alex && sudo chown root:root /etc/cron.d/alex
 ```
 
 ## License
 
-MIT License - Built for NAVADA
+MIT License — Built for NAVADA
 
 ---
 
-*ALEX: Your AI economist, always on duty.*
+*Clone it. Change the identity. Deploy your own AI agent.*

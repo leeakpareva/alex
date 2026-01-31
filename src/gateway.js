@@ -32,7 +32,7 @@ function downloadFile(url) {
 }
 
 import { WORKSPACE_PATH, loadConfig } from './config.js';
-import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
+import { appendFile, mkdir, readFile, writeFile, unlink } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
@@ -72,10 +72,13 @@ async function execToolWithDeps(name, input) {
         scheduledTasks,
         handleScheduledTask: (task) => handleScheduledTask(task, heartbeatDeps()),
         openaiClient,
+        bot,
     });
     // Queue files for sending after response completes
     if (result && result.send_photo && result.path) {
         pendingCharts.push({ type: 'photo', path: result.path, caption: result.caption || '' });
+    } else if (result && result.send_voice && result.path) {
+        pendingCharts.push({ type: 'voice', path: result.path });
     } else if (result && result.send_document && result.path) {
         pendingCharts.push({ type: 'document', path: result.path, caption: result.caption || '' });
     }
@@ -353,7 +356,37 @@ Just message me naturally - I'm here to help!`;
                     userMessage = `[User sent ${msg.document.file_name} but download failed: ${dlErr.message}]`;
                 }
             } else if (msg.voice) {
-                userMessage = '[User sent a voice message]';
+                try {
+                    const fileLink = await bot.getFileLink(msg.voice.file_id);
+                    const audioBuffer = await downloadFile(fileLink);
+
+                    // Save voice note to disk
+                    const voiceDir = path.join(WORKSPACE_PATH, 'voice');
+                    await mkdir(voiceDir, { recursive: true });
+                    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                    const voiceFilename = `${ts}_${msg.from.first_name || 'unknown'}.ogg`;
+                    const voicePath = path.join(voiceDir, voiceFilename);
+                    await writeFile(voicePath, audioBuffer);
+                    console.log(`[VOICE] Saved to ${voicePath}`);
+
+                    if (openaiClient) {
+                        const audioFile = new File([audioBuffer], 'voice.ogg', { type: 'audio/ogg' });
+                        const transcription = await openaiClient.audio.transcriptions.create({
+                            model: 'whisper-1',
+                            file: audioFile,
+                        });
+                        userMessage = transcription.text || '[Voice message could not be transcribed]';
+                        console.log(`[VOICE] Transcribed: ${userMessage.substring(0, 100)}`);
+
+                        // Save transcription alongside the audio
+                        await writeFile(voicePath.replace('.ogg', '.txt'), userMessage).catch(() => {});
+                    } else {
+                        userMessage = '[User sent a voice message but OpenAI is not configured for transcription]';
+                    }
+                } catch (voiceErr) {
+                    console.error('[VOICE] Transcription failed:', voiceErr.message);
+                    userMessage = '[User sent a voice message but transcription failed]';
+                }
             }
 
             if (!userMessage && !contentBlocks) return;
@@ -411,7 +444,10 @@ Just message me naturally - I'm here to help!`;
             const files = pendingCharts.splice(0);
             for (const file of files) {
                 try {
-                    if (file.type === 'document') {
+                    if (file.type === 'voice') {
+                        await bot.sendVoice(chatId, file.path);
+                        unlink(file.path).catch(() => {});
+                    } else if (file.type === 'document') {
                         await bot.sendDocument(chatId, file.path, {
                             caption: file.caption || undefined,
                         });
@@ -507,7 +543,10 @@ function setupControlAPI() {
                         }
                         for (const file of files) {
                             try {
-                                if (file.type === 'document') {
+                                if (file.type === 'voice') {
+                                    await bot.sendVoice(config.telegram_owner_id, file.path);
+                                    unlink(file.path).catch(() => {});
+                                } else if (file.type === 'document') {
                                     await bot.sendDocument(config.telegram_owner_id, file.path, { caption: file.caption || undefined });
                                 } else {
                                     await bot.sendPhoto(config.telegram_owner_id, file.path, { caption: file.caption || undefined });

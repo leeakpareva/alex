@@ -3,32 +3,28 @@
 # and notifies ALEX via the control API so he has context
 DEST="/home/head/.alex/uploads"
 mkdir -p "$DEST"
+touch /tmp/.taildrop-marker
 echo "[TAILDROP] Watching for incoming files → $DEST"
 
-while true; do
-    # --wait blocks until a file arrives
-    tailscale file get --wait --conflict=rename "$DEST" 2>/dev/null
+# Use --loop to continuously receive files as they arrive
+# --verbose to log what's happening
+tailscale file get --loop --verbose --conflict=rename "$DEST" 2>&1 | while IFS= read -r line; do
+    echo "[TAILDROP] $line"
 
-    # Check for new files and notify ALEX
-    for f in "$DEST"/.partial-*; do
-        [ -f "$f" ] && continue  # skip partial downloads
-    done
-
-    # Find files modified in the last 10 seconds (just received)
+    # When a file is received, tailscale prints the filename
+    # Check for new files modified in the last 10 seconds
     while IFS= read -r f; do
         [ -f "$f" ] || continue
         FNAME=$(basename "$f")
-        FSIZE=$(stat -c%s "$f")
+        FSIZE=$(stat -c%s "$f" 2>/dev/null || echo "?")
         echo "[TAILDROP] Received: $FNAME ($FSIZE bytes)"
 
         # Notify ALEX via control API (fire and forget)
-        curl -sf -X POST http://127.0.0.1:9090/api/trigger \
+        curl -sf --retry 2 --retry-delay 5 -X POST http://127.0.0.1:9090/api/trigger \
             -H 'Content-Type: application/json' \
             -d "{\"task\":\"file-received\",\"file\":\"$f\",\"filename\":\"$FNAME\"}" \
             >> /home/head/.alex/logs/cron.log 2>&1 &
     done < <(find "$DEST" -maxdepth 1 -type f -newer /tmp/.taildrop-marker 2>/dev/null)
 
-    # Update marker
     touch /tmp/.taildrop-marker
-    sleep 1
 done
