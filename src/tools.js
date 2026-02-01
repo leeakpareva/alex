@@ -581,9 +581,13 @@ function maskSensitive(text) {
         .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx');
 }
 
-// Sensitive tools — only the owner (telegram_owner_id) can execute these
+// Owner-only tools — non-owners get NO access to the Pi whatsoever
+// Only safe conversational tools (web_lookup, memory_recall, web_search) are open to all
 const OWNER_ONLY_TOOLS = new Set([
-    'bash', 'write_file', 'edit_file', 'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
+    'bash', 'read_file', 'write_file', 'edit_file', 'list_directory', 'grep', 'glob',
+    'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
+    'generate_pdf', 'generate_chart', 'generate_image', 'create_skill',
+    'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
 ]);
 
 export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
