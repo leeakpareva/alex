@@ -181,7 +181,7 @@ For comparison, a human doing the same job costs ~£50,000/year (UK mid-level + 
 | `/strategist` | Toggle strategic mode (SWOT, Porter's, PESTLE frameworks) |
 | `/learn` | Toggle educational mode (What / How / Why) |
 | `/voice` | Toggle voice reply mode |
-| `/python` | Toggle Python mode |
+| `/python` | Toggle Python mode (pandas, matplotlib, scikit-learn for every analytical question) |
 | `/models` | Switch AI model or restore auto-routing |
 | `/tracked` | View tracked capital-keyword tasks |
 | `/memory` | Browse memory banks |
