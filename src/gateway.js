@@ -238,11 +238,11 @@ function setupTelegram() {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        const welcome = `*ALEX — Global Economist at NAVADA*
+        const welcome = `<b>ALEX — Global Economist at NAVADA</b>
 
 I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research markets, write reports, send emails, and manage tasks — all on my own or when you ask.
 
-*What I can do:*
+<b>What I can do:</b>
 • Research global markets, startups, and economic trends
 • Draft and send professional emails with attachments
 • Generate PDF reports and data visualisations
@@ -253,7 +253,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 • Look up real-time stock prices, company data, crypto, and economic indicators
 • Run code, manage files, and control this Pi
 
-*Commands:*
+<b>Commands:</b>
 /alex — Full command reference
 /inbox — Email queue and triage
 /action 1 — Act on an email
@@ -261,7 +261,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /strategist — Strategic frameworks mode
 /learn — Educational mode
 /voice — Voice reply mode
-/research [topic] — Deep research on demand
+/research topic — Deep research on demand
 /brief — Recent activity summary
 /news — Latest gathered news
 /stocks AAPL — Quick stock quote
@@ -273,9 +273,9 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 
 Just message me naturally — I'm here to help.
 
-[About ALEX](https://alexnavada.xyz) · [NAVADA](https://www.navada.space) · [Slack Channel](https://navada-group.slack.com/archives/C0AC5MK54DU)`;
+<a href="https://alexnavada.xyz">About ALEX</a> · <a href="https://www.navada.space">NAVADA</a> · <a href="https://navada-group.slack.com/archives/C0AC5MK54DU">Slack Channel</a>`;
 
-        await bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, welcome, { parse_mode: 'HTML' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
     });
 
@@ -757,10 +757,10 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/alex/, async (msg) => {
         const chatId = msg.chat.id;
-        const text = `*ALEX — Quick Reference*
+        const text = `<b>ALEX — Quick Reference</b>
 
 /alex — This command list
-/inbox — Email queue (not\_started by default)
+/inbox — Email queue (not_started by default)
 /email 1 — Full email details
 /action 1 reply — Act on an email
 /status — System health and uptime
@@ -768,7 +768,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /brief — Recent activity summary
 /news — Latest gathered news
 
-*Modes (toggle on/off):*
+<b>Modes (toggle on/off):</b>
 /mathematician — Quantitative and computational
 /strategist — Strategic frameworks and analysis
 /learn — Educational mode (What/How/Why)
@@ -776,12 +776,12 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /mode — Show active modes
 /exit — Turn off all active modes
 
-*Tools:*
+<b>Tools:</b>
 /stocks AAPL — Quick stock quote
 /models — Switch AI model
-/research [topic] — Deep research on demand
+/research topic — Deep research on demand
 
-*Info:*
+<b>Info:</b>
 /memory — Browse memory banks
 /skills — View learned skills
 /tasks — Scheduled tasks
@@ -794,7 +794,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /help — Full guide with tips
 
 Just message me naturally for anything else.`;
-        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
     });
 
     bot.onText(/\/stocks(?:\s+(.+))?/, async (msg, match) => {
