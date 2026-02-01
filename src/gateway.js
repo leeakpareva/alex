@@ -46,6 +46,23 @@ import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmail
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, smartSplit } from './chat.js';
 
 // ============================================================================
+// TELEGRAM MARKDOWN SAFE SEND — tries Markdown, falls back to plain text
+// ============================================================================
+
+async function sendMarkdown(chatId, text, extra = {}) {
+    try {
+        await bot.sendMessage(chatId, text, { ...extra, parse_mode: 'Markdown' });
+    } catch (err) {
+        if (err?.response?.body?.error_code === 400) {
+            // Markdown parse failed — send as plain text
+            await bot.sendMessage(chatId, text, extra);
+        } else {
+            throw err;
+        }
+    }
+}
+
+// ============================================================================
 // GLOBAL STATE
 // ============================================================================
 
@@ -62,6 +79,7 @@ const learnModeChats = new Set(); // Track chats with /learn active
 const mathModeChats = new Set(); // Track chats with /mathematician active
 const strategistModeChats = new Set(); // Track chats with /strategist active
 const voiceModeChats = new Set(); // Track chats with /voice active
+const pythonModeChats = new Set(); // Track chats with /python active
 const modelOverrides = new Map(); // Track per-chat model locks
 const awaitingModelSelect = new Set(); // Chats waiting for model selection reply
 const recentUploads = new Map(); // chatId → [{ path, filename, timestamp }]
@@ -265,6 +283,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /strategist — Strategic frameworks mode
 /learn — Educational mode
 /voice — Voice reply mode
+/python — Python data analysis mode
 /research topic — Deep research on demand
 /brief — Recent activity summary
 /news — Latest gathered news
@@ -273,6 +292,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /duties — All duties and schedules
 /models — Switch AI model
 /mode — Show active modes
+/tracked — View tracked tasks
 /help — Full guide with tips
 
 Just message me naturally — I'm here to help.
@@ -301,6 +321,7 @@ Just message me naturally — I'm here to help.
         if (mathModeChats.has(chatId)) { mathModeChats.delete(chatId); cleared.push('Mathematician'); }
         if (strategistModeChats.has(chatId)) { strategistModeChats.delete(chatId); cleared.push('Strategist'); }
         if (voiceModeChats.has(chatId)) { voiceModeChats.delete(chatId); cleared.push('Voice'); }
+        if (pythonModeChats.has(chatId)) { pythonModeChats.delete(chatId); cleared.push('Python'); }
         if (cleared.length > 0) {
             await bot.sendMessage(chatId, `*${cleared.join(', ')} mode${cleared.length > 1 ? 's' : ''} off.*\n\nBack to normal.`, { parse_mode: 'Markdown' });
         } else {
@@ -366,7 +387,7 @@ Just message me naturally — I'm here to help.
             const sessionActivity = dashState.activity_log.length;
 
             // Active modes for this chat
-            const modes = [learnModeChats.has(chatId) && 'Learn', mathModeChats.has(chatId) && 'Mathematician', strategistModeChats.has(chatId) && 'Strategist', voiceModeChats.has(chatId) && 'Voice'].filter(Boolean);
+            const modes = [learnModeChats.has(chatId) && 'Learn', mathModeChats.has(chatId) && 'Mathematician', strategistModeChats.has(chatId) && 'Strategist', voiceModeChats.has(chatId) && 'Voice', pythonModeChats.has(chatId) && 'Python'].filter(Boolean);
 
             const status = `*ALEX — System Status*
 
@@ -749,6 +770,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
         if (mathModeChats.delete(chatId)) cleared.push('Mathematician');
         if (strategistModeChats.delete(chatId)) cleared.push('Strategist');
         if (voiceModeChats.delete(chatId)) cleared.push('Voice');
+        if (pythonModeChats.delete(chatId)) cleared.push('Python');
         if (modelOverrides.delete(chatId)) cleared.push('Model lock');
 
         let text = `*Conversation cleared.*\n\nChat history wiped and starting fresh.`;
@@ -795,6 +817,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /id — Your chat and user ID
 /dashboard — Live dashboard link
 /clear — Wipe chat history
+/tracked — View tracked tasks
 /help — Full guide with tips
 
 Just message me naturally for anything else.`;
@@ -910,6 +933,17 @@ Just message me naturally for anything else.`;
         } else {
             voiceModeChats.add(chatId);
             await bot.sendMessage(chatId, `*Voice mode on.*\n\nI'll now reply with voice messages. Send /exit to switch back to text.`, { parse_mode: 'Markdown' });
+        }
+    });
+
+    bot.onText(/\/python/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (pythonModeChats.has(chatId)) {
+            pythonModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Python mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
+        } else {
+            pythonModeChats.add(chatId);
+            await bot.sendMessage(chatId, `*Python mode on.*\n\nI'll now use Python for every analytical question:\n\n• pandas DataFrames with formatted tables\n• matplotlib/seaborn charts sent as images\n• numpy/scipy for calculations\n• scikit-learn for ML and clustering\n• Statistical tests, regressions, correlations\n• Data cleaning, pivots, groupby, merges\n\nSend me data, a CSV, or ask any analytical question. Send /exit to return to normal.`, { parse_mode: 'Markdown' });
         }
     });
 
@@ -1047,7 +1081,7 @@ Just message me naturally for anything else.`;
             .then(async (response) => {
                 const parts = smartSplit(response, 4000);
                 for (const part of parts) {
-                    await bot.sendMessage(chatId, part, { parse_mode: 'Markdown' });
+                    await sendMarkdown(chatId, part);
                 }
                 // Send any queued files
                 const files = pendingCharts.splice(0);
@@ -1071,6 +1105,7 @@ Just message me naturally for anything else.`;
         if (mathModeChats.has(chatId)) active.push({ name: 'Mathematician', cmd: '/mathematician', impact: 'Full calculations, micro/macro frameworks, sensitivity analysis. Adds ~350 tokens to each prompt. Responses are longer and more detailed.' });
         if (strategistModeChats.has(chatId)) active.push({ name: 'Strategist', cmd: '/strategist', impact: 'SWOT, Porter, PESTLE frameworks applied. Adds ~250 tokens to each prompt.' });
         if (voiceModeChats.has(chatId)) active.push({ name: 'Voice', cmd: '/voice', impact: 'Replies as voice messages via TTS. Adds OpenAI Whisper cost per response.' });
+        if (pythonModeChats.has(chatId)) active.push({ name: 'Python', cmd: '/python', impact: 'Forces Python execution for analysis. DataFrames, charts, stats, ML. Adds ~400 tokens to each prompt.' });
         const modelLock = modelOverrides.get(chatId);
 
         let text = `*ALEX — Mode Control Panel*\n\n`;
@@ -1096,6 +1131,7 @@ Just message me naturally for anything else.`;
         text += `• /strategist — Strategy consultant. SWOT, Porter, PESTLE, competitive analysis, recommendations.\n`;
         text += `• /learn — Educational. What / How / Why structure.\n`;
         text += `• /voice — Voice replies via TTS.\n`;
+        text += `• /python — Python data analyst. pandas, matplotlib, seaborn, scipy, sklearn. Produces tables, charts, and statistical analysis.\n`;
         text += `• /models — Lock a specific AI model.\n`;
         text += `\n_Modes can be combined. /mathematician + /strategist = quantitative strategic analysis._`;
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
@@ -1114,6 +1150,7 @@ Just message me naturally for anything else.`;
 /strategist — Strategic mode. SWOT, Porter's Five Forces, PESTLE, competitive analysis, scenario planning. Every response framed through strategic frameworks with actionable recommendations.
 /learn — Educational mode. Structures every answer as What / How / Why.
 /voice — Voice mode. Replies as voice messages.
+/python — Python mode. Forces Python execution for all analysis. Produces pandas DataFrames, matplotlib/seaborn charts, statistical tests, regressions, ML models. Data sent as formatted tables and chart images.
 
 *Intelligence:*
 /research [topic] — Trigger deep research on any topic. Runs in background and sends findings when done.
@@ -1136,6 +1173,7 @@ Just message me naturally for anything else.`;
 /id — Your Telegram user and chat ID
 /dashboard — Live dashboard link
 /clear — Wipe chat history (keeps long-term memory)
+/tracked — View tracked tasks
 /exit — Turn off all active modes
 
 *Tips:*
@@ -1144,6 +1182,7 @@ Just message me naturally for anything else.`;
 • /research runs in the background — keep chatting while it works
 • Ask me to remember facts, preferences, or instructions
 • I can draft emails, generate PDFs, create charts, and schedule tasks
+• Use CAPITAL keywords (TASK, APPOINTMENT, MEETING, etc.) to track items on the dashboard
 • Everything I do is logged to the live dashboard
 
 *About ALEX:*
@@ -1151,6 +1190,21 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 [alexnavada.xyz](https://alexnavada.xyz) · [navada.space](https://www.navada.space)`;
 
         await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/tracked/, async (msg) => {
+        const chatId = msg.chat.id;
+        const trackedTasks = dashState.tasks.filter(t => t.category === 'tracked-task').slice(0, 20);
+        if (trackedTasks.length === 0) {
+            await bot.sendMessage(chatId, `📌 *ALEX — Tracked Tasks*\n\nNo tracked tasks yet.\n\nUse CAPITAL keywords to track items:\nTASK, APPOINTMENT, BOOKING, MEETING, DEADLINE, REMINDER, TODO, FOLLOW-UP, ACTION, SCHEDULE\n\n_Example: "TASK call the accountant tomorrow"_`, { parse_mode: 'Markdown' });
+            return;
+        }
+        let text = `📌 *ALEX — Tracked Tasks*\n\n`;
+        trackedTasks.forEach((t, i) => {
+            text += `${i + 1}. [${t.time || '—'}] ${t.name} ✅\n`;
+        });
+        text += `\n_${trackedTasks.length} tracked. Use CAPITAL keywords (TASK, APPOINTMENT, BOOKING, etc.) to track items._`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     // ========================================================================
@@ -1259,9 +1313,9 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                 clearInterval(typingInterval);
 
                 if (result.success) {
-                    await bot.sendMessage(chatId, `*Email #${num} — Done*\n\n${result.response?.substring(0, 2000) || 'Completed.'}`, { parse_mode: 'Markdown' });
+                    await sendMarkdown(chatId, `*Email #${num} — Done*\n\n${result.response?.substring(0, 2000) || 'Completed.'}`);
                 } else {
-                    await bot.sendMessage(chatId, `*Email #${num} — Failed*\n\n${result.error}`, { parse_mode: 'Markdown' });
+                    await sendMarkdown(chatId, `*Email #${num} — Failed*\n\n${result.error}`);
                 }
             } catch (actionErr) {
                 clearInterval(typingInterval);
@@ -1752,6 +1806,43 @@ After formulating your response, you MUST use the send_voice_message tool to del
 `;
             }
 
+            if (pythonModeChats.has(chatId)) {
+                modePrefix += `[PYTHON MODE ACTIVE — DATA ANALYSIS OVERRIDE]
+
+You MUST use the generate_chart tool (which executes Python) for EVERY analytical question. Do not answer with text-only analysis — write Python code that computes the answer.
+
+Your Python environment has: numpy, pandas, matplotlib, seaborn, scipy, sklearn, statistics, math, json, csv, io, datetime.
+
+Structure your approach:
+
+DATA — Load or create the data. Use pandas DataFrames for any tabular data. If the user provides raw numbers or a CSV, parse it into a DataFrame first.
+
+ANALYSIS — Write Python code that performs the actual computation:
+• Use pandas for data manipulation: groupby, pivot_table, merge, rolling, resample, describe()
+• Use numpy/scipy for numerical work: linalg, optimize, stats, interpolate
+• Use sklearn for ML: clustering, regression, classification, PCA, train_test_split
+• Use statistics module for basic stats: mean, median, stdev, correlation
+
+OUTPUT — Always produce visible output:
+• Print formatted DataFrames using df.to_string() or tabulate
+• Print summary statistics, test results, coefficients
+• For any visual pattern, trend, or comparison: create a matplotlib/seaborn chart
+• Use plt.savefig() so the chart gets sent as an image to Telegram
+
+Rules for Python Mode:
+- ALWAYS execute Python code — never just describe what code would do
+- Print DataFrames and results so they appear in the response
+- Create charts for any data that benefits from visualisation
+- Use seaborn for statistical plots (heatmaps, pair plots, violin plots, regression plots)
+- Use matplotlib for custom plots (time series, bar charts, scatter, histograms)
+- Label axes, add titles, use plt.tight_layout()
+- If the user asks a simple factual question, still compute it in Python rather than answering from memory
+- For financial data, use the stock_quote / economic_indicator tools first, then analyse with Python
+- Show the key numbers in text AND as a chart where relevant
+
+`;
+            }
+
             if (modePrefix) {
                 if (typeof chatInput === 'string') {
                     chatInput = modePrefix + 'Now answer this:\n\n' + chatInput;
@@ -1778,14 +1869,18 @@ After formulating your response, you MUST use the send_voice_message tool to del
             });
             postDashboard('add_activity', { entry: `Alex responded to ${msg.from.first_name} (${response.length} chars)` });
 
-            // Log task to dashboard
-            const taskSummary = userMessage.substring(0, 80);
-            postDashboard('add_task', { task: {
-                name: taskSummary,
-                category: 'user-request',
-                status: 'completed',
-                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT',
-            }});
+            // Log task to dashboard only when CAPITAL trigger keywords are used
+            const TASK_TRIGGERS = /\b(TASK|APPOINTMENT|BOOKING|MEETING|DEADLINE|REMINDER|TODO|FOLLOW[\s-]?UP|ACTION|SCHEDULE)\b/;
+            if (TASK_TRIGGERS.test(userMessage)) {
+                const taskSummary = userMessage.substring(0, 120);
+                postDashboard('add_task', { task: {
+                    name: taskSummary,
+                    category: 'tracked-task',
+                    status: 'completed',
+                    time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT',
+                }});
+                postDashboard('add_activity', { entry: `📌 Tracked: ${taskSummary}` });
+            }
 
             // Send any queued files (photos + documents)
             const files = pendingCharts.splice(0);
@@ -1811,7 +1906,7 @@ After formulating your response, you MUST use the send_voice_message tool to del
             // Smart message splitting at paragraph boundaries
             const parts = smartSplit(response, 4000);
             for (const part of parts) {
-                await bot.sendMessage(chatId, part, { parse_mode: 'Markdown' });
+                await sendMarkdown(chatId, part);
             }
 
         } catch (error) {
@@ -1825,7 +1920,7 @@ After formulating your response, you MUST use the send_voice_message tool to del
                     try {
                         await bot.sendChatAction(chatId, 'typing');
                         const retryResponse = await chatSystem.chat(chatId, msg.text || '', msg.from);
-                        await bot.sendMessage(chatId, retryResponse, { parse_mode: 'Markdown' });
+                        await sendMarkdown(chatId, retryResponse);
                     } catch (retryErr) {
                         console.error('[RETRY_FAILED]', retryErr.message);
                     }
@@ -1939,7 +2034,7 @@ function setupControlAPI() {
                         const { smartSplit } = await import('./chat.js');
                         const parts = smartSplit(response, 4000);
                         for (const part of parts) {
-                            await bot.sendMessage(config.telegram_owner_id, part, { parse_mode: 'Markdown' }).catch(() => {});
+                            await sendMarkdown(config.telegram_owner_id, part).catch(() => {});
                         }
                         for (const file of files) {
                             try {
@@ -2125,6 +2220,9 @@ function setupControlAPI() {
                             return;
                         }
                     }
+
+                    // Scheduled tasks are system-level — grant owner permissions
+                    currentCallerUserId = config.telegram_owner_id || null;
 
                     // Run asynchronously so we can respond immediately
                     // Scheduled tasks are system-level — grant owner permissions
