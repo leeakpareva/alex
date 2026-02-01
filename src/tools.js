@@ -565,6 +565,22 @@ export const TOOLS = [
 // TOOL EXECUTION
 // ============================================================================
 
+/**
+ * Mask sensitive values in tool output (API keys, passwords, tokens, secrets)
+ */
+function maskSensitive(text) {
+    if (typeof text !== 'string') return text;
+    return text
+        .replace(/\b(sk-ant-[a-zA-Z0-9_-]{6})[a-zA-Z0-9_-]+/g, '$1xxxxxxxxxxxx')
+        .replace(/\b(sk-proj-[a-zA-Z0-9_-]{6})[a-zA-Z0-9_-]+/g, '$1xxxxxxxxxxxx')
+        .replace(/\b(sk-[a-zA-Z0-9]{6})[a-zA-Z0-9]+/g, '$1xxxxxxxxxxxx')
+        .replace(/\b(xoxb-[a-zA-Z0-9-]{6})[a-zA-Z0-9-]+/g, '$1xxxxxxxxxxxx')
+        .replace(/\b([a-z]{4}) [a-z]{4} [a-z]{4} [a-z]{4}\b/g, '$1 xxxx xxxx xxxx')
+        .replace(/"(api_key|api_token|password|secret|token|app_password|redis_token|control_api_token)"\s*:\s*"([^"]{4})[^"]+"/gi,
+            '"$1": "$2xxxxxxxxxxxx"')
+        .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx');
+}
+
 // Sensitive tools — only the owner (telegram_owner_id) can execute these
 const OWNER_ONLY_TOOLS = new Set([
     'bash', 'write_file', 'edit_file', 'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
@@ -599,7 +615,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     maxBuffer: 50 * 1024 * 1024
                 };
                 const { stdout, stderr } = await execAsync(input.command, options);
-                return { success: true, stdout, stderr };
+                return { success: true, stdout: maskSensitive(stdout), stderr: maskSensitive(stderr) };
             }
 
             case 'read_file': {
@@ -608,10 +624,10 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     // Extract text from PDF instead of reading raw binary
                     const { stdout } = await execAsync(`pdftotext "${input.path}" -`, { maxBuffer: 5 * 1024 * 1024, timeout: 15000 });
                     const text = stdout.substring(0, 200000); // cap at 200k chars
-                    return { success: true, content: text, note: text.length >= 200000 ? 'Truncated to 200,000 characters' : undefined };
+                    return { success: true, content: maskSensitive(text), note: text.length >= 200000 ? 'Truncated to 200,000 characters' : undefined };
                 }
                 const content = await fs.readFile(input.path, 'utf-8');
-                return { success: true, content: content.substring(0, 500000) };
+                return { success: true, content: maskSensitive(content.substring(0, 500000)) };
             }
 
             case 'write_file': {
@@ -639,7 +655,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 args.push(input.pattern, input.path);
                 try {
                     const { stdout } = await execAsync(`grep ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
-                    const lines = stdout.trim().split('\n').filter(l => l).slice(0, maxResults);
+                    const lines = stdout.trim().split('\n').filter(l => l).slice(0, maxResults).map(l => maskSensitive(l));
                     return { success: true, matches: lines, count: lines.length };
                 } catch (err) {
                     if (err.code === 1) return { success: true, matches: [], count: 0, note: 'No matches found' };

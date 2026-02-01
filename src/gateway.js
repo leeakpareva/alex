@@ -379,15 +379,15 @@ Just message me naturally — I'm here to help.
 *Resources:*
 • RAM: ${mem.trim()}
 • Disk: ${disk.trim()}
-• Workspace: ${workspaceSize} (\`${WORKSPACE_PATH}\`)
-• Node.js: ${process.version} (PID ${process.pid})
+• Workspace: ${workspaceSize}
+• Runtime: Node.js ${process.version}
 
 *Services:*
 • Telegram bot: online
-• Control API: port 9090
+• Control API: active
 • Gmail inbox: ${config.gmail_address ? 'polling' : 'disabled'}
 • Slack: ${config.slack_token ? 'polling' : 'disabled'}
-• Dashboard: ${redis ? 'connected (Upstash)' : 'local only'}
+• Dashboard: ${redis ? 'connected' : 'local only'}
 • DeepSeek: ${deepseekClient ? 'available' : 'disabled'}
 • OpenAI: ${openaiClient ? 'available' : 'disabled'}
 
