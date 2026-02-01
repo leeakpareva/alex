@@ -92,7 +92,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         const systemPrompt = await buildSystemPrompt();
 
         const response = await callAnthropicQueued({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-haiku-20241022',
             max_tokens: 8192,
             system: systemPrompt,
             tools: TOOLS,
@@ -100,7 +100,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
                 role: 'user',
                 content: `[SCHEDULED TASK: ${task.name}]\n\n${task.task_description}\n\nExecute this task now and report results.`
             }]
-        }, 1);
+        }, 1, { source: 'scheduled', taskName: task.name });
 
         const finalText = await processResponse(response, null, true, systemPrompt, 'claude-sonnet-4-20250514');
 
@@ -164,7 +164,9 @@ export async function runDashboardSync() {
                 let modelName = 'Sonnet';
                 if (e.model?.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
                 else if (e.model?.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
-                else { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
+                else if (e.model?.includes('gpt')) { costUsd = inp / 1e6 * 2.5 + out / 1e6 * 10; modelName = 'GPT-4o'; }
+                else if (e.model?.includes('sonnet')) { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
+                else { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; }
                 totalCostUsd += costUsd;
                 if (!byModel[modelName]) byModel[modelName] = { model: modelName, calls: 0, input_tokens: 0, output_tokens: 0, cost_gbp: 0 };
                 byModel[modelName].calls++;

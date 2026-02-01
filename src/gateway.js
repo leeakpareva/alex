@@ -43,7 +43,7 @@ import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDa
 import { setupInbox, startInboxPolling } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone } from './email-filing.js';
-import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, smartSplit } from './chat.js';
+import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
 
 // ============================================================================
 // TELEGRAM MARKDOWN SAFE SEND — tries Markdown, falls back to plain text
@@ -380,7 +380,7 @@ Just message me naturally — I'm here to help.
                     if (model.includes('haiku')) costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
                     else if (model.includes('deepseek')) costUsd = data.input / 1e6 * 0.14 + data.output / 1e6 * 0.28;
                     else if (model.includes('gpt')) costUsd = data.input / 1e6 * 2.5 + data.output / 1e6 * 10;
-                    else costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    else costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
                     costGbp += costUsd * GBP;
                 }
                 todayCost = `£${costGbp.toFixed(4)}`;
@@ -586,7 +586,8 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
                     if (model.includes('haiku')) costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
                     else if (model.includes('deepseek')) costUsd = data.input / 1e6 * 0.14 + data.output / 1e6 * 0.28;
                     else if (model.includes('gpt')) costUsd = data.input / 1e6 * 2.5 + data.output / 1e6 * 10;
-                    else costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    else if (model.includes('sonnet')) costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    else costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
                     const costGbp = costUsd * GBP;
                     totalCostGbp += costGbp;
                     const pct = stats.totalCalls > 0 ? ((data.calls / stats.totalCalls) * 100).toFixed(0) : 0;
@@ -785,6 +786,39 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
         }
     });
 
+    bot.onText(/\/costs/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const { bySource, byTask, GBP_RATE } = await getTokenStatsBySource();
+            let text = `*ALEX — Cost Breakdown by Source*\n\n`;
+
+            const sources = Object.entries(bySource).sort((a, b) => b[1].costUsd - a[1].costUsd);
+            if (sources.length === 0) {
+                text += `No usage data with source attribution yet.\n\nNew entries will be tagged automatically.`;
+            } else {
+                text += `*By Source:*\n`;
+                for (const [source, data] of sources) {
+                    const tokFmt = data.tokens >= 1_000_000 ? `${(data.tokens / 1_000_000).toFixed(1)}M` : `${(data.tokens / 1_000).toFixed(1)}K`;
+                    text += `• ${source}: ${data.calls} calls, ${tokFmt} tokens — $${data.costUsd.toFixed(4)} / £${(data.costUsd * GBP_RATE).toFixed(4)}\n`;
+                }
+
+                const tasks = Object.entries(byTask).sort((a, b) => b[1].costUsd - a[1].costUsd);
+                if (tasks.length > 0) {
+                    text += `\n*By Task:*\n`;
+                    for (const [task, data] of tasks.slice(0, 10)) {
+                        text += `• ${task}: ${data.calls} calls — $${data.costUsd.toFixed(4)}\n`;
+                    }
+                }
+            }
+
+            text += `\n_Source tracking is automatic on new API calls._`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error getting cost breakdown: ${error.message}`);
+        }
+    });
+
     bot.onText(/\/clear/, async (msg) => {
         const chatId = msg.chat.id;
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
@@ -821,6 +855,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /news — Latest gathered news
 
 <b>Modes (toggle on/off):</b>
+/python — Python data analysis mode
 /mathematician — Quantitative and computational
 /strategist — Strategic frameworks and analysis
 /learn — Educational mode (What/How/Why)
@@ -1522,9 +1557,9 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
     });
 
     const MODEL_OPTIONS = [
-        { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku for greetings, Sonnet for research, DeepSeek for deep analysis', price: '' },
-        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Best for quick questions and simple tasks', price: '$0.80/$4.00 per 1M tokens' },
-        { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Balanced power. Research, reports, emails, tool use', price: '$3.00/$15.00 per 1M tokens' },
+        { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku default, DeepSeek for deep analysis. Sonnet only if you select it.', price: '' },
+        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Default for all tasks', price: '$0.80/$4.00 per 1M tokens' },
+        { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Most capable. Research, reports, emails, tool use. Use only when needed', price: '$3.00/$15.00 per 1M tokens' },
         { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. No tool use (text only)', price: '$0.14/$0.28 per 1M tokens' },
         { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'OpenAI fallback. No tool use (text only)', price: '$2.50/$10.00 per 1M tokens' },
     ];
@@ -1538,7 +1573,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
             text += `*${i + 1}. ${opt.label}*${marker}\n  ${opt.desc}\n`;
             if (opt.price) text += `  ${opt.price}\n`;
         });
-        text += `\nReply with a *number* (1-5) or *name* (e.g. haiku) to switch.\nModel lock persists until you change it or select Auto.`;
+        text += `\nReply with a *number* (1-${MODEL_OPTIONS.length}) or *name* (e.g. haiku) to switch.\nModel lock persists until you change it or select Auto.`;
         return text;
     }
 
@@ -1888,7 +1923,7 @@ Rules for Python Mode:
             let response;
             try {
                 currentCallerUserId = userId;
-                response = await chatSystem.chat(chatId, chatInput, msg.from, { modelOverride: modelOverrides.get(chatId) });
+                response = await chatSystem.chat(chatId, chatInput, msg.from, { modelOverride: modelOverrides.get(chatId) }, { chatId, source: 'telegram' });
             } finally {
                 currentCallerUserId = null;
                 clearInterval(typingInterval);
@@ -2057,7 +2092,7 @@ function setupControlAPI() {
 
                     // Process through chat system (control API is trusted — grant owner permissions)
                     currentCallerUserId = config.telegram_owner_id || null;
-                    const response = await chatSystem.chat(controlChatId, userMessage, { first_name: 'Claude Code', username: 'claude_code' });
+                    const response = await chatSystem.chat(controlChatId, userMessage, { first_name: 'Claude Code', username: 'claude_code' }, {}, { source: 'api' });
                     currentCallerUserId = null;
 
                     // Send queued files

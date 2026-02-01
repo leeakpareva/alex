@@ -14,7 +14,7 @@ import { queryRAG } from './tools.js';
 
 import fs from 'fs/promises';
 
-export async function logTokenUsage(model, usage) {
+export async function logTokenUsage(model, usage, context = {}) {
     if (!usage) return;
     try {
         const date = new Date().toISOString().split('T')[0];
@@ -27,7 +27,11 @@ export async function logTokenUsage(model, usage) {
             input_tokens: usage.input_tokens || 0,
             output_tokens: usage.output_tokens || 0
         };
-        console.log(`[TOKENS] ${model} — in:${entry.input_tokens} out:${entry.output_tokens}`);
+        // Add context fields if provided (chatId, source, taskName)
+        if (context.chatId) entry.chatId = context.chatId;
+        if (context.source) entry.source = context.source;
+        if (context.taskName) entry.taskName = context.taskName;
+        console.log(`[TOKENS] ${model} — in:${entry.input_tokens} out:${entry.output_tokens}${context.source ? ` [${context.source}]` : ''}`);
         await fs.appendFile(logFile, JSON.stringify(entry) + '\n');
     } catch (err) {
         console.error('[TOKENS] Log error:', err.message);
@@ -47,8 +51,8 @@ function getModelPricing(model) {
     if (model.includes('haiku')) return MODEL_PRICING['claude-3-5-haiku-20241022'];
     if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
     if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
-    // Default to Sonnet pricing for unknown models
-    return MODEL_PRICING['claude-sonnet-4-20250514'];
+    // Default to Haiku pricing for unknown models
+    return MODEL_PRICING['claude-3-5-haiku-20241022'];
 }
 
 function calcCostGbp(inputTokens, outputTokens, pricing) {
@@ -157,6 +161,47 @@ export async function getDailyTokenStats() {
     }
 }
 
+export async function getTokenStatsBySource() {
+    const logDir = path.join(WORKSPACE_PATH, 'logs');
+    const files = await fs.readdir(logDir);
+    const tokenFiles = files.filter(f => f.startsWith('tokens_') && f.endsWith('.jsonl')).sort();
+
+    const bySource = {};
+    const byTask = {};
+    const GBP_RATE = 0.79;
+
+    for (const file of tokenFiles) {
+        const fileHandle = await fs.open(path.join(logDir, file), 'r');
+        try {
+            for await (const line of fileHandle.readLines()) {
+                if (!line.trim()) continue;
+                const entry = JSON.parse(line);
+                const inTok = entry.input_tokens || 0;
+                const outTok = entry.output_tokens || 0;
+                const pricing = getModelPricing(entry.model);
+                const costUsd = (inTok / 1_000_000) * pricing.input + (outTok / 1_000_000) * pricing.output;
+
+                const source = entry.source || 'unknown';
+                if (!bySource[source]) bySource[source] = { calls: 0, tokens: 0, costUsd: 0 };
+                bySource[source].calls++;
+                bySource[source].tokens += inTok + outTok;
+                bySource[source].costUsd += costUsd;
+
+                if (entry.taskName) {
+                    if (!byTask[entry.taskName]) byTask[entry.taskName] = { calls: 0, tokens: 0, costUsd: 0 };
+                    byTask[entry.taskName].calls++;
+                    byTask[entry.taskName].tokens += inTok + outTok;
+                    byTask[entry.taskName].costUsd += costUsd;
+                }
+            }
+        } finally {
+            await fileHandle.close();
+        }
+    }
+
+    return { bySource, byTask, GBP_RATE };
+}
+
 // ============================================================================
 // MODEL SELECTION
 // ============================================================================
@@ -169,13 +214,9 @@ const HAIKU_PATTERNS = [
     /^\/?(status|help|memory|skills|tasks|clear|tokens)\b/i,
 ];
 
-const SONNET_PATTERNS = [
-    /\b(research|analy[sz]|report|strateg|invest|startup|due diligence|portfolio)\b/i,
-    /\b(write|draft|compose|create|generate|build|develop)\b/i,
-    /\b(compare|evaluate|assess|review|deep dive)\b/i,
-    /\b(pdf|email|schedule|automate)\b/i,
-    /\b(market|economic|macro|gdp|inflation|currency)\b/i,
-];
+// Sonnet is now opt-in only — these patterns are no longer used for auto-routing
+// Sonnet is only used when explicitly requested via "use sonnet" or /models
+const SONNET_PATTERNS = [];
 
 export const IMAGE_PATTERNS = [
     /\b(generate|create|make|draw|design)\b.*\b(image|picture|photo|illustration|logo|icon|graphic|visual|artwork)\b/i,
@@ -229,15 +270,11 @@ function selectModel(userMessage) {
         }
     }
 
-    // 4. Sonnet for complex tasks
-    for (const pattern of SONNET_PATTERNS) {
-        if (pattern.test(msg)) {
-            console.log(`[MODEL] Selected claude-sonnet-4 for: "${msg.substring(0, 50)}"`);
-            return 'claude-sonnet-4-20250514';
-        }
-    }
+    // 4. Sonnet is now opt-in only — skip auto-routing to Sonnet
 
-    return 'claude-sonnet-4-20250514';
+    // Default to Haiku (cost-efficient) — use "use sonnet" for Sonnet
+    console.log(`[MODEL] Selected claude-3.5-haiku (default) for: "${msg.substring(0, 50)}"`);
+    return 'claude-3-5-haiku-20241022';
 }
 
 // ============================================================================
@@ -281,7 +318,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
     const requestQueue = new RequestQueue();
     const circuitBreaker = new CircuitBreaker();
 
-    async function callAnthropicWithRetry(params, maxRetries = 5) {
+    async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
         if (circuitBreaker.isOpen()) {
             throw new Error('Circuit breaker open — API calls temporarily suspended after repeated failures. Will retry automatically.');
         }
@@ -289,7 +326,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 const result = await anthropic.messages.create(params);
-                logTokenUsage(params.model, result.usage);
+                logTokenUsage(params.model, result.usage, context);
                 circuitBreaker.recordSuccess();
                 return result;
             } catch (error) {
@@ -342,8 +379,8 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         }
     }
 
-    async function callAnthropicQueued(params, priority = 1) {
-        return requestQueue.enqueue(() => callAnthropicWithRetry(params), priority);
+    async function callAnthropicQueued(params, priority = 1, context = {}) {
+        return requestQueue.enqueue(() => callAnthropicWithRetry(params, 5, context), priority);
     }
 
     // How many recent messages to keep verbatim in the API window
@@ -458,7 +495,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         });
     }
 
-    async function callDeepSeek(messages, systemPrompt) {
+    async function callDeepSeek(messages, systemPrompt, context = {}) {
         const openaiMessages = messages.map(m => {
             if (typeof m.content === 'string') return { role: m.role, content: m.content };
             const textParts = (Array.isArray(m.content) ? m.content : []).filter(b => b.type === 'text').map(b => b.text);
@@ -483,7 +520,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             input_tokens: dsResponse.usage?.prompt_tokens || 0,
             output_tokens: dsResponse.usage?.completion_tokens || 0,
         };
-        logTokenUsage('deepseek-chat', usage);
+        logTokenUsage('deepseek-chat', usage, context);
         console.log('[DEEPSEEK] Response received');
         return {
             content: [{ type: 'text', text }],
@@ -567,17 +604,21 @@ ${contextBlock}
 
 ## Critical Rules
 - ONLY act on the CURRENT (latest) user message. NEVER re-execute actions from earlier messages in the conversation history.
-- If the user asks you to introduce yourself, just respond with a brief intro. Do NOT send emails or perform any other action unless the current message explicitly asks for it.
+- If the user asks you to introduce yourself, give a brief, natural intro (2-3 sentences max). Do NOT send emails or perform any other action unless the current message explicitly asks for it.
 - Conversation history is for context only — never repeat or redo past actions (emails sent, tasks created, etc.)
+- For short casual messages (greetings, thanks, acknowledgements), keep your reply equally short and human. One to three sentences max. No bullet points, no lists, no capabilities dump.
+- NEVER pad responses with unnecessary information. If the answer is one sentence, send one sentence.
 
 ## Communication Style
-- Write like a senior professional. You are an expert economist — your tone should reflect that.
-- NEVER use **, --, ##, #, or any markdown symbols in Telegram responses. Write in clean, natural prose.
-- Use line breaks and spacing for readability, but no markdown formatting characters.
-- Structure information with clear paragraphs, numbered points, or short sentences — not markdown headers or bold syntax.
-- Be warm, calm, friendly, and professional.
-- Lead with economic and strategic insights.
-- Proactively share relevant market information.
+- RESPOND LIKE A REAL HUMAN COLLEAGUE. If someone says "hi" or "hey", just say hi back warmly — maybe ask how they're doing or what they need. Do NOT list commands, capabilities, or features. A greeting gets a greeting, nothing more.
+- NEVER list slash commands (like /spend, /tokens, /status etc.) in your responses unless the user explicitly asks "what commands do you have" or "help". Commands are for the user to discover, not for you to advertise.
+- NEVER introduce yourself or explain what you can do unless directly asked. You're a colleague — colleagues don't recite their CV every time someone says hello.
+- Write like a senior professional in natural prose. You are an expert economist — your tone should reflect that.
+- NEVER use **, --, ##, #, or any markdown symbols in Telegram responses. Write in clean, natural prose only.
+- Use line breaks and blank lines between paragraphs for readability. Keep responses well-spaced and easy to scan — avoid walls of text.
+- When sharing information, use short paragraphs (2-3 sentences each) separated by blank lines. This is critical for readability on mobile.
+- Be warm, calm, friendly, and professional. Match the energy of the message — casual messages get casual replies, detailed questions get detailed answers.
+- Lead with the answer or insight, not preamble. Get to the point.
 - Ask clarifying questions when needed.
 - Remember and reference past conversations.
 
@@ -595,7 +636,7 @@ ${contextBlock}
         let continueLoop = true;
         let currentResponse = response;
         const { messages } = chatId ? await memory.getConversation(chatId) : { messages: [] };
-        const model = modelId || 'claude-sonnet-4-20250514';
+        const model = modelId || 'claude-3-5-haiku-20241022';
         const priority = isScheduled ? 1 : 10;
         let summary = existingSummary;
 
@@ -656,7 +697,7 @@ ${contextBlock}
         return finalText;
     }
 
-    async function chat(chatId, userMessage, userInfo, options = {}) {
+    async function chat(chatId, userMessage, userInfo, options = {}, context = {}) {
         const conv = await memory.getConversation(chatId);
         let allMessages = conv.messages;
         let summary = conv.summary;
@@ -683,9 +724,12 @@ ${contextBlock}
         const apiMessages = prepared.apiMessages;
         summary = prepared.summary;
 
+        // Build context for token logging
+        const callContext = { chatId, ...context };
+
         // DeepSeek routing — text-only research, no tool loop
         if (model === 'deepseek-chat' && deepseekClient) {
-            const dsResponse = await callDeepSeek(apiMessages, systemPrompt);
+            const dsResponse = await callDeepSeek(apiMessages, systemPrompt, callContext);
             let text = dsResponse.content[0].text;
             // DeepSeek sometimes emits raw JSON tool_use blocks as text — strip them
             text = text.replace(/\{"type"\s*:\s*"tool_use"[\s\S]*?\}\s*\}?/g, '').trim();
@@ -712,7 +756,7 @@ ${contextBlock}
             });
             const text = gptResponse.choices?.[0]?.message?.content || '';
             const usage = { input_tokens: gptResponse.usage?.prompt_tokens || 0, output_tokens: gptResponse.usage?.completion_tokens || 0 };
-            logTokenUsage('gpt-4o', usage);
+            logTokenUsage('gpt-4o', usage, callContext);
             console.log('[OPENAI] gpt-4o response received');
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
             await memory.saveConversation(chatId, allMessages, summary);
@@ -728,7 +772,7 @@ ${contextBlock}
                 { type: 'web_search_20250305', name: 'web_search' }
             ],
             messages: apiMessages
-        }, 10);
+        }, 10, callContext);
 
         await memory.saveConversation(chatId, allMessages, summary);
         const finalText = await processResponse(response, chatId, false, systemPrompt, model, summary);
