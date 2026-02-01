@@ -35,6 +35,8 @@ const OPTIONAL_KEYS = {
     telegram_notify_tasks: { type: 'boolean' },
     auto_cc_email: { type: 'string' },
     deepseek_api_key: { type: 'string' },
+    upstash_redis_url: { type: 'string' },
+    upstash_redis_token: { type: 'string' },
 };
 
 export async function loadConfig() {

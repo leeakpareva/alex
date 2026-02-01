@@ -20,9 +20,12 @@ Your agent operates via Telegram as a persistent AI colleague that can:
 | **Proactive** | Morning briefings, research updates, evening summaries (8 daily heartbeats) |
 | **Smart Routing** | Haiku for simple queries, Sonnet for complex tasks, DeepSeek for deep research |
 | **RAG** | ChromaDB vector search over knowledge base for relevant context |
+| **Gmail Inbox** | IMAP polling every 2 min — AI-generated replies via Claude, Telegram notifications with action summaries |
 | **Dashboard** | Live dashboard deployed on Vercel with real-time metrics |
 | **Token Logging** | Per-call token tracking with daily usage stats and cost breakdown |
 | **File Understanding** | Accepts photos, PDFs, and documents via Telegram with multimodal analysis |
+| **Learn Mode** | `/learn` toggles educational mode — answers structured as What / How / Why |
+| **CLI Access** | `alex` command for terminal interaction via the control API |
 
 ## Architecture
 
@@ -80,8 +83,10 @@ Telegram message → gateway.js (dedup + auth)
 | `src/heartbeat.js` | Built-in task definitions map, scheduled task execution through AI, dashboard sync, cleanup |
 | `src/memory.js` | `MemorySystem` class. Conversations, categories, identity, user info, rolling summaries |
 | `src/skills.js` | `SkillsSystem` class. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
+| `src/inbox.js` | Gmail inbox monitor. IMAP polling, AI reply generation via Claude, Telegram notifications with action summaries |
 | `src/config.js` | Config loader. Workspace paths, allowed write/attachment paths, path validation |
 | `src/queue.js` | Priority request queue with circuit breaker, rate limiting, cooldown on 429s |
+| `bin/alex` | CLI wrapper for terminal access to the agent via the control API |
 
 ---
 
@@ -265,14 +270,41 @@ curl -X POST http://127.0.0.1:9090/api/send \
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Welcome message |
-| `/status` | System status (uptime, temp, memory, disk) |
-| `/memory` | View memory summary |
-| `/skills` | List available skills |
-| `/tasks` | List scheduled tasks |
-| `/tokens` | Daily token usage stats by model |
-| `/clear` | Clear conversation history |
-| `/help` | Show help |
+| `/start` | Welcome message with full capabilities and command list |
+| `/status` | System health — hardware, services, load, learn mode state |
+| `/memory` | Browse memory banks with entry counts per category |
+| `/skills` | List custom-learned skills |
+| `/tasks` | List scheduled and recurring tasks |
+| `/tokens` | Today's API usage breakdown by model |
+| `/spend` | Full lifetime cost report with daily breakdown and averages |
+| `/learn` | Toggle educational mode — answers structured as What / How / Why |
+| `/clear` | Clear conversation history (preserves long-term memory) |
+| `/help` | Full command reference with tips |
+
+## Gmail Inbox Monitoring
+
+The agent monitors its Gmail inbox via IMAP every 2 minutes. For each new email:
+
+1. **AI Reply** — Claude (Haiku) generates a contextual, personalised reply based on the email content. Falls back to a standard acknowledgement if AI generation fails.
+2. **Telegram Notification** — Sends the owner a summary including: sender, subject, email preview, an AI-generated action assessment (priority, what was done, what the owner should do).
+3. **Mark as Read** — Marks the email as `\Seen` on IMAP.
+
+Anti-loop protections skip auto-replies for: noreply, mailer-daemon, bounce, notifications, googlegroups, calendar, digest, the agent's own address, and plus-addressed emails.
+
+Seen UIDs are persisted to `~/.alex/logs/inbox-seen.json` (trimmed to 500) to prevent reprocessing across restarts.
+
+## CLI Access
+
+A shell command is available for terminal interaction from the Pi:
+
+```bash
+alex "what is the FTSE at today?"     # Send a message (response stays in terminal)
+alex send 123456789 "Hello"           # Send a Telegram message to a user
+alex trigger morning-briefing          # Fire a scheduled task
+alex users                             # List known Telegram users
+```
+
+Install: `sudo ln -sf /path/to/navada-1/bin/alex /usr/local/bin/alex`
 
 ## Dashboard
 

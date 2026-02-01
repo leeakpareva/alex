@@ -34,6 +34,100 @@ export async function logTokenUsage(model, usage) {
     }
 }
 
+// Pricing: USD per 1M tokens, converted to GBP at 0.79
+const MODEL_PRICING = {
+    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
+    'deepseek-chat': { input: 0.14, output: 0.28 },
+};
+const USD_TO_GBP = 0.79;
+
+function getModelPricing(model) {
+    if (MODEL_PRICING[model]) return MODEL_PRICING[model];
+    if (model.includes('haiku')) return MODEL_PRICING['claude-3-5-haiku-20241022'];
+    if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
+    if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
+    // Default to Sonnet pricing for unknown models
+    return MODEL_PRICING['claude-sonnet-4-20250514'];
+}
+
+function calcCostGbp(inputTokens, outputTokens, pricing) {
+    const inputCost = (inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+    return (inputCost + outputCost) * USD_TO_GBP;
+}
+
+function getModelLabel(model) {
+    if (model.includes('haiku')) return 'Haiku';
+    if (model.includes('sonnet')) return 'Sonnet';
+    if (model.includes('deepseek')) return 'DeepSeek';
+    if (model.includes('gpt')) return 'GPT-4o';
+    return model;
+}
+
+export async function getLifetimeTokenStats() {
+    const logDir = path.join(WORKSPACE_PATH, 'logs');
+    const files = await fs.readdir(logDir);
+    const tokenFiles = files.filter(f => f.startsWith('tokens_') && f.endsWith('.jsonl')).sort();
+
+    let totalIn = 0, totalOut = 0, totalCalls = 0;
+    const byModel = {};
+    const byDay = [];
+
+    for (const file of tokenFiles) {
+        const date = file.replace('tokens_', '').replace('.jsonl', '');
+        let dayCalls = 0, dayIn = 0, dayOut = 0, dayCost = 0;
+
+        const fileHandle = await fs.open(path.join(logDir, file), 'r');
+        try {
+            for await (const line of fileHandle.readLines()) {
+                if (!line.trim()) continue;
+                const entry = JSON.parse(line);
+                const inTok = entry.input_tokens || 0;
+                const outTok = entry.output_tokens || 0;
+                const pricing = getModelPricing(entry.model);
+                const cost = calcCostGbp(inTok, outTok, pricing);
+                const label = getModelLabel(entry.model);
+
+                totalIn += inTok;
+                totalOut += outTok;
+                totalCalls++;
+                dayCalls++;
+                dayIn += inTok;
+                dayOut += outTok;
+                dayCost += cost;
+
+                if (!byModel[label]) byModel[label] = { calls: 0, in: 0, out: 0, costGbp: 0 };
+                byModel[label].calls++;
+                byModel[label].in += inTok;
+                byModel[label].out += outTok;
+                byModel[label].costGbp += cost;
+            }
+        } finally {
+            await fileHandle.close();
+        }
+
+        byDay.push({ date, calls: dayCalls, tokens: dayIn + dayOut, costGbp: dayCost });
+    }
+
+    const totalCostGbp = Object.values(byModel).reduce((s, m) => s + m.costGbp, 0);
+    const firstDay = tokenFiles.length > 0 ? tokenFiles[0].replace('tokens_', '').replace('.jsonl', '') : null;
+
+    return {
+        firstDay,
+        totalDays: tokenFiles.length,
+        totalCalls,
+        totalIn,
+        totalOut,
+        totalTokens: totalIn + totalOut,
+        totalCostGbp,
+        byModel,
+        byDay,
+        avgCostPerDay: tokenFiles.length > 0 ? totalCostGbp / tokenFiles.length : 0,
+        avgCostPerCall: totalCalls > 0 ? totalCostGbp / totalCalls : 0,
+    };
+}
+
 export async function getDailyTokenStats() {
     try {
         const date = new Date().toISOString().split('T')[0];

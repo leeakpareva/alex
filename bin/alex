@@ -1,0 +1,61 @@
+#!/bin/bash
+# CLI interface for ALEX — sends messages via the control API
+
+API="http://127.0.0.1:9090"
+
+# Join all args as the message, or read from stdin
+if [ $# -gt 0 ]; then
+    MSG="$*"
+else
+    echo -n "alex> "
+    read -r MSG
+fi
+
+if [ -z "$MSG" ]; then
+    echo "Usage: alex <message>"
+    echo "       alex send <chat_id> <message>"
+    echo "       alex trigger <task-name>"
+    echo "       alex users"
+    exit 1
+fi
+
+# Subcommands
+case "$1" in
+    send)
+        shift
+        CHAT_ID="$1"; shift
+        curl -s "$API/api/send" -H 'Content-Type: application/json' \
+            -d "{\"chat_id\": $CHAT_ID, \"message\": \"$*\"}" | python3 -m json.tool
+        exit 0
+        ;;
+    trigger)
+        shift
+        curl -s "$API/api/trigger" -H 'Content-Type: application/json' \
+            -d "{\"task\": \"$1\"}" | python3 -m json.tool
+        exit 0
+        ;;
+    users)
+        curl -s "$API/api/users" | python3 -m json.tool
+        exit 0
+        ;;
+esac
+
+# Default: send message through chat (no telegram forwarding from CLI)
+ESCAPED=$(echo "$MSG" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
+RESP=$(curl -s "$API/api/command" -H 'Content-Type: application/json' \
+    -d "{\"message\": $ESCAPED, \"send_to_telegram\": false}" --max-time 120)
+
+# Extract and print just the response text
+echo "$RESP" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    if d.get('response'):
+        print(d['response'])
+    elif d.get('error'):
+        print('Error:', d['error'])
+    else:
+        print(json.dumps(d, indent=2))
+except:
+    print(sys.stdin.read())
+" 2>/dev/null

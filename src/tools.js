@@ -8,10 +8,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import nodemailer from 'nodemailer';
-import http from 'http';
 import { WORKSPACE_PATH, ALLOWED_WRITE_PATHS, ALLOWED_ATTACHMENT_PATHS, isPathAllowed } from './config.js';
-
-const DASHBOARD_API = 'http://127.0.0.1:8080/api/update';
 
 const execAsync = promisify(exec);
 
@@ -114,42 +111,15 @@ async function webLookup(query) {
 }
 
 // ============================================================================
-// DASHBOARD API HELPER
+// DASHBOARD HELPER — delegates to gateway's postDashboard via setter
 // ============================================================================
 
-async function postDashboard(payload) {
-    return new Promise((resolve) => {
-        const body = JSON.stringify(payload);
-        const req = http.request(DASHBOARD_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-            timeout: 5000,
-        }, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.ok) {
-                        resolve({ success: true, message: `Dashboard updated (${payload.action})` });
-                    } else {
-                        resolve({ success: false, error: parsed.error || 'Unknown error' });
-                    }
-                } catch {
-                    resolve({ success: false, error: `Bad response: ${data.substring(0, 200)}` });
-                }
-            });
-        });
-        req.on('error', (err) => {
-            resolve({ success: false, error: `Dashboard unreachable: ${err.message}` });
-        });
-        req.on('timeout', () => {
-            req.destroy();
-            resolve({ success: false, error: 'Dashboard request timed out' });
-        });
-        req.write(body);
-        req.end();
-    });
+let dashPostFn = () => {};
+export function setToolsDashPost(fn) { dashPostFn = fn; }
+
+function postDashboard(payload) {
+    dashPostFn(payload.action, payload);
+    return { success: true, message: `Dashboard updated (${payload.action})` };
 }
 
 // ============================================================================
@@ -632,8 +602,10 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     // Default: wrap in styled container with signature (hosted logo for Gmail compatibility)
                     const sigHtml = `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 24px;">
                         <tr><td style="border-top: 1px solid #e8e8e8; padding-top: 20px;">
-                            <img src="https://iili.io/fQCM49a.png" alt="ALEX" width="200" style="display: block;" /><br>
+                            <span style="font-family: Georgia, 'Times New Roman', serif; font-size: 15px; color: #1a1a1a; font-weight: bold; letter-spacing: 0.3px;">ALEX</span><br>
                             <span style="font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color: #555; letter-spacing: 0.3px;">Global Economist, NAVADA</span><br>
+                            <a href="https://alexnavada.xyz" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">alexnavada.xyz</a>
+                            <span style="font-size: 12px; color: #ccc;">&nbsp;&bull;&nbsp;</span>
                             <a href="https://www.navada.space" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">navada.space</a>
                             <span style="font-size: 12px; color: #ccc;">&nbsp;&bull;&nbsp;</span>
                             <a href="https://www.raventerminal.xyz" style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #888; text-decoration: none;">raventerminal.xyz</a>

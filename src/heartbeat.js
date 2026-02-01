@@ -5,19 +5,14 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import http from 'http';
 import { WORKSPACE_PATH } from './config.js';
 
-// Quick dashboard POST helper (fire-and-forget)
-function dashPost(action, payload) {
-    const body = JSON.stringify({ action, ...payload });
-    const req = http.request({
-        hostname: '127.0.0.1', port: 8080, path: '/api/update',
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => { res.resume(); });
-    req.on('error', () => {});
-    req.end(body);
-}
+// dashPost is set by gateway.js via setDashPost()
+let dashPost = () => {};
+let redisRef = null;
+
+export function setDashPost(fn) { dashPost = fn; }
+export function setRedis(r) { redisRef = r; }
 
 /**
  * Built-in heartbeat task definitions — looked up by the /api/trigger endpoint
@@ -124,6 +119,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
 
 /**
  * Hourly dashboard metrics sync (non-AI, lightweight)
+ * Pushes tokens + commits directly to Redis, updates in-memory dash state
  */
 export async function runDashboardSync() {
     console.log('[HEARTBEAT] Dashboard sync');
@@ -134,10 +130,9 @@ export async function runDashboardSync() {
 
         // Services check
         const alexActive = await execAsync('systemctl is-active alex.service').then(() => 'online').catch(() => 'offline');
-        const dashActive = await execAsync('systemctl is-active dashboard.service').then(() => 'online').catch(() => 'offline');
         dashPost('update_services', { services: [
             { name: 'ALEX Gateway', port: 'systemd', status: alexActive },
-            { name: 'Dashboard Server', port: '8080', status: dashActive },
+            { name: 'Upstash Redis', port: 'cloud', status: 'online' },
             { name: 'Telegram Bot', port: 'polling', status: alexActive },
         ]});
         dashPost('set_status', { status: alexActive });
@@ -145,27 +140,68 @@ export async function runDashboardSync() {
         // Token metrics from today's log
         const date = new Date().toISOString().split('T')[0];
         const logFile = path.join(WORKSPACE_PATH, 'logs', `tokens_${date}.jsonl`);
-        let totalTokens = 0, totalCalls = 0, totalCost = 0;
+        let totalIn = 0, totalOut = 0, totalCalls = 0, totalCostUsd = 0;
+        const byModel = {};
         try {
             const content = await fs.readFile(logFile, 'utf-8');
             for (const line of content.split('\n')) {
                 if (!line.trim()) continue;
                 const e = JSON.parse(line);
-                totalTokens += (e.input_tokens || 0) + (e.output_tokens || 0);
-                totalCalls++;
-                // Rough cost estimate
                 const inp = e.input_tokens || 0, out = e.output_tokens || 0;
-                if (e.model?.includes('haiku')) totalCost += inp / 1e6 * 0.8 + out / 1e6 * 4;
-                else if (e.model?.includes('deepseek')) totalCost += inp / 1e6 * 0.14 + out / 1e6 * 0.28;
-                else totalCost += inp / 1e6 * 3 + out / 1e6 * 15;
+                totalIn += inp;
+                totalOut += out;
+                totalCalls++;
+                let costUsd = 0;
+                let modelName = 'Sonnet';
+                if (e.model?.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
+                else if (e.model?.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
+                else { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
+                totalCostUsd += costUsd;
+                if (!byModel[modelName]) byModel[modelName] = { model: modelName, calls: 0, input_tokens: 0, output_tokens: 0, cost_gbp: 0 };
+                byModel[modelName].calls++;
+                byModel[modelName].input_tokens += inp;
+                byModel[modelName].output_tokens += out;
+                byModel[modelName].cost_gbp += costUsd * 0.79;
             }
         } catch {}
+
+        const totalTokens = totalIn + totalOut;
+        const totalCostGbp = totalCostUsd * 0.79;
+
         dashPost('update_metrics', { metrics: {
             total_tokens: totalTokens,
             total_api_calls: totalCalls,
-            est_session_cost: `£${(totalCost * 0.79).toFixed(4)}`,
+            est_session_cost: `£${totalCostGbp.toFixed(4)}`,
             avg_tokens_per_task: totalCalls ? Math.round(totalTokens / totalCalls) : 0,
         }});
+
+        // Push token stats to Redis (dash:tokens)
+        if (redisRef) {
+            const tokenData = {
+                date,
+                total_input_tokens: totalIn,
+                total_output_tokens: totalOut,
+                total_tokens: totalTokens,
+                total_calls: totalCalls,
+                total_cost_gbp: totalCostGbp,
+                total_cost_usd: totalCostUsd,
+                avg_cost_per_task_gbp: totalCalls ? totalCostGbp / totalCalls : 0,
+                by_model: Object.values(byModel),
+            };
+            await redisRef.set('dash:tokens', JSON.stringify(tokenData)).catch(e => console.error('[DASH] tokens push failed:', e.message));
+
+            // Git commits
+            try {
+                const { stdout } = await execAsync('git log --max-count=30 --format="%H|%h|%s|%an|%aI|%D"', { cwd: '/home/head/navada-1' });
+                const commits = stdout.trim().split('\n').filter(l => l).map(line => {
+                    const [hash, short_hash, message, author, date, refs] = line.split('|');
+                    return { hash, short_hash, message, author, date, refs: refs || '' };
+                });
+                await redisRef.set('dash:commits', JSON.stringify({ commits })).catch(e => console.error('[DASH] commits push failed:', e.message));
+            } catch (gitErr) {
+                console.error('[DASH] git log failed:', gitErr.message);
+            }
+        }
     } catch (err) {
         console.error('[HEARTBEAT] Dashboard sync failed:', err.message);
     }

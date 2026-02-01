@@ -7,6 +7,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import TelegramBot from 'node-telegram-bot-api';
+import { Redis } from '@upstash/redis';
 import os from 'os';
 import path from 'path';
 import http from 'http';
@@ -37,9 +38,10 @@ import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
 import { SkillsSystem } from './skills.js';
-import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable } from './tools.js';
-import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup } from './heartbeat.js';
-import { createChatSystem, getDailyTokenStats, smartSplit } from './chat.js';
+import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost } from './tools.js';
+import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
+import { setupInbox, startInboxPolling } from './inbox.js';
+import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, smartSplit } from './chat.js';
 
 // ============================================================================
 // GLOBAL STATE
@@ -53,6 +55,36 @@ let deepseekClient = null;
 let memory = null;
 let skills = null;
 let scheduledTasks = new Map();
+let redis = null;
+const learnModeChats = new Set(); // Track chats with /learn active
+
+// In-memory dashboard state (mirrors dash:data in Redis)
+const dashState = {
+    title: 'ALEX — NAVADA',
+    status: 'offline',
+    summary: { total_tasks: 0, completed: 0, in_progress: 0, failed: 0 },
+    tasks: [],
+    news: [],
+    activity_log: [],
+    heartbeats: [],
+    services: [],
+    last_updated: new Date().toISOString(),
+};
+
+// Debounce Redis writes — max 1 push per 5 seconds
+let dashPushTimer = null;
+function scheduleDashPush() {
+    if (!redis || dashPushTimer) return;
+    dashPushTimer = setTimeout(async () => {
+        dashPushTimer = null;
+        try {
+            dashState.last_updated = new Date().toISOString();
+            await redis.set('dash:data', JSON.stringify(dashState));
+        } catch (err) {
+            console.error('[DASH] Redis push failed:', err.message);
+        }
+    }, 5000);
+}
 
 // Chat system functions (initialized in init())
 let chatSystem = null;
@@ -113,16 +145,51 @@ async function auditLog(entry) {
     }
 }
 
-async function postDashboard(action, payload) {
-    const body = JSON.stringify({ action, ...payload });
-    return new Promise((resolve) => {
-        const req = http.request({
-            hostname: '127.0.0.1', port: 8080, path: '/api/update',
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-        }, (res) => { res.resume(); resolve(); });
-        req.on('error', () => resolve());
-        req.end(body);
-    });
+function postDashboard(action, payload) {
+    const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT';
+    switch (action) {
+        case 'add_task': {
+            const t = payload.task;
+            dashState.tasks.unshift(t);
+            if (dashState.tasks.length > 50) dashState.tasks.length = 50;
+            // Update summary
+            const s = dashState.summary;
+            s.total_tasks++;
+            if (t.status === 'completed') s.completed++;
+            else if (t.status === 'in_progress') s.in_progress++;
+            else if (t.status === 'failed') s.failed++;
+            break;
+        }
+        case 'add_activity': {
+            dashState.activity_log.unshift({ time: now, text: payload.entry });
+            if (dashState.activity_log.length > 100) dashState.activity_log.length = 100;
+            break;
+        }
+        case 'add_news': {
+            const item = { ...payload.item, time: now };
+            dashState.news.unshift(item);
+            if (dashState.news.length > 30) dashState.news.length = 30;
+            break;
+        }
+        case 'update_services': {
+            dashState.services = payload.services;
+            break;
+        }
+        case 'set_status': {
+            dashState.status = payload.status;
+            break;
+        }
+        case 'update_metrics': {
+            dashState.metrics = payload.metrics;
+            break;
+        }
+        case 'update_task': {
+            const existing = dashState.tasks.find(t => t.name === payload.name);
+            if (existing && payload.updates) Object.assign(existing, payload.updates);
+            break;
+        }
+    }
+    scheduleDashPush();
 }
 
 // ============================================================================
@@ -136,23 +203,48 @@ function setupTelegram() {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        const welcome = `*ALEX - Global Economist at NAVADA*
+        const welcome = `*ALEX — Global Economist at NAVADA*
 
-Welcome! I'm ALEX, your AI economist and colleague at NAVADA.
+I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research markets, write reports, send emails, and manage tasks — all on my own or when you ask.
 
-I can:
+*What I can do:*
 • Research global markets, startups, and economic trends
-• Manage files and run code
-• Draft and send emails
-• Generate PDF reports and email them
-• Schedule tasks and reminders
-• Remember everything we discuss
-• Create new skills to extend my abilities
+• Draft and send professional emails with attachments
+• Generate PDF reports and data visualisations
+• Schedule recurring tasks and reminders
+• Remember everything we discuss across sessions
+• Create new skills to extend my own capabilities
+• Monitor the Gmail inbox and auto-reply to contacts
+• Run code, manage files, and control this Pi
 
-Just message me naturally - I'm here to help!`;
+*Commands:*
+/status — System health, uptime, temperature
+/memory — What I currently remember (by category)
+/skills — Custom skills I've learned
+/tasks — Scheduled and recurring tasks
+/tokens — Today's API usage breakdown
+/spend — Full lifetime cost and spending report
+/learn — Toggle educational mode (structured answers)
+/clear — Wipe conversation history
+/help — Full command list with tips
+
+Just message me naturally — I'm here to help.
+
+[About ALEX](https://alexnavada.xyz) · [NAVADA](https://www.navada.space)`;
 
         await bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
+    });
+
+    bot.onText(/\/learn/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (learnModeChats.has(chatId)) {
+            learnModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Educational mode off.*\n\nI'll respond normally from here.`, { parse_mode: 'Markdown' });
+        } else {
+            learnModeChats.add(chatId);
+            await bot.sendMessage(chatId, `*Educational mode on.*\n\nI'll now structure every answer in three parts:\n\n*What* — The facts and core concept\n*How* — How it works or applies in practice\n*Why* — Why it matters and the deeper reasoning\n\nAsk me anything. Send /learn again to switch back.`, { parse_mode: 'Markdown' });
+        }
     });
 
     bot.onText(/\/status/, async (msg) => {
@@ -162,19 +254,34 @@ Just message me naturally - I'm here to help!`;
             const { stdout: temp } = await execAsync('vcgencmd measure_temp 2>/dev/null || echo "temp=N/A"');
             const { stdout: disk } = await execAsync("df -h / | tail -1 | awk '{print $5}'");
             const { stdout: mem } = await execAsync("free -m | awk '/Mem:/ {printf \"%.1f%%\", $3/$2 * 100}'");
+            const { stdout: loadavg } = await execAsync("cat /proc/loadavg | awk '{print $1, $2, $3}'");
 
             const tasks = Array.from(scheduledTasks.keys());
+            const uptimeSec = os.uptime();
+            const days = Math.floor(uptimeSec / 86400);
+            const hours = Math.floor((uptimeSec % 86400) / 3600);
 
-            const status = `*ALEX Status*
+            const status = `*ALEX — System Status*
 
-*System:*
-• Uptime: ${uptime.trim()}
+*Hardware:*
+• Raspberry Pi 5 (${os.arch()})
 • Temperature: ${temp.trim().replace('temp=', '')}
-• Disk Usage: ${disk.trim()}
-• Memory: ${mem.trim()}
+• Uptime: ${uptime.trim()} (${days}d ${hours}h)
+• Load average: ${loadavg.trim()}
 
-*Scheduled Tasks:* ${tasks.length > 0 ? tasks.join(', ') : 'None'}
+*Resources:*
+• Memory: ${mem.trim()} used
+• Disk: ${disk.trim()} used
+• Node.js: ${process.version}
 
+*Services:*
+• Telegram bot: online
+• Control API: port 9090
+• Gmail inbox: ${config.gmail_address ? 'polling' : 'disabled'}
+• Dashboard: ${redis ? 'connected' : 'local only'}
+
+*Scheduled Tasks:* ${tasks.length > 0 ? tasks.map(t => `\`${t}\``).join(', ') : 'None active'}
+*Learn Mode:* ${learnModeChats.has(chatId) ? 'on' : 'off'}
 *Workspace:* \`${WORKSPACE_PATH}\``;
 
             await bot.sendMessage(chatId, status, { parse_mode: 'Markdown' });
@@ -186,21 +293,31 @@ Just message me naturally - I'm here to help!`;
     bot.onText(/\/memory/, async (msg) => {
         const chatId = msg.chat.id;
         const categories = ['user', 'projects', 'research', 'tasks', 'knowledge'];
-        let summary = '*Memory Summary*\n\n';
+        let text = '*ALEX — Memory Banks*\n\n';
+        let totalEntries = 0;
         for (const cat of categories) {
             const content = await memory.getMemory(cat);
             const lines = content.split('\n').filter(l => l.trim()).length;
-            summary += `• ${cat}: ${lines} entries\n`;
+            totalEntries += lines;
+            const desc = { user: 'People and preferences', projects: 'Active projects and goals', research: 'Market data and findings', tasks: 'Task history and outcomes', knowledge: 'Accumulated facts and insights' };
+            text += `*${cat}* — ${desc[cat]}\n  ${lines} entries\n\n`;
         }
-        await bot.sendMessage(chatId, summary, { parse_mode: 'Markdown' });
+        text += `*Total:* ${totalEntries} entries across ${categories.length} categories\n\n`;
+        text += `_I remember everything we discuss. Ask me to save or forget anything._`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/skills/, async (msg) => {
         const chatId = msg.chat.id;
         const allSkills = await skills.getAllSkills();
-        let text = '*Available Skills*\n\n';
-        for (const skill of allSkills) {
-            text += `• \`${skill.name}\`\n`;
+        let text = '*ALEX — Learned Skills*\n\n';
+        if (allSkills.length === 0) {
+            text += `No custom skills yet.\n\n_Ask me to create a skill for any recurring task — I'll learn it and remember how to do it next time._`;
+        } else {
+            for (const skill of allSkills) {
+                text += `• \`${skill.name}\`\n`;
+            }
+            text += `\n${allSkills.length} skill${allSkills.length !== 1 ? 's' : ''} available.\n\n_I can create new skills on request. Just describe what you need automated._`;
         }
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
@@ -208,13 +325,15 @@ Just message me naturally - I'm here to help!`;
     bot.onText(/\/tasks/, async (msg) => {
         const chatId = msg.chat.id;
         const tasks = Array.from(scheduledTasks.entries());
+
+        let text = '*ALEX — Scheduled Tasks*\n\n';
         if (tasks.length === 0) {
-            await bot.sendMessage(chatId, 'No scheduled tasks.');
-            return;
-        }
-        let text = '*Scheduled Tasks*\n\n';
-        for (const [name] of tasks) {
-            text += `• \`${name}\`\n`;
+            text += `No active scheduled tasks.\n\n_Ask me to schedule anything — briefings, reports, reminders, research runs. I'll set it up with system cron and run it automatically._`;
+        } else {
+            for (const [name] of tasks) {
+                text += `• \`${name}\`\n`;
+            }
+            text += `\n${tasks.length} task${tasks.length !== 1 ? 's' : ''} scheduled.\n\n_Tasks run automatically via system cron. I can add, remove, or adjust schedules anytime._`;
         }
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
@@ -223,48 +342,114 @@ Just message me naturally - I'm here to help!`;
         const chatId = msg.chat.id;
         try {
             const stats = await getDailyTokenStats();
-            let text = `*Token Usage Today*\n\n`;
-            text += `Total API calls: ${stats.totalCalls}\n`;
-            text += `Total input tokens: ${stats.totalIn.toLocaleString()}\n`;
-            text += `Total output tokens: ${stats.totalOut.toLocaleString()}\n\n`;
+            let text = `*ALEX — Token Usage Today*\n\n`;
+            text += `*Total:* ${stats.totalCalls} API calls\n`;
+            text += `*Input:* ${stats.totalIn.toLocaleString()} tokens\n`;
+            text += `*Output:* ${stats.totalOut.toLocaleString()} tokens\n\n`;
             if (Object.keys(stats.byModel).length > 0) {
                 text += `*By Model:*\n`;
                 for (const [model, data] of Object.entries(stats.byModel)) {
-                    const shortName = model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model;
-                    text += `• ${shortName}: ${data.calls} calls, ${data.input.toLocaleString()} in / ${data.output.toLocaleString()} out\n`;
+                    const shortName = model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.includes('deepseek') ? 'DeepSeek' : model;
+                    text += `• ${shortName}: ${data.calls} calls — ${data.input.toLocaleString()} in / ${data.output.toLocaleString()} out\n`;
                 }
             }
+            text += `\n_For full cost breakdown, use /spend_`;
             await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
         } catch (error) {
             await bot.sendMessage(chatId, `Error getting token stats: ${error.message}`);
         }
     });
 
+    bot.onText(/\/spend/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            const stats = await getLifetimeTokenStats();
+            if (!stats.firstDay) {
+                await bot.sendMessage(chatId, 'No token usage data found.');
+                return;
+            }
+
+            // Format first day nicely
+            const firstDate = new Date(stats.firstDay + 'T00:00:00');
+            const firstDayFmt = firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            let text = `*ALEX Spending Report*\n\n`;
+            text += `Operational since: ${firstDayFmt} (${stats.totalDays} day${stats.totalDays !== 1 ? 's' : ''})\n`;
+            text += `Total API calls: ${stats.totalCalls}\n\n`;
+            text += `*Total Cost: £${stats.totalCostGbp.toFixed(4)}*\n\n`;
+
+            // By model (sorted by cost descending)
+            const models = Object.entries(stats.byModel).sort((a, b) => b[1].costGbp - a[1].costGbp);
+            text += `*By Model:*\n`;
+            for (const [name, data] of models) {
+                text += `• ${name}: ${data.calls} calls — £${data.costGbp.toFixed(4)}\n`;
+            }
+
+            // Daily breakdown (last 7 days, reversed so most recent first)
+            text += `\n*Last 7 Days:*\n`;
+            const recentDays = stats.byDay.slice(-7).reverse();
+            for (const day of recentDays) {
+                const d = new Date(day.date + 'T00:00:00');
+                const dayFmt = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                const tokFmt = day.tokens >= 1_000_000 ? `${(day.tokens / 1_000_000).toFixed(1)}M` : `${(day.tokens / 1_000).toFixed(1)}K`;
+                text += `• ${dayFmt}: ${day.calls} calls, ${tokFmt} tokens — £${day.costGbp.toFixed(4)}\n`;
+            }
+
+            // Averages
+            const avgTokensPerCall = stats.totalCalls > 0 ? stats.totalTokens / stats.totalCalls : 0;
+            const avgTokFmt = avgTokensPerCall >= 1_000_000 ? `${(avgTokensPerCall / 1_000_000).toFixed(1)}M` : `${(avgTokensPerCall / 1_000).toFixed(1)}K`;
+            text += `\n*Averages:*\n`;
+            text += `• £${stats.avgCostPerDay.toFixed(2)} / day\n`;
+            text += `• £${stats.avgCostPerCall.toFixed(4)} / call\n`;
+            text += `• ${avgTokFmt} tokens / call`;
+
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error getting spending report: ${error.message}`);
+        }
+    });
+
     bot.onText(/\/clear/, async (msg) => {
         const chatId = msg.chat.id;
         await memory.saveConversation(chatId, []);
-        await bot.sendMessage(chatId, 'Conversation history cleared.');
+        learnModeChats.delete(chatId);
+        await bot.sendMessage(chatId, `*Conversation cleared.*\n\nStarting fresh. My long-term memory (people, projects, research) is still intact — only the chat history was wiped.`, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/help/, async (msg) => {
         const chatId = msg.chat.id;
-        const help = `*ALEX Commands*
+        const help = `*ALEX — Command Reference*
 
-/start - Welcome message
-/status - System status
-/memory - View memory summary
-/skills - List available skills
-/tasks - List scheduled tasks
-/tokens - Daily token usage stats
-/clear - Clear conversation history
-/help - This message
+*Core:*
+/start — Introduction and overview
+/help — This reference guide
+
+*Intelligence:*
+/learn — Toggle educational mode (What / How / Why)
+/memory — Browse my memory banks
+/skills — View custom skills I've learned
+
+*Operations:*
+/status — System health, hardware, services
+/tasks — Scheduled and recurring tasks
+/tokens — Today's API usage by model
+/spend — Full lifetime cost report
+
+*Utility:*
+/clear — Wipe chat history (keeps long-term memory)
 
 *Tips:*
-• Just chat naturally - I understand context
-• Ask me to remember things
-• I can create new skills for recurring tasks
-• I can generate PDF reports and email them
-• I'll proactively notify you of important findings`;
+• Just message naturally — no commands needed for most things
+• Ask me to remember facts, preferences, or instructions
+• I can draft emails, generate PDFs, create charts, and schedule tasks
+• Say "use deepseek" or "use haiku" to switch models for a message
+• I monitor Gmail and auto-reply to new contacts
+• I run scheduled briefings and research autonomously
+• Everything I do is logged to the live dashboard
+
+*About ALEX:*
+Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
+[alexnavada.xyz](https://alexnavada.xyz) · [navada.space](https://www.navada.space)`;
 
         await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
     });
@@ -404,20 +589,39 @@ Just message me naturally - I'm here to help!`;
             });
             postDashboard('add_activity', { entry: `${msg.from.first_name}: ${userMessage.substring(0, 120)}` });
 
-            // Natural acknowledgement
-            const acks = ['On it.', 'Give me a moment.', 'Looking into it.', 'One sec.'];
-            const ack = acks[Math.floor(Math.random() * acks.length)];
-            await new Promise(r => setTimeout(r, 1500 + Math.random() * 2000));
-            await bot.sendMessage(chatId, ack, { parse_mode: 'Markdown' });
+            // Detect short casual messages (greetings, etc.)
+            const isShortCasual = userMessage.length < 80 && /^(hi|hey|hello|yo|sup|morning|evening|good\s|what'?s up|how are you|howdy|hiya)/i.test(userMessage.trim());
+
+            if (isShortCasual) {
+                // For greetings: just pause naturally, no ack — avoids double response
+                await new Promise(r => setTimeout(r, 3000 + Math.random() * 3000));
+            } else {
+                // For substantial messages: send acknowledgement then work
+                const acks = ['On it.', 'Give me a moment.', 'Looking into it.', 'One sec.', 'Let me check.'];
+                const ack = acks[Math.floor(Math.random() * acks.length)];
+                await new Promise(r => setTimeout(r, 1500 + Math.random() * 2000));
+                await bot.sendMessage(chatId, ack, { parse_mode: 'Markdown' });
+            }
 
             // Keep typing indicator alive
             const typingInterval = setInterval(() => {
                 bot.sendChatAction(chatId, 'typing').catch(() => {});
             }, 4000);
 
+            // Inject learn mode instruction if active
+            let chatInput = contentBlocks || userMessage;
+            if (learnModeChats.has(chatId)) {
+                const learnPrefix = '[LEARN MODE ACTIVE] Structure your entire response in three clear sections:\n\nWhat — State the facts, define the concept or answer the question directly.\nHow — Explain how it works, how it applies, or how to do it in practice.\nWhy — Explain why it matters, the deeper reasoning, or the significance.\n\nKeep each section concise but thorough. Now answer this:\n\n';
+                if (typeof chatInput === 'string') {
+                    chatInput = learnPrefix + chatInput;
+                } else if (Array.isArray(chatInput)) {
+                    chatInput = [{ type: 'text', text: learnPrefix }, ...chatInput];
+                }
+            }
+
             let response;
             try {
-                response = await chatSystem.chat(chatId, contentBlocks || userMessage, msg.from);
+                response = await chatSystem.chat(chatId, chatInput, msg.from);
             } finally {
                 clearInterval(typingInterval);
             }
@@ -866,6 +1070,19 @@ async function init() {
         console.log('[DEEPSEEK] No API key configured, deep research disabled');
     }
 
+    // Initialize Upstash Redis for dashboard
+    if (config.upstash_redis_url && config.upstash_redis_token) {
+        redis = new Redis({ url: config.upstash_redis_url, token: config.upstash_redis_token });
+        console.log('[REDIS] Upstash client initialized');
+    } else {
+        console.log('[REDIS] No Upstash config — dashboard pushes disabled');
+    }
+
+    // Wire up dashboard helpers for heartbeat + tools modules
+    setDashPost(postDashboard);
+    setRedis(redis);
+    setToolsDashPost(postDashboard);
+
     // Initialize memory system
     memory = new MemorySystem(WORKSPACE_PATH);
     await memory.init();
@@ -899,6 +1116,10 @@ async function init() {
     // Setup Control API on port 9090
     setupControlAPI();
 
+    // Start Gmail inbox polling
+    setupInbox({ config, bot, postDashboard, anthropic });
+    startInboxPolling();
+
     // Check for missed scheduled tasks during downtime
     await catchUpMissedTasks();
 
@@ -907,8 +1128,9 @@ async function init() {
     postDashboard('add_activity', { entry: 'ALEX started and online' });
     postDashboard('update_services', { services: [
         { name: 'ALEX Gateway', port: 'systemd', status: 'online' },
-        { name: 'Dashboard Server', port: '8080', status: 'online' },
+        { name: 'Upstash Redis', port: 'cloud', status: 'online' },
         { name: 'Telegram Bot', port: 'polling', status: 'online' },
+        { name: 'Gmail Inbox', port: 'IMAP', status: config.gmail_address ? 'online' : 'disabled' },
     ]});
 
     // Write alive marker every 60s so catch-up knows when we were last running
