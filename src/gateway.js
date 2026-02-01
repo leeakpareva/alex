@@ -1624,6 +1624,54 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
             return;
         }
 
+        // EXEC_SUMMARY trigger — send Executive Summary PDF to a client via email
+        if (msg.text && msg.text.includes('EXEC_SUMMARY')) {
+            const emailMatch = msg.text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+            if (!emailMatch) {
+                await bot.sendMessage(chatId, '📧 Please include an email address.\n\nExample: `send EXEC_SUMMARY to john@company.com`', { parse_mode: 'Markdown' });
+                return;
+            }
+            const recipientEmail = emailMatch[0];
+            await bot.sendChatAction(chatId, 'typing');
+            try {
+                currentCallerUserId = userId;
+                const execSummaryPrompt = `Send an email with the following EXACT details using the send_email tool. Do NOT change any of these values:
+
+- to: ${recipientEmail}
+- subject: NAVADA AI Business Model — Executive Summary
+- body: Use this professional HTML body:
+<div style="font-family: Arial, sans-serif; color: #333;">
+<p>Dear Colleague,</p>
+<p>Thank you for your interest in NAVADA's AI Business Model research.</p>
+<p>Please find attached our <strong>Executive Summary</strong>, which covers:</p>
+<ul>
+<li>AI token economics and cost optimisation frameworks</li>
+<li>Consultant vs AI cost comparisons (£6,950 vs £185 for equivalent work)</li>
+<li>5-year revenue trajectories for AI adopters vs non-adopters</li>
+<li>Strategic recommendations for CEO-level AI implementation</li>
+<li>Sector-specific impact analysis and workforce planning</li>
+</ul>
+<p>If you would like to discuss how these findings apply to your organisation, please don't hesitate to get in touch.</p>
+<p>Best regards,<br><strong>Lee Akpareva</strong><br>Founder & CEO, NAVADA<br>AI Strategy & Implementation Consulting</p>
+</div>
+- attachment_path: /home/head/.alex/documents/NAVADA_Executive_Summary.pdf
+
+Call the send_email tool now with exactly these parameters.`;
+                const response = await chatSystem.chat(chatId, execSummaryPrompt, msg.from, { modelOverride: modelOverrides.get(chatId) }, { chatId, source: 'telegram' });
+                if (!response.toLowerCase().includes('error') && !response.toLowerCase().includes('failed')) {
+                    await bot.sendMessage(chatId, `✅ Executive Summary sent to *${recipientEmail}*`, { parse_mode: 'Markdown' });
+                } else {
+                    await bot.sendMessage(chatId, `⚠️ There may have been an issue:\n${response.substring(0, 500)}`);
+                }
+            } catch (err) {
+                console.error('[EXEC_SUMMARY] Error:', err.message);
+                await bot.sendMessage(chatId, `❌ Failed to send Executive Summary: ${err.message}`);
+            } finally {
+                currentCallerUserId = null;
+            }
+            return;
+        }
+
         await bot.sendChatAction(chatId, 'typing');
 
         try {
@@ -2088,6 +2136,44 @@ function setupControlAPI() {
                     let userMessage = message;
                     if (image_path) {
                         userMessage += `\n\n[Image attached at: ${image_path}]`;
+                    }
+
+                    // EXEC_SUMMARY trigger via control API
+                    if (userMessage.includes('EXEC_SUMMARY')) {
+                        const emailMatch = userMessage.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+                        if (!emailMatch) {
+                            res.writeHead(400);
+                            res.end(JSON.stringify({ error: 'Include an email address. Example: send EXEC_SUMMARY to john@company.com' }));
+                            return;
+                        }
+                        const recipientEmail = emailMatch[0];
+                        currentCallerUserId = config.telegram_owner_id || null;
+                        const execPrompt = `Send an email with the following EXACT details using the send_email tool. Do NOT change any of these values:
+- to: ${recipientEmail}
+- subject: NAVADA AI Business Model — Executive Summary
+- body: Use this professional HTML body:
+<div style="font-family: Arial, sans-serif; color: #333;">
+<p>Dear Colleague,</p>
+<p>Thank you for your interest in NAVADA's AI Business Model research.</p>
+<p>Please find attached our <strong>Executive Summary</strong>, which covers:</p>
+<ul>
+<li>AI token economics and cost optimisation frameworks</li>
+<li>Consultant vs AI cost comparisons (£6,950 vs £185 for equivalent work)</li>
+<li>5-year revenue trajectories for AI adopters vs non-adopters</li>
+<li>Strategic recommendations for CEO-level AI implementation</li>
+<li>Sector-specific impact analysis and workforce planning</li>
+</ul>
+<p>If you would like to discuss how these findings apply to your organisation, please don't hesitate to get in touch.</p>
+<p>Best regards,<br><strong>Lee Akpareva</strong><br>Founder & CEO, NAVADA<br>AI Strategy & Implementation Consulting</p>
+</div>
+- attachment_path: /home/head/.alex/documents/NAVADA_Executive_Summary.pdf
+
+Call the send_email tool now with exactly these parameters.`;
+                        const execResponse = await chatSystem.chat(controlChatId, execPrompt, { first_name: 'Control API', username: 'api' }, {}, { source: 'api' });
+                        currentCallerUserId = null;
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, response: `Executive Summary sent to ${recipientEmail}`, detail: execResponse.substring(0, 500) }));
+                        return;
                     }
 
                     // Process through chat system (control API is trusted — grant owner permissions)
