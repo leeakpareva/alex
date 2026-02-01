@@ -24,6 +24,8 @@ The framework solves the hard problems of running an AI agent 24/7: conversation
 | **PDF Reports** | Styled PDF reports with tables, charts, and NAVADA branding |
 | **Data Analysis** | Python execution with numpy, pandas, matplotlib, seaborn, scipy, scikit-learn |
 | **Charts** | Generate and send data visualisations directly in Telegram |
+| **Diagrams** | Mermaid diagram rendering (flowcharts, sequence, ER, Gantt, pie, etc.) → PNG in Telegram |
+| **Mind Maps** | Markmap mind map generation from markdown outlines → PNG in Telegram |
 | **Voice** | Receive voice notes (Whisper transcription) and send voice responses (TTS) |
 | **URL Fetching** | Hit any API, scrape any page, download data via `fetch_url` |
 | **Scheduling** | Cron-based tasks, reminders, recurring jobs — 8 daily heartbeats by default |
@@ -39,25 +41,25 @@ The framework solves the hard problems of running an AI agent 24/7: conversation
 
 ## Security Model
 
-The agent enforces a tiered permission system. The **owner** (configured Telegram ID) has full access to all tools and the host system. **All other users** can chat with the agent but have zero access to the Pi.
+The agent enforces a two-tier permission system at both the **command** and **tool** level.
 
 ### Owner (full access)
 
-All 25+ tools available including bash, file operations, email, code execution, scheduling, and system management.
+All 30+ tools available including bash, file operations, email, code execution, scheduling, diagrams, mind maps, and system management. All Telegram commands available.
 
-### Other Users (conversation only)
+### Limited Users (chat + basic commands)
 
-| Allowed | Blocked |
-|---------|---------|
-| Chat with the agent | `bash` — shell commands |
-| `web_lookup` — search the web | `read_file` / `write_file` / `edit_file` — filesystem |
-| `web_search` — Claude web search | `list_directory` / `grep` / `glob` — filesystem browsing |
-| `memory_recall` — read knowledge | `send_email` — email sending |
-| | `generate_pdf` / `generate_chart` / `generate_image` — file creation |
-| | `fetch_url` — HTTP requests |
-| | `schedule_task` / `delete_task` — cron management |
-| | `send_file` / `send_voice_message` — file exfiltration |
-| | `create_skill` / `update_dashboard` / `memory_save` — system modification |
+Limited users can chat with the agent and use a subset of commands. Owner-only tools are blocked at the API level.
+
+| Allowed Commands | Allowed Tools | Blocked |
+|-----------------|---------------|---------|
+| `/start`, `/help` | `web_lookup` — search the web | `bash` — shell commands |
+| `/stocks`, `/news` | `web_search` — Claude web search | `read_file` / `write_file` / `edit_file` — filesystem |
+| `/research`, `/brief` | `memory_recall` — read knowledge | `send_email`, `fetch_url`, `generate_pdf` |
+| `/tracked` | | `generate_chart`, `generate_image`, `generate_diagram`, `generate_mindmap` |
+| | | `schedule_task`, `delete_task`, `create_skill` |
+| | | `send_file`, `send_voice_message`, `update_dashboard`, `memory_save` |
+| | | All other commands (`/status`, `/tokens`, `/spend`, `/duties`, `/modes`, etc.) |
 
 ### Additional Protections
 
@@ -110,7 +112,7 @@ Telegram/Slack message → gateway.js (dedup + auth + permission tier)
 
 | Trigger | Model | Cost/Call |
 |---------|-------|-----------|
-| Greetings, status checks, short messages (<80 chars) | Haiku 3.5 | ~$0.002 |
+| Greetings, status checks, short messages (<80 chars) | Haiku 3.5 (8192 max tokens) | ~$0.002 |
 | Research, analysis, reports, emails, tools | Sonnet 4 | ~$0.10 |
 | "use deepseek", deep research, thorough analysis | DeepSeek | ~$0.001 |
 | "use gpt", explicit GPT request | GPT-4o | ~$0.05 |
@@ -122,7 +124,7 @@ Telegram/Slack message → gateway.js (dedup + auth + permission tier)
 |--------|---------|
 | `src/gateway.js` | Entry point. Telegram/Slack bots, authenticated control API, tool execution with dependency injection, permission enforcement, startup catch-up for missed tasks |
 | `src/chat.js` | Chat system factory. Model selection, token logging, conversation summarisation, API calls with retry and fallback |
-| `src/tools.js` | 25+ tool definitions + `executeTool()` switch. Owner-only permission enforcement, sensitive data masking, delete guardrail |
+| `src/tools.js` | 30+ tool definitions + `executeTool()` switch. Owner-only permission enforcement, sensitive data masking, delete guardrail. Includes Mermaid diagrams and Markmap mind maps |
 | `src/heartbeat.js` | Built-in task definitions, scheduled task execution through AI, dashboard sync, cleanup |
 | `src/memory.js` | Persistent memory system. Per-chat conversations with rolling summaries, categorised memory, RAG integration |
 | `src/skills.js` | Self-extending skill system. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
@@ -179,7 +181,9 @@ For comparison, a human doing the same job costs ~£50,000/year (UK mid-level + 
 | `/strategist` | Toggle strategic mode (SWOT, Porter's, PESTLE frameworks) |
 | `/learn` | Toggle educational mode (What / How / Why) |
 | `/voice` | Toggle voice reply mode |
+| `/python` | Toggle Python mode |
 | `/models` | Switch AI model or restore auto-routing |
+| `/tracked` | View tracked capital-keyword tasks |
 | `/memory` | Browse memory banks |
 | `/skills` | List custom skills |
 | `/tasks` | List scheduled tasks |
@@ -203,7 +207,7 @@ pip3 install --break-system-packages reportlab chromadb plotly kaleido
 ### 2. Create Workspace
 
 ```bash
-mkdir -p ~/.alex/{memory,conversations,skills,tasks,reports,research,data,logs,charts,images,uploads,voice,templates}
+mkdir -p ~/.alex/{memory,conversations,skills,tasks,reports,research,data,logs,charts,images,uploads,voice,templates,diagrams,mindmaps}
 chmod 700 ~/.alex
 ```
 
@@ -228,7 +232,7 @@ chmod 700 ~/.alex
 
 `chmod 600 ~/.alex/config.json`
 
-**Note:** Leave `telegram_authorized_users` empty to allow anyone to chat. Only the `telegram_owner_id` gets system access — everyone else is conversation-only.
+**Note:** Leave `telegram_authorized_users` as a list of owner Telegram user IDs for full access. All other users get limited access (chat + basic commands). Add user IDs to grant full access.
 
 | Key | Where to Get It |
 |-----|----------------|

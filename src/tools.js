@@ -546,6 +546,30 @@ export const TOOLS = [
         }
     },
     {
+        name: "generate_diagram",
+        description: "Generate a diagram from Mermaid syntax. Renders to PNG and sends as photo. Supports flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, and more.",
+        input_schema: {
+            type: "object",
+            properties: {
+                mermaid_code: { type: "string", description: "Mermaid diagram syntax (e.g. 'graph TD\\n    A-->B')" },
+                filename: { type: "string", description: "Optional output filename (default: auto-generated)" }
+            },
+            required: ["mermaid_code"]
+        }
+    },
+    {
+        name: "generate_mindmap",
+        description: "Generate a mind map from a markdown outline. Renders to PNG and sends as photo. Use nested markdown headings or bullet lists to define the hierarchy.",
+        input_schema: {
+            type: "object",
+            properties: {
+                markdown: { type: "string", description: "Markdown outline with headings/bullets defining the mind map hierarchy" },
+                filename: { type: "string", description: "Optional output filename (default: auto-generated)" }
+            },
+            required: ["markdown"]
+        }
+    },
+    {
         name: "fetch_url",
         description: "Fetch any URL and return the response body. Use for API calls, web scraping, downloading data, checking endpoints. Supports GET and POST with custom headers and body.",
         input_schema: {
@@ -588,6 +612,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_chart', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
+    'generate_diagram', 'generate_mindmap',
 ]);
 
 export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
@@ -1127,6 +1152,64 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 };
             }
 
+
+            case 'generate_diagram': {
+                const diagramsDir = path.join(WORKSPACE_PATH, 'diagrams');
+                await fs.mkdir(diagramsDir, { recursive: true });
+                const mmdFilename = `diagram_${Date.now()}.mmd`;
+                const mmdPath = path.join(diagramsDir, mmdFilename);
+                const outFilename = input.filename || `diagram_${Date.now()}.png`;
+                const outputPath = path.join(diagramsDir, outFilename);
+                await fs.writeFile(mmdPath, input.mermaid_code);
+                try {
+                    await execAsync(`npx --yes @mermaid-js/mermaid-cli mmdc -i ${JSON.stringify(mmdPath)} -o ${JSON.stringify(outputPath)} -b transparent --puppeteerConfigFile /dev/null`, { timeout: 60000 });
+                    await fs.unlink(mmdPath).catch(() => {});
+                    return { success: true, path: outputPath, message: `Diagram generated: ${outputPath}`, send_photo: true, caption: 'Mermaid diagram' };
+                } catch (err) {
+                    await fs.unlink(mmdPath).catch(() => {});
+                    return { success: false, error: `Mermaid rendering failed: ${err.message}` };
+                }
+            }
+
+            case 'generate_mindmap': {
+                const mindmapsDir = path.join(WORKSPACE_PATH, 'mindmaps');
+                await fs.mkdir(mindmapsDir, { recursive: true });
+                const mdFilename = `mindmap_${Date.now()}.md`;
+                const mdPath = path.join(mindmapsDir, mdFilename);
+                const htmlFilename = `mindmap_${Date.now()}.html`;
+                const htmlPath = path.join(mindmapsDir, htmlFilename);
+                const outFilename = input.filename || `mindmap_${Date.now()}.png`;
+                const outputPath = path.join(mindmapsDir, outFilename);
+                await fs.writeFile(mdPath, input.markdown);
+                try {
+                    // Generate HTML with markmap-cli
+                    await execAsync(`npx --yes markmap-cli ${JSON.stringify(mdPath)} -o ${JSON.stringify(htmlPath)} --no-open`, { timeout: 60000 });
+                    // Screenshot HTML to PNG with puppeteer
+                    const screenshotScript = `
+                        const puppeteer = require('puppeteer');
+                        (async () => {
+                            const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+                            const page = await browser.newPage();
+                            await page.setViewport({ width: 1400, height: 1000 });
+                            await page.goto('file://${htmlPath.replace(/'/g, "\\'")}', { waitUntil: 'networkidle0', timeout: 30000 });
+                            await new Promise(r => setTimeout(r, 1500));
+                            await page.screenshot({ path: '${outputPath.replace(/'/g, "\\'")}', fullPage: true });
+                            await browser.close();
+                        })();
+                    `;
+                    const tmpScript = path.join(mindmapsDir, `_ss_${Date.now()}.cjs`);
+                    await fs.writeFile(tmpScript, screenshotScript);
+                    await execAsync(`node ${JSON.stringify(tmpScript)}`, { timeout: 60000 });
+                    await fs.unlink(tmpScript).catch(() => {});
+                    await fs.unlink(mdPath).catch(() => {});
+                    await fs.unlink(htmlPath).catch(() => {});
+                    return { success: true, path: outputPath, message: `Mind map generated: ${outputPath}`, send_photo: true, caption: 'Mind map' };
+                } catch (err) {
+                    await fs.unlink(mdPath).catch(() => {});
+                    await fs.unlink(htmlPath).catch(() => {});
+                    return { success: false, error: `Mind map rendering failed: ${err.message}` };
+                }
+            }
 
             default:
                 return { success: false, error: `Unknown tool: ${name}` };

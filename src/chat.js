@@ -628,7 +628,7 @@ ${contextBlock}
 
                     currentResponse = await callAnthropicQueued({
                         model,
-                        max_tokens: 16384,
+                        max_tokens: model.includes('haiku') ? 8192 : 16384,
                         system: systemPrompt,
                         tools: TOOLS,
                         messages: apiMessages
@@ -721,7 +721,7 @@ ${contextBlock}
 
         const response = await callAnthropicQueued({
             model,
-            max_tokens: 16384,
+            max_tokens: model.includes('haiku') ? 8192 : 16384,
             system: systemPrompt,
             tools: [
                 ...TOOLS,

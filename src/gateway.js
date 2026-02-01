@@ -253,6 +253,21 @@ function timeAgo(dateStr) {
     return `${days}d ago`;
 }
 
+// Commands restricted to authorized (owner) users only
+const LIMITED_USER_ALLOWED_COMMANDS = new Set([
+    '/start', '/help', '/stocks', '/news', '/research', '/brief', '/tracked'
+]);
+
+function isAuthorizedUser(userId) {
+    return config.telegram_authorized_users?.includes(userId);
+}
+
+function isLimitedCommand(text) {
+    if (!text || !text.startsWith('/')) return false;
+    const cmd = text.split(/\s/)[0].split('@')[0].toLowerCase();
+    return LIMITED_USER_ALLOWED_COMMANDS.has(cmd);
+}
+
 function setupTelegram() {
     bot = new TelegramBot(config.telegram_bot_token, { polling: true });
 
@@ -305,6 +320,7 @@ Just message me naturally — I'm here to help.
 
     bot.onText(/\/learn/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         if (learnModeChats.has(chatId)) {
             learnModeChats.delete(chatId);
             await bot.sendMessage(chatId, `*Educational mode off.*\n\nI'll respond normally from here.`, { parse_mode: 'Markdown' });
@@ -316,6 +332,7 @@ Just message me naturally — I'm here to help.
 
     bot.onText(/\/exit/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const cleared = [];
         if (learnModeChats.has(chatId)) { learnModeChats.delete(chatId); cleared.push('Educational'); }
         if (mathModeChats.has(chatId)) { mathModeChats.delete(chatId); cleared.push('Mathematician'); }
@@ -331,6 +348,7 @@ Just message me naturally — I'm here to help.
 
     bot.onText(/\/status/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const { stdout: uptime } = await execAsync('uptime -p');
             const { stdout: temp } = await execAsync('vcgencmd measure_temp 2>/dev/null || echo "temp=N/A"');
@@ -433,6 +451,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/memory/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const categories = ['user', 'projects', 'research', 'tasks', 'knowledge'];
             const desc = { user: 'People, preferences, contacts', projects: 'Active projects, goals, pipelines', research: 'Market data, findings, analysis', tasks: 'Task history, outcomes, schedules', knowledge: 'Accumulated facts, insights, learnings' };
@@ -470,6 +489,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/skills/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const allSkills = await skills.getAllSkills();
             let text = '*ALEX — Learned Skills*\n\n';
@@ -498,6 +518,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/tasks/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             // Read all user-created tasks from disk with full detail
             const taskDir = path.join(WORKSPACE_PATH, 'tasks');
@@ -541,6 +562,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/tokens/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const stats = await getDailyTokenStats();
             const GBP = 0.79;
@@ -596,6 +618,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/spend/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const stats = await getLifetimeTokenStats();
             if (!stats.firstDay) {
@@ -691,6 +714,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/projection/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const GBP_RATE = 0.79;
             const stats = await getLifetimeTokenStats();
@@ -763,6 +787,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/clear/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         await memory.saveConversation(chatId, []);
         // Clear all modes for this chat
         const cleared = [];
@@ -783,6 +808,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
     bot.onText(/\/alex/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const text = `<b>ALEX — Quick Reference</b>
 
 /alex — This command list
@@ -865,6 +891,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/id/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const userId = msg.from.id;
         const username = msg.from.username ? `@${msg.from.username}` : 'not set';
         const firstName = msg.from.first_name || 'unknown';
@@ -888,6 +915,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/dashboard/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const lastUpdated = dashState.last_updated ? new Date(dashState.last_updated).toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' GMT' : 'unknown';
 
         let text = `*ALEX Dashboard*\n\n`;
@@ -905,6 +933,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/mathematician/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         if (mathModeChats.has(chatId)) {
             mathModeChats.delete(chatId);
             await bot.sendMessage(chatId, `*Mathematician mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
@@ -916,6 +945,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/strategist/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         if (strategistModeChats.has(chatId)) {
             strategistModeChats.delete(chatId);
             await bot.sendMessage(chatId, `*Strategist mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
@@ -927,6 +957,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/voice/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         if (voiceModeChats.has(chatId)) {
             voiceModeChats.delete(chatId);
             await bot.sendMessage(chatId, `*Voice mode off.*\n\nI'll reply with text from here.`, { parse_mode: 'Markdown' });
@@ -938,6 +969,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/python/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         if (pythonModeChats.has(chatId)) {
             pythonModeChats.delete(chatId);
             await bot.sendMessage(chatId, `*Python mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
@@ -958,12 +990,12 @@ Just message me naturally for anything else.`;
             const completedTasks = dashState.tasks.filter(t => t.status === 'completed');
             const failedTasks = dashState.tasks.filter(t => t.status === 'failed');
             const heartbeatTasks = dashState.tasks.filter(t => t.category === 'heartbeat');
-            const userRequests = dashState.tasks.filter(t => t.category === 'user-request');
+            const trackedTasks = dashState.tasks.filter(t => t.category === 'tracked-task');
 
             let text = `*ALEX — Session Brief*\n\n`;
             text += `Session running: ${sessionStr}\n`;
             text += `Tasks: ${completedTasks.length} completed, ${failedTasks.length} failed\n`;
-            text += `Heartbeats: ${heartbeatTasks.length} | User requests: ${userRequests.length}\n`;
+            text += `Heartbeats: ${heartbeatTasks.length} | Tracked: ${trackedTasks.length}\n`;
             text += `Activity entries: ${dashState.activity_log.length}\n`;
             text += `News items: ${dashState.news.length}\n\n`;
 
@@ -1009,6 +1041,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/testreport/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             await bot.sendMessage(chatId, 'Generating test report...', { parse_mode: 'Markdown' });
             await bot.sendChatAction(chatId, 'typing');
@@ -1100,6 +1133,7 @@ Just message me naturally for anything else.`;
 
     bot.onText(/\/mode/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const active = [];
         if (learnModeChats.has(chatId)) active.push({ name: 'Educational', cmd: '/learn', impact: 'Structures all answers as What / How / Why. Adds ~200 tokens to each prompt.' });
         if (mathModeChats.has(chatId)) active.push({ name: 'Mathematician', cmd: '/mathematician', impact: 'Full calculations, micro/macro frameworks, sensitivity analysis. Adds ~350 tokens to each prompt. Responses are longer and more detailed.' });
@@ -1213,6 +1247,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
     bot.onText(/\/inbox(?:\s+(.+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const statusFilter = (match?.[1] || 'not_started').trim().toLowerCase();
             const validStatuses = ['not_started', 'in_progress', 'done', 'all'];
@@ -1248,6 +1283,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
     bot.onText(/\/email\s+(\d+)/, async (msg, match) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const num = parseInt(match[1]);
             const email = await getEmailByNumber(num);
@@ -1293,6 +1329,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
     bot.onText(/\/action\s+(\d+)(?:\s+(.+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const num = parseInt(match[1]);
             const instruction = match[2]?.trim() || null;
@@ -1328,6 +1365,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
     bot.onText(/\/duties/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             // --- Uptime & last-alive ---
             const { stdout: uptime } = await execAsync('uptime -p');
@@ -1506,6 +1544,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
     bot.onText(/\/(models|agents)/, async (msg) => {
         const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         await bot.sendMessage(chatId, buildModelMenu(chatId), { parse_mode: 'Markdown' });
         awaitingModelSelect.add(chatId);
     });
@@ -1527,13 +1566,8 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        // Check authorization
-        if (config.telegram_authorized_users?.length > 0) {
-            if (!config.telegram_authorized_users.includes(userId)) {
-                await bot.sendMessage(chatId, 'Unauthorized. Your user ID is not in the allowed list.');
-                return;
-            }
-        }
+        // Tiered authorization: authorized users get full access, others get limited chat
+        // (Limited users can chat but owner-only tools are blocked in tools.js via OWNER_ONLY_TOOLS)
 
         // Handle model selection reply
         if (awaitingModelSelect.has(chatId) && msg.text) {
