@@ -14,7 +14,6 @@ export const ALLOWED_WRITE_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
     '/home/head',
-    '/',  // Full system access — ALEX has sudo anyway
 ];
 
 // Allowed directories for email attachments
@@ -22,7 +21,6 @@ export const ALLOWED_ATTACHMENT_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
     '/home/head',
-    '/',  // Full system access
 ];
 
 const REQUIRED_KEYS = ['anthropic_api_key', 'telegram_bot_token'];
@@ -37,6 +35,7 @@ const OPTIONAL_KEYS = {
     telegram_notify_tasks: { type: 'boolean' },
     auto_cc_email: { type: 'string' },
     deepseek_api_key: { type: 'string' },
+    control_api_token: { type: 'string' },
     upstash_redis_url: { type: 'string' },
     upstash_redis_token: { type: 'string' },
     alphavantage_api_key: { type: 'string' },

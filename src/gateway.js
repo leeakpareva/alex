@@ -112,6 +112,9 @@ function getUploadedFiles(chatId) {
     return recent;
 }
 
+// Track the current caller's userId for tool permission checks
+let currentCallerUserId = null;
+
 async function execToolWithDeps(name, input) {
     const result = await executeTool(name, input, {
         memory,
@@ -122,6 +125,7 @@ async function execToolWithDeps(name, input) {
         openaiClient,
         bot,
         getUploadedFiles,
+        callerUserId: currentCallerUserId,
     });
     // Queue files for sending after response completes
     if (result && result.send_photo && result.path) {
@@ -273,7 +277,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 
 Just message me naturally — I'm here to help.
 
-<a href="https://alexnavada.xyz">About ALEX</a> · <a href="https://www.navada.space">NAVADA</a> · <a href="https://navada-group.slack.com/archives/C0AC5MK54DU">Slack Channel</a>`;
+<a href="https://www.alexnavada.xyz">www.alexnavada.xyz</a>`;
 
         await bot.sendMessage(chatId, welcome, { parse_mode: 'HTML' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
@@ -969,6 +973,45 @@ Just message me naturally for anything else.`;
         }
     });
 
+    bot.onText(/\/testreport/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            await bot.sendMessage(chatId, 'Generating test report...', { parse_mode: 'Markdown' });
+            await bot.sendChatAction(chatId, 'typing');
+            const typingInterval = setInterval(() => {
+                bot.sendChatAction(chatId, 'typing').catch(() => {});
+            }, 4000);
+
+            let response;
+            try {
+                currentCallerUserId = msg.from.id;
+                response = await chatSystem.chat(chatId,
+                    'Generate a concise system test report covering: 1) System health (CPU, memory, disk, temp), 2) Service status (all running services), 3) Recent activity summary, 4) Tool availability check (test that bash, read_file, web_lookup, and fetch_url work), 5) API connectivity. Format as a clean status report. Be thorough but concise.',
+                    msg.from
+                );
+            } finally {
+                currentCallerUserId = null;
+                clearInterval(typingInterval);
+            }
+
+            const parts = smartSplit(response, 4000);
+            for (const part of parts) {
+                await bot.sendMessage(chatId, part, { parse_mode: 'Markdown' });
+            }
+
+            // Send any queued files
+            const files = pendingCharts.splice(0);
+            for (const file of files) {
+                try {
+                    if (file.type === 'photo') await bot.sendPhoto(chatId, file.path, { caption: file.caption || undefined });
+                    else if (file.type === 'document') await bot.sendDocument(chatId, file.path, { caption: file.caption || undefined });
+                } catch {}
+            }
+        } catch (error) {
+            await bot.sendMessage(chatId, `Test report failed: ${error.message}`);
+        }
+    });
+
     bot.onText(/\/news/, async (msg) => {
         const chatId = msg.chat.id;
         try {
@@ -1075,6 +1118,7 @@ Just message me naturally for anything else.`;
 *Intelligence:*
 /research [topic] — Trigger deep research on any topic. Runs in background and sends findings when done.
 /brief — Summary of recent ALEX activity this session
+/testreport — Run a full system test report (health, tools, connectivity)
 /news — Latest news gathered from research runs
 /memory — Browse my memory banks
 /skills — View custom skills I've learned
@@ -1718,8 +1762,10 @@ After formulating your response, you MUST use the send_voice_message tool to del
 
             let response;
             try {
+                currentCallerUserId = userId;
                 response = await chatSystem.chat(chatId, chatInput, msg.from, { modelOverride: modelOverrides.get(chatId) });
             } finally {
+                currentCallerUserId = null;
                 clearInterval(typingInterval);
             }
 
@@ -1801,12 +1847,63 @@ function setupControlAPI() {
     const CONTROL_PORT = 9090;
     const controlChatId = 'control-api';
 
+    // Rate limiter: max 30 requests per 60 seconds per IP
+    const rateLimiter = new Map(); // ip → { count, resetAt }
+    const RATE_LIMIT = 30;
+    const RATE_WINDOW = 60000;
+
+    function checkRateLimit(ip) {
+        const now = Date.now();
+        let entry = rateLimiter.get(ip);
+        if (!entry || now > entry.resetAt) {
+            entry = { count: 0, resetAt: now + RATE_WINDOW };
+            rateLimiter.set(ip, entry);
+        }
+        entry.count++;
+        if (entry.count > RATE_LIMIT) return false;
+        return true;
+    }
+
+    // Clean up stale rate limit entries every 5 minutes
+    setInterval(() => {
+        const now = Date.now();
+        for (const [ip, entry] of rateLimiter) {
+            if (now > entry.resetAt) rateLimiter.delete(ip);
+        }
+    }, 300000);
+
     const server = http.createServer(async (req, res) => {
         // CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+        // Rate limiting
+        const clientIp = req.socket.remoteAddress || 'unknown';
+        if (!checkRateLimit(clientIp)) {
+            console.log(`[CONTROL] Rate limited: ${clientIp}`);
+            res.writeHead(429, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Rate limit exceeded. Max 30 requests per minute.' }));
+            return;
+        }
+
+        // Auth token check (if configured) — skip for /api/trigger from localhost (cron)
+        const apiToken = config.control_api_token;
+        if (apiToken) {
+            const authHeader = req.headers['authorization'] || '';
+            const providedToken = authHeader.replace(/^Bearer\s+/i, '');
+            const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+            const isTrigger = req.url === '/api/trigger';
+
+            // Allow unauthenticated /api/trigger from localhost (cron jobs)
+            if (!(isLocalhost && isTrigger) && providedToken !== apiToken) {
+                console.log(`[CONTROL] Auth rejected from ${clientIp} for ${req.url}`);
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized. Provide Authorization: Bearer <token> header.' }));
+                return;
+            }
+        }
 
         if (req.method === 'POST' && req.url === '/api/command') {
             let body = '';
@@ -1829,8 +1926,10 @@ function setupControlAPI() {
                         userMessage += `\n\n[Image attached at: ${image_path}]`;
                     }
 
-                    // Process through chat system
+                    // Process through chat system (control API is trusted — grant owner permissions)
+                    currentCallerUserId = config.telegram_owner_id || null;
                     const response = await chatSystem.chat(controlChatId, userMessage, { first_name: 'Claude Code', username: 'claude_code' });
+                    currentCallerUserId = null;
 
                     // Send queued files
                     const files = pendingCharts.splice(0);
@@ -2028,6 +2127,8 @@ function setupControlAPI() {
                     }
 
                     // Run asynchronously so we can respond immediately
+                    // Scheduled tasks are system-level — grant owner permissions
+                    currentCallerUserId = config.telegram_owner_id || null;
                     handleScheduledTask(taskDef, heartbeatDeps()).catch(err => {
                         console.error(`[TRIGGER] ${taskName} failed:`, err.message);
                     });

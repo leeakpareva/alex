@@ -565,8 +565,21 @@ export const TOOLS = [
 // TOOL EXECUTION
 // ============================================================================
 
-export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot }) {
+// Sensitive tools — only the owner (telegram_owner_id) can execute these
+const OWNER_ONLY_TOOLS = new Set([
+    'bash', 'write_file', 'edit_file', 'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
+]);
+
+export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
     console.log(`[TOOL] Executing: ${name}`, JSON.stringify(input).substring(0, 200));
+
+    // Tiered permissions: sensitive tools are owner-only
+    if (OWNER_ONLY_TOOLS.has(name) && config.telegram_owner_id && callerUserId) {
+        if (callerUserId !== config.telegram_owner_id) {
+            console.log(`[TOOL] Permission denied: ${name} is owner-only (caller: ${callerUserId})`);
+            return { success: false, error: `Permission denied: '${name}' is restricted to the account owner.` };
+        }
+    }
 
     try {
         switch (name) {
