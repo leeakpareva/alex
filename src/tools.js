@@ -610,9 +610,8 @@ function maskSensitive(text) {
 const OWNER_ONLY_TOOLS = new Set([
     'bash', 'read_file', 'write_file', 'edit_file', 'list_directory', 'grep', 'glob',
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
-    'generate_pdf', 'generate_chart', 'generate_image', 'create_skill',
+    'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
-    'generate_diagram', 'generate_mindmap',
 ]);
 
 export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
