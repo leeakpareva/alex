@@ -150,7 +150,7 @@ export const TOOLS = [
             properties: {
                 command: { type: "string", description: "The bash command to execute" },
                 working_directory: { type: "string", description: "Optional working directory for the command" },
-                timeout: { type: "number", description: "Timeout in milliseconds (default: 60000)" }
+                timeout: { type: "number", description: "Timeout in milliseconds (default: 300000)" }
             },
             required: ["command"]
         }
@@ -544,6 +544,20 @@ export const TOOLS = [
             },
             required: ["command", "password"]
         }
+    },
+    {
+        name: "fetch_url",
+        description: "Fetch any URL and return the response body. Use for API calls, web scraping, downloading data, checking endpoints. Supports GET and POST with custom headers and body.",
+        input_schema: {
+            type: "object",
+            properties: {
+                url: { type: "string", description: "The URL to fetch (e.g. https://api.github.com)" },
+                method: { type: "string", description: "HTTP method (default: GET)", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+                headers: { type: "object", description: "Optional HTTP headers as key-value pairs" },
+                body: { type: "string", description: "Optional request body (for POST/PUT/PATCH)" }
+            },
+            required: ["url"]
+        }
     }
 ];
 
@@ -568,8 +582,8 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 }
                 const options = {
                     cwd: input.working_directory || os.homedir(),
-                    timeout: input.timeout || 60000,
-                    maxBuffer: 10 * 1024 * 1024
+                    timeout: input.timeout || 300000,
+                    maxBuffer: 50 * 1024 * 1024
                 };
                 const { stdout, stderr } = await execAsync(input.command, options);
                 return { success: true, stdout, stderr };
@@ -580,11 +594,11 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 if (ext === '.pdf') {
                     // Extract text from PDF instead of reading raw binary
                     const { stdout } = await execAsync(`pdftotext "${input.path}" -`, { maxBuffer: 5 * 1024 * 1024, timeout: 15000 });
-                    const text = stdout.substring(0, 50000); // cap at 50k chars
-                    return { success: true, content: text, note: text.length >= 50000 ? 'Truncated to 50,000 characters' : undefined };
+                    const text = stdout.substring(0, 200000); // cap at 200k chars
+                    return { success: true, content: text, note: text.length >= 200000 ? 'Truncated to 200,000 characters' : undefined };
                 }
                 const content = await fs.readFile(input.path, 'utf-8');
-                return { success: true, content: content.substring(0, 100000) };
+                return { success: true, content: content.substring(0, 500000) };
             }
 
             case 'write_file': {
@@ -611,7 +625,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 if (input.include) args.push('--include', input.include);
                 args.push(input.pattern, input.path);
                 try {
-                    const { stdout } = await execAsync(`grep ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, { timeout: 15000, maxBuffer: 5 * 1024 * 1024 });
+                    const { stdout } = await execAsync(`grep ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
                     const lines = stdout.trim().split('\n').filter(l => l).slice(0, maxResults);
                     return { success: true, matches: lines, count: lines.length };
                 } catch (err) {
@@ -864,7 +878,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
 
                 let stdout = '';
                 try {
-                    const result = await execAsync(`python3 ${tmpScript}`, { timeout: 60000 });
+                    const result = await execAsync(`python3 ${tmpScript}`, { timeout: 180000 });
                     stdout = result.stdout || '';
                     if (result.stderr) console.log('[PYTHON] stderr:', result.stderr.substring(0, 200));
                 } finally {
@@ -882,14 +896,14 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                         caption: input.caption || '',
                         message: `Output generated: ${outputPath}`,
                         send_photo: true,
-                        printed_output: stdout.substring(0, 3000) || undefined
+                        printed_output: stdout.substring(0, 10000) || undefined
                     };
                 }
                 // Text-only output (no image produced)
                 return {
                     success: true,
-                    message: stdout.substring(0, 4000) || 'Script completed with no output.',
-                    printed_output: stdout.substring(0, 4000) || undefined
+                    message: stdout.substring(0, 10000) || 'Script completed with no output.',
+                    printed_output: stdout.substring(0, 10000) || undefined
                 };
             }
 
@@ -1035,6 +1049,51 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 console.log(`[GUARDRAIL] Delete executed after password verification: ${input.command}`);
                 return { success: true, stdout, stderr, note: 'Delete command executed after password verification.' };
             }
+
+            case 'fetch_url': {
+                const fetchModule = await import('node:https');
+                const httpModule = await import('node:http');
+                const urlObj = new URL(input.url);
+                const lib = urlObj.protocol === 'https:' ? fetchModule.default : httpModule.default;
+                const method = input.method || 'GET';
+                const headers = input.headers || {};
+                if (!headers['User-Agent']) headers['User-Agent'] = 'ALEX/1.0';
+
+                const body = await new Promise((resolve, reject) => {
+                    const req = lib.request(input.url, { method, headers, timeout: 30000 }, (res) => {
+                        // Follow redirects
+                        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+                            resolve({ redirect: res.headers.location });
+                            return;
+                        }
+                        let data = '';
+                        res.on('data', chunk => {
+                            data += chunk;
+                            if (data.length > 50000) { res.destroy(); }
+                        });
+                        res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
+                        res.on('error', reject);
+                    });
+                    req.on('error', reject);
+                    req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
+                    if (input.body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+                        req.write(input.body);
+                    }
+                    req.end();
+                });
+
+                if (body.redirect) {
+                    return { success: true, redirect: body.redirect, message: `Redirected to ${body.redirect} — fetch that URL to follow` };
+                }
+                return {
+                    success: true,
+                    status: body.status,
+                    content_type: body.headers?.['content-type'] || '',
+                    body: (body.body || '').substring(0, 50000),
+                    note: (body.body || '').length > 50000 ? 'Truncated to 50,000 characters' : undefined
+                };
+            }
+
 
             default:
                 return { success: false, error: `Unknown tool: ${name}` };

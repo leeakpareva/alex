@@ -18,7 +18,8 @@ Your agent operates via Telegram and Slack as a persistent AI colleague that can
 | **Scheduling** | Cron-based tasks, reminders, recurring jobs |
 | **Skills** | Extensible plugin system — agent can create its own tools |
 | **Proactive** | Morning briefings, research updates, evening summaries (8 daily heartbeats) |
-| **Smart Routing** | Haiku for simple queries, Sonnet for complex tasks, DeepSeek for deep research |
+| **Smart Routing** | Haiku for simple queries, Sonnet for complex tasks, Opus for maximum power, DeepSeek for deep research |
+| **URL Fetching** | Fetch any URL — API calls, web scraping, data downloads via `fetch_url` tool |
 | **RAG** | ChromaDB vector search over knowledge base for relevant context |
 | **Gmail Inbox** | IMAP polling every 2 min — AI-generated replies via Claude, Telegram notifications with action summaries |
 | **Dashboard** | Live dashboard deployed on Vercel with real-time metrics |
@@ -59,7 +60,7 @@ Telegram/Slack message → gateway.js (dedup + auth)
   → voice notes: saved to ~/.alex/voice/ + Whisper transcription
   → chat.js chat() → selectModel() routes to Haiku/Sonnet/DeepSeek/GPT-4o
   → buildSystemPrompt() includes identity, memory, RAG context
-  → prepareMessages() summarizes old messages, keeps last 8 verbatim
+  → prepareMessages() summarizes old messages, keeps last 12 verbatim
   → callAnthropicQueued() via queue.js (priority queue with circuit breaker)
   → processResponse() loops on tool_use blocks
     → tools.js executeTool() with dependency injection (+ delete guardrail)
@@ -74,6 +75,7 @@ Telegram/Slack message → gateway.js (dedup + auth)
 | Research, analysis, reports, emails, tools | Sonnet 4 | ~$0.10 |
 | "use deepseek", deep research, thorough analysis | DeepSeek | ~$0.001 |
 | "use gpt", explicit GPT request | GPT-4o | ~$0.05 |
+| "use opus", explicit Opus request | Opus 4.5 | ~$0.30 |
 
 ### Source Modules
 
@@ -420,6 +422,7 @@ To set up the Vercel dashboard for a clone:
 | `generate_chart` | Create Plotly charts and visualisations |
 | `generate_image` | Create images via DALL-E |
 | `send_voice_message` | Text-to-speech voice notes via OpenAI TTS |
+| `fetch_url` | Fetch any URL (GET/POST/PUT/PATCH/DELETE) with custom headers |
 | `schedule_task` | Create cron-based scheduled jobs |
 | `create_skill` | Build new agent capabilities |
 | `update_dashboard` | Push updates to the live dashboard |
@@ -443,7 +446,7 @@ Three layers ensure scheduled tasks never get lost:
 
 - **Dependency injection**: `executeTool()` receives all deps as a single object — never imports globals. When adding tools, add deps to `execToolWithDeps()` in gateway.js
 - **Multimodal content**: `chat()` accepts string or array of Claude content blocks (text/image/document)
-- **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, last 8 messages verbatim
+- **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, last 12 messages verbatim
 - **Queue priority**: User messages = priority 10, scheduled tasks = priority 1. Higher = processed first
 - **Fire-and-forget dashboard**: Dashboard POSTs never block the main response flow
 

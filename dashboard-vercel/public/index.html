@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ALEX — NAVADA Dashboard</title>
+  <title>ALEX — NAVADA VC Dashboard</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -97,7 +97,7 @@
     .summary-icon {
       width: 32px; height: 32px; border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      margin-bottom: 0.5rem;
+      font-size: 1rem; margin-bottom: 0.5rem;
     }
     .summary-icon svg { width: 16px; height: 16px; }
     .summary-icon.purple { background: rgba(99,102,241,0.2); }
@@ -213,7 +213,7 @@
       <div class="header-left">
         <span class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg></span>
         <div>
-          <h1 id="dash-title">ALEX — NAVADA</h1>
+          <h1 id="dash-title">ALEX — NAVADA VC</h1>
           <div class="header-time" id="current-time">Loading...</div>
           <div class="header-updated" id="last-updated"></div>
         </div>
@@ -223,6 +223,10 @@
         <span id="status-text">ONLINE</span>
       </div>
     </header>
+
+    <div class="nav-links">
+      <a href="uk-economy.html" class="nav-link">📈 UK Economy</a>
+    </div>
 
     <!-- Summary -->
     <div class="grid-4">
@@ -345,7 +349,7 @@
     </div>
 
     <footer class="footer">
-      ALEX Activity Tracker — NAVADA — Auto-refreshes every 15s<br>
+      ALEX Activity Tracker — NAVADA VC — Auto-refreshes every 15s<br>
       <span style="color:var(--accent);">Raspberry Pi 5</span>
     </footer>
   </div>

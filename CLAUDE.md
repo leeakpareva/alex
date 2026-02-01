@@ -63,7 +63,7 @@ User-created tasks via `schedule_task` tool write both a JSON file and a cron li
 
 ### Model Routing (selectModel in chat.js)
 
-1. Explicit overrides: "use haiku", "use deepseek", "use gpt" etc.
+1. Explicit overrides: "use haiku", "use deepseek", "use gpt", "use opus" etc.
 2. DeepSeek patterns: "deep research", "thorough analysis"
 3. Haiku for short simple messages (<80 chars): greetings, status checks
 4. Sonnet (default): research, analysis, reports, email, tools

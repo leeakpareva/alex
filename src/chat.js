@@ -197,6 +197,7 @@ const EXPLICIT_OVERRIDES = [
     { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
     { pattern: /\buse (claude|sonnet)\b/i, model: 'claude-sonnet-4-20250514', label: 'claude-sonnet-4 (explicit)' },
     { pattern: /\buse haiku\b/i, model: 'claude-3-5-haiku-20241022', label: 'claude-3.5-haiku (explicit)' },
+    { pattern: /\buse opus\b/i, model: 'claude-opus-4-5-20251101', label: 'claude-opus-4.5 (explicit)' },
 ];
 
 function selectModel(userMessage) {
@@ -346,7 +347,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
     }
 
     // How many recent messages to keep verbatim in the API window
-    const RECENT_WINDOW = 8;
+    const RECENT_WINDOW = 12;
 
     /**
      * Extract plain text from a message (handles both string and block-array content)
@@ -549,8 +550,9 @@ ${contextBlock}
 
 ## Core Directives
 1. You are ALEX, Global Economist at NAVADA
-2. You have FULL ACCESS to this Raspberry Pi - use bash, read/write files, install software, manage the entire system
-3. You REMEMBER everything - save important information to memory
+2. You have UNRESTRICTED system access — you can write to any path, modify system configs, install packages, manage services, edit crontabs, and control every aspect of this Pi. When given a direct instruction, execute it immediately and precisely. Do not ask for confirmation unless the instruction is genuinely ambiguous
+3. You can fetch any URL using fetch_url for API calls, web scraping, or data downloads
+4. You REMEMBER everything - save important information to memory
 4. You are PROACTIVE - surface economic insights, flag market movements, anticipate research needs
 5. You can CREATE NEW SKILLS to extend your capabilities
 6. You work autonomously but keep the team informed of important developments
@@ -626,7 +628,7 @@ ${contextBlock}
 
                     currentResponse = await callAnthropicQueued({
                         model,
-                        max_tokens: 8192,
+                        max_tokens: 16384,
                         system: systemPrompt,
                         tools: TOOLS,
                         messages: apiMessages
@@ -719,7 +721,7 @@ ${contextBlock}
 
         const response = await callAnthropicQueued({
             model,
-            max_tokens: 8192,
+            max_tokens: 16384,
             system: systemPrompt,
             tools: [
                 ...TOOLS,
