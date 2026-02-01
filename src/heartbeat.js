@@ -6,6 +6,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { WORKSPACE_PATH } from './config.js';
+import { archiveOldDone } from './email-filing.js';
 
 // dashPost is set by gateway.js via setDashPost()
 let dashPost = () => {};
@@ -58,6 +59,14 @@ Save key findings to memory and provide a summary.`
 5. Brief strategic reflection on portfolio and pipeline
 
 End with a brief strategic reflection.`
+    }],
+    ['inbox-review', {
+        name: 'inbox-review',
+        task_description: `Review the email inbox filing system at ~/.alex/inbox/emails.json.
+1. Check for not_started emails older than 4 hours — send Lee a reminder on Telegram
+2. Check for in_progress emails with no activity for 24 hours — nudge Lee
+3. If any emails have can_handle_autonomously=true and are still not_started, propose handling them
+4. Send Lee a brief inbox status summary via Telegram`
     }],
     ['weekly-self-review', {
         name: 'weekly-self-review',
@@ -216,5 +225,11 @@ export async function runCleanup(memory) {
         await memory.cleanupOldConversations();
     } catch (err) {
         console.error('[CLEANUP]', err.message);
+    }
+    // Prune old done emails
+    try {
+        await archiveOldDone();
+    } catch (err) {
+        console.error('[CLEANUP] Email archive failed:', err.message);
     }
 }

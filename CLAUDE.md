@@ -38,7 +38,8 @@ Telegram message → gateway.js (dedup + auth)
 
 - **gateway.js** — Entry point. Telegram bot setup, control API (port 9090), tool execution wrapper with dependency injection (`execToolWithDeps`), `heartbeatDeps()` factory for scheduled task context.
 - **chat.js** — `createChatSystem()` returns `{ chat, processResponse, callAnthropicQueued, buildSystemPrompt }`. Model selection via regex pattern matching. Token logging to `~/.alex/logs/tokens_*.jsonl`. Conversation summarization with Haiku to keep context compact.
-- **tools.js** — `TOOLS` array (tool definitions for Claude) and `executeTool()` switch. Tools get deps via object destructuring: `{ memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient }`.
+- **tools.js** — `TOOLS` array (tool definitions for Claude) and `executeTool()` switch. Tools get deps via object destructuring: `{ memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient }`. Delete guardrail blocks `rm`/`rmdir`/`unlink`/`shred` in `bash` tool — requires `confirm_delete` tool with 3 user confirmations + password.
+- **slack.js** — `setupSlack(deps)` and `startSlackPolling()`. Polls channel + DMs via Slack Web API every 3s. Mention-only in channels, always responds in DMs. Threaded replies in channels, direct replies in DMs. Each thread gets its own conversation context.
 - **heartbeat.js** — `BUILTIN_TASKS` map of task definitions. `handleScheduledTask()` runs a task through the AI. `runDashboardSync()` for hourly metrics. `runCleanup()` for conversation pruning. No scheduling logic — system cron handles that.
 - **memory.js** — `MemorySystem` class. Conversations stored per chat ID with rolling summaries. Categories: user, projects, research, tasks, knowledge. Identity from `IDENTITY.md`, user info from `USER.md`.
 - **skills.js** — `SkillsSystem` class. Skills stored as `~/.alex/skills/{name}/SKILL.md`. Skill names injected into system prompt.
@@ -98,6 +99,7 @@ Fire-and-forget POSTs to `http://127.0.0.1:8080/api/update`. Dashboard server is
 - **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, and last 8 messages verbatim.
 - **Queue priority**: User messages = priority 10, scheduled tasks = priority 1. Higher number = processed first.
 - **Email signature**: Uses publicly hosted images (freeimage.host) for Gmail compatibility. Both template and non-template paths must be updated when changing the signature.
+- **Alpha Vantage**: Financial data tools (stock_quote, stock_search, company_overview, market_news, crypto_rate, economic_indicator) use the Alpha Vantage REST API. API key stored in config as `alphavantage_api_key`. Helper function `alphaVantageQuery()` in tools.js handles all API calls. `/stocks` Telegram command provides a quick quote shortcut.
 
 ## Cron Job Reliability
 

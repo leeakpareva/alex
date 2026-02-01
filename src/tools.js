@@ -123,6 +123,21 @@ function postDashboard(payload) {
 }
 
 // ============================================================================
+// ALPHA VANTAGE HELPER
+// ============================================================================
+
+async function alphaVantageQuery(params, apiKey) {
+    const url = new URL('https://www.alphavantage.co/query');
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    url.searchParams.set('apikey', apiKey);
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (data['Error Message']) throw new Error(data['Error Message']);
+    if (data['Note']) throw new Error('Alpha Vantage rate limit. Try again in 60s.');
+    return data;
+}
+
+// ============================================================================
 // TOOL DEFINITIONS
 // ============================================================================
 
@@ -442,6 +457,93 @@ export const TOOLS = [
             },
             required: ["text"]
         }
+    },
+    {
+        name: "get_recent_uploads",
+        description: "Get list of files recently uploaded by the user in this chat (photos, documents). Returns file paths that can be used with send_email attachment_path.",
+        input_schema: {
+            type: "object",
+            properties: {}
+        }
+    },
+    {
+        name: "stock_quote",
+        description: "Get real-time stock price, change, and volume for a ticker symbol. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                symbol: { type: "string", description: "Stock ticker symbol (e.g. AAPL, TSLA, MSFT)" }
+            },
+            required: ["symbol"]
+        }
+    },
+    {
+        name: "stock_search",
+        description: "Search for stock ticker symbols by company name or keyword. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                keywords: { type: "string", description: "Search keywords (e.g. 'Tesla', 'Microsoft')" }
+            },
+            required: ["keywords"]
+        }
+    },
+    {
+        name: "company_overview",
+        description: "Get company fundamentals: market cap, P/E ratio, EPS, sector, description, dividend yield, 52-week range. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                symbol: { type: "string", description: "Stock ticker symbol (e.g. AAPL, TSLA)" }
+            },
+            required: ["symbol"]
+        }
+    },
+    {
+        name: "market_news",
+        description: "Get latest market news and sentiment. Can filter by tickers or topics. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                tickers: { type: "string", description: "Comma-separated ticker symbols (e.g. 'AAPL,TSLA')" },
+                topics: { type: "string", description: "Topics to filter by (e.g. 'technology', 'earnings', 'ipo', 'mergers_and_acquisitions', 'financial_markets', 'economy_fiscal', 'economy_monetary', 'economy_macro', 'energy_transportation', 'finance', 'life_sciences', 'manufacturing', 'real_estate', 'retail_wholesale', 'blockchain')" }
+            }
+        }
+    },
+    {
+        name: "crypto_rate",
+        description: "Get current cryptocurrency exchange rate. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                symbol: { type: "string", description: "Crypto symbol (e.g. BTC, ETH, SOL)" },
+                market: { type: "string", description: "Market currency (default: USD)" }
+            },
+            required: ["symbol"]
+        }
+    },
+    {
+        name: "economic_indicator",
+        description: "Get US economic indicator data: GDP, inflation, unemployment, interest rates, etc. Uses Alpha Vantage.",
+        input_schema: {
+            type: "object",
+            properties: {
+                function: { type: "string", description: "Indicator function: REAL_GDP, REAL_GDP_PER_CAPITA, INFLATION, INFLATION_EXPECTATION, CONSUMER_SENTIMENT, RETAIL_SALES, DURABLES, UNEMPLOYMENT, NONFARM_PAYROLL, TREASURY_YIELD, FEDERAL_FUNDS_RATE, CPI" }
+            },
+            required: ["function"]
+        }
+    },
+    {
+        name: "confirm_delete",
+        description: "Execute a file deletion command ONLY after the user has confirmed 3 times AND provided the correct delete password. You MUST have received 3 explicit confirmations and the correct password in the conversation before calling this tool. Never call this without all 4 requirements met.",
+        input_schema: {
+            type: "object",
+            properties: {
+                command: { type: "string", description: "The delete command to execute (rm, rmdir, etc.)" },
+                password: { type: "string", description: "The delete password provided by the user" }
+            },
+            required: ["command", "password"]
+        }
     }
 ];
 
@@ -455,6 +557,15 @@ export async function executeTool(name, input, { memory, skills, config, schedul
     try {
         switch (name) {
             case 'bash': {
+                // Guardrail: block destructive file operations without password
+                const cmd = input.command;
+                const destructivePatterns = /\brm\s|rmdir\s|unlink\s|shred\s|\brm\b.*-rf|\brm\b.*-r/i;
+                if (destructivePatterns.test(cmd)) {
+                    return {
+                        success: false,
+                        error: 'DELETE_GUARDRAIL: This command would delete files. You MUST ask the user to confirm 3 times AND provide the delete password before executing any file deletion. Ask: "This will delete files. Are you sure? (Confirmation 1 of 3)" — then ask twice more — then ask: "Please provide the delete password to proceed." The password must match exactly. Do NOT proceed without all 3 confirmations and the correct password.'
+                    };
+                }
                 const options = {
                     cwd: input.working_directory || os.homedir(),
                     timeout: input.timeout || 60000,
@@ -822,6 +933,107 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const voicePath = path.join(WORKSPACE_PATH, `voice_${Date.now()}.ogg`);
                 await fs.writeFile(voicePath, buffer);
                 return { success: true, path: voicePath, send_voice: true, message: 'Voice message generated' };
+            }
+
+            case 'get_recent_uploads': {
+                const { getUploadedFiles } = { getUploadedFiles: arguments[2]?.getUploadedFiles };
+                if (!getUploadedFiles) {
+                    return { success: true, uploads: [], note: 'Upload tracking not available' };
+                }
+                // Use owner chat ID as default — uploads come from the main chat
+                const uploads = getUploadedFiles(config?.telegram_owner_id) || [];
+                return { success: true, uploads, count: uploads.length };
+            }
+
+            case 'stock_quote': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const data = await alphaVantageQuery({ function: 'GLOBAL_QUOTE', symbol: input.symbol }, apiKey);
+                const q = data['Global Quote'];
+                if (!q || !q['05. price']) return { success: false, error: `No quote data found for ${input.symbol}` };
+                return {
+                    success: true,
+                    message: `${input.symbol.toUpperCase()}\nPrice: $${parseFloat(q['05. price']).toFixed(2)}\nChange: ${q['09. change']} (${q['10. change percent']})\nVolume: ${parseInt(q['06. volume']).toLocaleString()}\nPrevious Close: $${parseFloat(q['08. previous close']).toFixed(2)}\nLast Trading Day: ${q['07. latest trading day']}`
+                };
+            }
+
+            case 'stock_search': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const data = await alphaVantageQuery({ function: 'SYMBOL_SEARCH', keywords: input.keywords }, apiKey);
+                const matches = data['bestMatches'] || [];
+                if (matches.length === 0) return { success: true, message: `No matches found for "${input.keywords}"` };
+                const results = matches.slice(0, 8).map(m =>
+                    `${m['1. symbol']} — ${m['2. name']} (${m['4. region']}, ${m['3. type']})`
+                ).join('\n');
+                return { success: true, message: `Search results for "${input.keywords}":\n${results}` };
+            }
+
+            case 'company_overview': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const d = await alphaVantageQuery({ function: 'OVERVIEW', symbol: input.symbol }, apiKey);
+                if (!d.Symbol) return { success: false, error: `No data found for ${input.symbol}` };
+                return {
+                    success: true,
+                    message: `${d.Name} (${d.Symbol}) — ${d.Exchange}\nSector: ${d.Sector} | Industry: ${d.Industry}\nMarket Cap: $${(parseInt(d.MarketCapitalization) / 1e9).toFixed(2)}B\nP/E Ratio: ${d.PERatio} | EPS: $${d.EPS}\nDividend Yield: ${d.DividendYield || 'N/A'}\n52-Week Range: $${d['52WeekLow']} – $${d['52WeekHigh']}\nAnalyst Target: $${d.AnalystTargetPrice}\nProfit Margin: ${d.ProfitMargin} | Revenue TTM: $${(parseInt(d.RevenueTTM) / 1e9).toFixed(2)}B\n\nDescription: ${(d.Description || '').substring(0, 500)}`
+                };
+            }
+
+            case 'market_news': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const params = { function: 'NEWS_SENTIMENT', limit: '10' };
+                if (input.tickers) params.tickers = input.tickers;
+                if (input.topics) params.topics = input.topics;
+                const data = await alphaVantageQuery(params, apiKey);
+                const feed = data.feed || [];
+                if (feed.length === 0) return { success: true, message: 'No news articles found.' };
+                const articles = feed.slice(0, 8).map(a =>
+                    `• ${a.title}\n  Source: ${a.source} | ${a.time_published?.substring(0, 8) || ''}\n  Sentiment: ${a.overall_sentiment_label || 'N/A'}\n  ${a.summary?.substring(0, 150) || ''}`
+                ).join('\n\n');
+                return { success: true, message: `Market News:\n\n${articles}` };
+            }
+
+            case 'crypto_rate': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const market = input.market || 'USD';
+                const data = await alphaVantageQuery({ function: 'CURRENCY_EXCHANGE_RATE', from_currency: input.symbol, to_currency: market }, apiKey);
+                const r = data['Realtime Currency Exchange Rate'];
+                if (!r) return { success: false, error: `No exchange rate data for ${input.symbol}/${market}` };
+                return {
+                    success: true,
+                    message: `${r['2. From_Currency Name']} (${input.symbol.toUpperCase()}) → ${market}\nRate: ${parseFloat(r['5. Exchange Rate']).toFixed(4)}\nBid: ${r['8. Bid Price']} | Ask: ${r['9. Ask Price']}\nLast Updated: ${r['6. Last Refreshed']}`
+                };
+            }
+
+            case 'economic_indicator': {
+                const apiKey = config?.alphavantage_api_key;
+                if (!apiKey) return { success: false, error: 'Alpha Vantage API key not configured.' };
+                const data = await alphaVantageQuery({ function: input.function }, apiKey);
+                const points = data.data || [];
+                if (points.length === 0) return { success: false, error: `No data for ${input.function}` };
+                const recent = points.slice(0, 8);
+                const name = data.name || input.function;
+                const unit = data.unit || '';
+                const lines = recent.map(p => `${p.date}: ${p.value}${unit ? ' ' + unit : ''}`).join('\n');
+                return { success: true, message: `${name}\nInterval: ${data.interval || 'N/A'}\n\nRecent data:\n${lines}` };
+            }
+
+            case 'confirm_delete': {
+                const DELETE_PASSWORD = 'Navadaonline2026!';
+                if (input.password !== DELETE_PASSWORD) {
+                    return { success: false, error: 'Incorrect delete password. Deletion blocked. Ask the user to provide the correct password.' };
+                }
+                const deleteOptions = {
+                    cwd: os.homedir(),
+                    timeout: 60000,
+                    maxBuffer: 10 * 1024 * 1024
+                };
+                const { stdout, stderr } = await execAsync(input.command, deleteOptions);
+                console.log(`[GUARDRAIL] Delete executed after password verification: ${input.command}`);
+                return { success: true, stdout, stderr, note: 'Delete command executed after password verification.' };
             }
 
             default:

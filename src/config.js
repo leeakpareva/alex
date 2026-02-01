@@ -37,6 +37,7 @@ const OPTIONAL_KEYS = {
     deepseek_api_key: { type: 'string' },
     upstash_redis_url: { type: 'string' },
     upstash_redis_token: { type: 'string' },
+    alphavantage_api_key: { type: 'string' },
 };
 
 export async function loadConfig() {

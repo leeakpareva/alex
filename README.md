@@ -4,7 +4,7 @@ A production-ready autonomous AI agent that runs 24/7 on a Raspberry Pi 5. Origi
 
 ## What It Does
 
-Your agent operates via Telegram as a persistent AI colleague that can:
+Your agent operates via Telegram and Slack as a persistent AI colleague that can:
 
 | Capability | Description |
 |------------|-------------|
@@ -25,6 +25,8 @@ Your agent operates via Telegram as a persistent AI colleague that can:
 | **Token Logging** | Per-call token tracking with daily usage stats and cost breakdown |
 | **File Understanding** | Accepts photos, PDFs, and documents via Telegram with multimodal analysis |
 | **Learn Mode** | `/learn` toggles educational mode — answers structured as What / How / Why |
+| **Slack** | Channel polling + DMs via Slack Web API, threaded replies, mention-only in channels |
+| **Delete Guardrail** | File deletions require 3 confirmations + password — protects the Pi from accidental data loss |
 | **CLI Access** | `alex` command for terminal interaction via the control API |
 
 ## Architecture
@@ -34,8 +36,8 @@ Your agent operates via Telegram as a persistent AI colleague that can:
 │                        Agent Gateway                         │
 │                      (src/gateway.js)                        │
 ├──────────┬──────────┬──────────┬──────────┬────────────────┤
-│ Telegram │  Memory  │  Skills  │  System  │    Request     │
-│   Bot    │  System  │  System  │   Cron   │     Queue      │
+│ Telegram │  Slack   │  Memory  │  Skills  │    Request     │
+│   Bot    │   Bot    │  System  │  System  │     Queue      │
 ├──────────┴──────────┴──────────┴──────────┴────────────────┤
 │         Claude API (Sonnet 4 / Haiku 3.5 / DeepSeek)       │
 │        OpenAI (Whisper STT / TTS) + Web Search + Tools     │
@@ -52,16 +54,16 @@ Your agent operates via Telegram as a persistent AI colleague that can:
 ### Message Flow
 
 ```
-Telegram message → gateway.js (dedup + auth)
-  → downloads photos/docs/voice as content blocks
+Telegram/Slack message → gateway.js (dedup + auth)
+  → downloads photos/docs/voice as content blocks (Telegram)
   → voice notes: saved to ~/.alex/voice/ + Whisper transcription
   → chat.js chat() → selectModel() routes to Haiku/Sonnet/DeepSeek/GPT-4o
   → buildSystemPrompt() includes identity, memory, RAG context
   → prepareMessages() summarizes old messages, keeps last 8 verbatim
   → callAnthropicQueued() via queue.js (priority queue with circuit breaker)
   → processResponse() loops on tool_use blocks
-    → tools.js executeTool() with dependency injection
-  → smartSplit() response at paragraph boundaries → send via Telegram
+    → tools.js executeTool() with dependency injection (+ delete guardrail)
+  → smartSplit() response at paragraph boundaries → send via Telegram/Slack
 ```
 
 ### Model Routing
@@ -83,6 +85,7 @@ Telegram message → gateway.js (dedup + auth)
 | `src/heartbeat.js` | Built-in task definitions map, scheduled task execution through AI, dashboard sync, cleanup |
 | `src/memory.js` | `MemorySystem` class. Conversations, categories, identity, user info, rolling summaries |
 | `src/skills.js` | `SkillsSystem` class. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
+| `src/slack.js` | Slack interface. Polls channel + DMs via Web API every 3s, threaded replies in channels, direct replies in DMs, mention-only filtering |
 | `src/inbox.js` | Gmail inbox monitor. IMAP polling, AI reply generation via Claude, Telegram notifications with action summaries |
 | `src/config.js` | Config loader. Workspace paths, allowed write/attachment paths, path validation |
 | `src/queue.js` | Priority request queue with circuit breaker, rate limiting, cooldown on 429s |
@@ -127,7 +130,9 @@ chmod 700 ~/.alex
   "gmail_address": "your.email@gmail.com",
   "gmail_app_password": "xxxx xxxx xxxx xxxx",
   "recipient_email": "default@recipient.com",
-  "openai_api_key": "sk-..."
+  "openai_api_key": "sk-...",
+  "slack_token": "xoxb-...",
+  "slack_channel_id": "C0XXXXXXXX"
 }
 ```
 
@@ -142,6 +147,8 @@ Set permissions: `chmod 600 ~/.alex/config.json`
 | `telegram_owner_id` | Telegram → @userinfobot → send any message |
 | `gmail_app_password` | Google Account → Security → 2FA → App Passwords |
 | `openai_api_key` | [platform.openai.com](https://platform.openai.com) → API Keys (for voice/TTS) |
+| `slack_token` | [api.slack.com/apps](https://api.slack.com/apps) → Your App → OAuth & Permissions → Bot User OAuth Token |
+| `slack_channel_id` | Right-click channel in Slack → View channel details → copy Channel ID |
 
 ### Step 5: Define the Agent's Identity (`~/.alex/IDENTITY.md`)
 
@@ -278,6 +285,7 @@ curl -X POST http://127.0.0.1:9090/api/send \
 | `/tokens` | Today's API usage breakdown by model |
 | `/spend` | Full lifetime cost report with daily breakdown and averages |
 | `/learn` | Toggle educational mode — answers structured as What / How / Why |
+| `/stocks <symbol>` | Quick stock quote from Alpha Vantage |
 | `/clear` | Clear conversation history (preserves long-term memory) |
 | `/help` | Full command reference with tips |
 
@@ -292,6 +300,45 @@ The agent monitors its Gmail inbox via IMAP every 2 minutes. For each new email:
 Anti-loop protections skip auto-replies for: noreply, mailer-daemon, bounce, notifications, googlegroups, calendar, digest, the agent's own address, and plus-addressed emails.
 
 Seen UIDs are persisted to `~/.alex/logs/inbox-seen.json` (trimmed to 500) to prevent reprocessing across restarts.
+
+## Slack Integration
+
+The agent connects to Slack via the Web API (polling every 3 seconds). No WebSocket or Events API needed.
+
+### How It Works
+
+- **Channels**: The agent only responds when `@mentioned`. Replies are sent in threads to keep the channel clean.
+- **Direct Messages**: The agent responds to every DM automatically. DM channels are discovered via `conversations.list` and rescanned every 60 seconds.
+- **Conversations**: Each channel and each thread gets its own conversation context (`slack-{channelId}-{threadTs}`), keeping memory separate.
+- **Learn Mode**: Works independently per chat — Slack and Telegram learn modes don't interfere.
+
+### Required Slack App Scopes (Bot Token)
+
+| Scope | Purpose |
+|-------|---------|
+| `chat:write` | Send messages and replies |
+| `channels:history` | Read channel messages |
+| `im:history` | Read direct messages |
+| `im:read` | List DM conversations |
+| `users:read` | Resolve user display names |
+
+### Setup
+
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps) → **From scratch**
+2. Add the scopes above under **OAuth & Permissions** → **Bot Token Scopes**
+3. Install the app to your workspace
+4. Copy the **Bot User OAuth Token** (`xoxb-...`) to `~/.alex/config.json` as `slack_token`
+5. Add the bot to your channel: `/invite @YourAppName`
+6. Set `slack_channel_id` in config to your channel's ID
+
+## Delete Guardrail
+
+File deletion commands (`rm`, `rmdir`, `unlink`, `shred`) are blocked by default. To delete files, the user must:
+
+1. Confirm the deletion **3 times** when prompted by the agent
+2. Provide the **delete password**
+
+This protects the Pi from accidental file deletion by any user on Telegram or Slack. The password is configured in `src/tools.js`.
 
 ## CLI Access
 
@@ -363,7 +410,7 @@ To set up the Vercel dashboard for a clone:
 
 | Tool | Description |
 |------|-------------|
-| `bash` | Execute any shell command |
+| `bash` | Execute any shell command (delete commands blocked — see guardrail) |
 | `read_file` / `write_file` | Read and write files |
 | `list_directory` | Browse filesystem |
 | `web_search` | Search the internet |
@@ -376,6 +423,13 @@ To set up the Vercel dashboard for a clone:
 | `schedule_task` | Create cron-based scheduled jobs |
 | `create_skill` | Build new agent capabilities |
 | `update_dashboard` | Push updates to the live dashboard |
+| `stock_quote` | Real-time stock price, change, and volume via Alpha Vantage |
+| `stock_search` | Search for stock ticker symbols by name/keyword |
+| `company_overview` | Company fundamentals: market cap, P/E, EPS, sector, description |
+| `market_news` | Market news and sentiment, filterable by tickers/topics |
+| `crypto_rate` | Cryptocurrency exchange rates |
+| `economic_indicator` | US economic indicators: GDP, inflation, unemployment, etc. |
+| `confirm_delete` | Execute file deletion after 3 confirmations + password verification |
 
 ## Cron Resilience
 
@@ -433,7 +487,7 @@ journalctl -u alex -f
 tail -f ~/.alex/logs/gateway.log
 
 # Syntax check after code changes
-node --check src/gateway.js src/chat.js src/tools.js src/heartbeat.js
+node --check src/gateway.js src/chat.js src/tools.js src/heartbeat.js src/slack.js
 
 # Manually trigger a task
 curl -X POST http://127.0.0.1:9090/api/trigger \

@@ -41,6 +41,8 @@ import { SkillsSystem } from './skills.js';
 import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost } from './tools.js';
 import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
 import { setupInbox, startInboxPolling } from './inbox.js';
+import { setupSlack, startSlackPolling } from './slack.js';
+import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, smartSplit } from './chat.js';
 
 // ============================================================================
@@ -57,6 +59,12 @@ let skills = null;
 let scheduledTasks = new Map();
 let redis = null;
 const learnModeChats = new Set(); // Track chats with /learn active
+const mathModeChats = new Set(); // Track chats with /mathematician active
+const strategistModeChats = new Set(); // Track chats with /strategist active
+const voiceModeChats = new Set(); // Track chats with /voice active
+const modelOverrides = new Map(); // Track per-chat model locks
+const awaitingModelSelect = new Set(); // Chats waiting for model selection reply
+const recentUploads = new Map(); // chatId → [{ path, filename, timestamp }]
 
 // In-memory dashboard state (mirrors dash:data in Redis)
 const dashState = {
@@ -96,6 +104,14 @@ let pendingCharts = [];
 // TOOL EXECUTION WRAPPER (passes dependencies)
 // ============================================================================
 
+function getUploadedFiles(chatId) {
+    const uploads = recentUploads.get(chatId) || [];
+    const oneHourAgo = Date.now() - 3600000;
+    const recent = uploads.filter(u => u.timestamp > oneHourAgo);
+    recentUploads.set(chatId, recent);
+    return recent;
+}
+
 async function execToolWithDeps(name, input) {
     const result = await executeTool(name, input, {
         memory,
@@ -105,6 +121,7 @@ async function execToolWithDeps(name, input) {
         handleScheduledTask: (task) => handleScheduledTask(task, heartbeatDeps()),
         openaiClient,
         bot,
+        getUploadedFiles,
     });
     // Queue files for sending after response completes
     if (result && result.send_photo && result.path) {
@@ -188,6 +205,14 @@ function postDashboard(action, payload) {
             if (existing && payload.updates) Object.assign(existing, payload.updates);
             break;
         }
+        case 'update_inbox': {
+            dashState.inbox = payload;
+            // Also push to Redis as separate key
+            if (redis) {
+                redis.set('dash:inbox', JSON.stringify(payload)).catch(e => console.error('[DASH] inbox push failed:', e.message));
+            }
+            break;
+        }
     }
     scheduleDashPush();
 }
@@ -195,6 +220,16 @@ function postDashboard(action, payload) {
 // ============================================================================
 // TELEGRAM BOT SETUP
 // ============================================================================
+
+function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
 
 function setupTelegram() {
     bot = new TelegramBot(config.telegram_bot_token, { polling: true });
@@ -215,23 +250,30 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 • Remember everything we discuss across sessions
 • Create new skills to extend my own capabilities
 • Monitor the Gmail inbox and auto-reply to contacts
+• Look up real-time stock prices, company data, crypto, and economic indicators
 • Run code, manage files, and control this Pi
 
 *Commands:*
-/status — System health, uptime, temperature
-/memory — What I currently remember (by category)
-/skills — Custom skills I've learned
-/tasks — Scheduled and recurring tasks
-/tokens — Today's API usage breakdown
-/spend — Full lifetime cost and spending report
-/learn — Enter educational mode (structured answers)
-/exit — Leave educational mode
-/clear — Wipe conversation history
-/help — Full command list with tips
+/alex — Full command reference
+/inbox — Email queue and triage
+/action 1 — Act on an email
+/mathematician — Quantitative and computational mode
+/strategist — Strategic frameworks mode
+/learn — Educational mode
+/voice — Voice reply mode
+/research [topic] — Deep research on demand
+/brief — Recent activity summary
+/news — Latest gathered news
+/stocks AAPL — Quick stock quote
+/status — System health and uptime
+/duties — All duties and schedules
+/models — Switch AI model
+/mode — Show active modes
+/help — Full guide with tips
 
 Just message me naturally — I'm here to help.
 
-[About ALEX](https://alexnavada.xyz) · [NAVADA](https://www.navada.space)`;
+[About ALEX](https://alexnavada.xyz) · [NAVADA](https://www.navada.space) · [Slack Channel](https://navada-group.slack.com/archives/C0AC5MK54DU)`;
 
         await bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
@@ -250,9 +292,13 @@ Just message me naturally — I'm here to help.
 
     bot.onText(/\/exit/, async (msg) => {
         const chatId = msg.chat.id;
-        if (learnModeChats.has(chatId)) {
-            learnModeChats.delete(chatId);
-            await bot.sendMessage(chatId, `*Educational mode off.*\n\nBack to normal.`, { parse_mode: 'Markdown' });
+        const cleared = [];
+        if (learnModeChats.has(chatId)) { learnModeChats.delete(chatId); cleared.push('Educational'); }
+        if (mathModeChats.has(chatId)) { mathModeChats.delete(chatId); cleared.push('Mathematician'); }
+        if (strategistModeChats.has(chatId)) { strategistModeChats.delete(chatId); cleared.push('Strategist'); }
+        if (voiceModeChats.has(chatId)) { voiceModeChats.delete(chatId); cleared.push('Voice'); }
+        if (cleared.length > 0) {
+            await bot.sendMessage(chatId, `*${cleared.join(', ')} mode${cleared.length > 1 ? 's' : ''} off.*\n\nBack to normal.`, { parse_mode: 'Markdown' });
         } else {
             await bot.sendMessage(chatId, `No active mode to exit.`);
         }
@@ -263,37 +309,96 @@ Just message me naturally — I'm here to help.
         try {
             const { stdout: uptime } = await execAsync('uptime -p');
             const { stdout: temp } = await execAsync('vcgencmd measure_temp 2>/dev/null || echo "temp=N/A"');
-            const { stdout: disk } = await execAsync("df -h / | tail -1 | awk '{print $5}'");
-            const { stdout: mem } = await execAsync("free -m | awk '/Mem:/ {printf \"%.1f%%\", $3/$2 * 100}'");
+            const { stdout: disk } = await execAsync("df -h / | tail -1 | awk '{print $3 \" / \" $2 \" (\" $5 \")\"}'");
+            const { stdout: mem } = await execAsync("free -m | awk '/Mem:/ {printf \"%dMB / %dMB (%.1f%%)\", $3, $2, $3/$2 * 100}'");
             const { stdout: loadavg } = await execAsync("cat /proc/loadavg | awk '{print $1, $2, $3}'");
 
-            const tasks = Array.from(scheduledTasks.keys());
             const uptimeSec = os.uptime();
             const days = Math.floor(uptimeSec / 86400);
             const hours = Math.floor((uptimeSec % 86400) / 3600);
+
+            // Process uptime (how long since ALEX started, not system)
+            const processUpSec = Math.floor(process.uptime());
+            const pDays = Math.floor(processUpSec / 86400);
+            const pHours = Math.floor((processUpSec % 86400) / 3600);
+            const pMins = Math.floor((processUpSec % 3600) / 60);
+            const processUpStr = pDays > 0 ? `${pDays}d ${pHours}h ${pMins}m` : pHours > 0 ? `${pHours}h ${pMins}m` : `${pMins}m`;
+
+            // Today's token cost
+            let todayCost = '£0.00';
+            let todayCalls = 0;
+            try {
+                const stats = await getDailyTokenStats();
+                todayCalls = stats.totalCalls;
+                const GBP = 0.79;
+                let costGbp = 0;
+                for (const [model, data] of Object.entries(stats.byModel)) {
+                    let costUsd = 0;
+                    if (model.includes('haiku')) costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
+                    else if (model.includes('deepseek')) costUsd = data.input / 1e6 * 0.14 + data.output / 1e6 * 0.28;
+                    else if (model.includes('gpt')) costUsd = data.input / 1e6 * 2.5 + data.output / 1e6 * 10;
+                    else costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    costGbp += costUsd * GBP;
+                }
+                todayCost = `£${costGbp.toFixed(4)}`;
+            } catch {}
+
+            // Workspace size
+            let workspaceSize = 'unknown';
+            try {
+                const { stdout: du } = await execAsync(`du -sh ${WORKSPACE_PATH} 2>/dev/null | awk '{print $1}'`);
+                workspaceSize = du.trim();
+            } catch {}
+
+            // Conversation count
+            let convCount = 0;
+            try {
+                const { stdout: cc } = await execAsync(`ls ${WORKSPACE_PATH}/conversations/*.json 2>/dev/null | wc -l`);
+                convCount = parseInt(cc.trim()) || 0;
+            } catch {}
+
+            // Session activity
+            const sessionTasks = dashState.tasks.length;
+            const sessionActivity = dashState.activity_log.length;
+
+            // Active modes for this chat
+            const modes = [learnModeChats.has(chatId) && 'Learn', mathModeChats.has(chatId) && 'Mathematician', strategistModeChats.has(chatId) && 'Strategist', voiceModeChats.has(chatId) && 'Voice'].filter(Boolean);
 
             const status = `*ALEX — System Status*
 
 *Hardware:*
 • Raspberry Pi 5 (${os.arch()})
 • Temperature: ${temp.trim().replace('temp=', '')}
-• Uptime: ${uptime.trim()} (${days}d ${hours}h)
+• System uptime: ${uptime.trim()} (${days}d ${hours}h)
 • Load average: ${loadavg.trim()}
 
 *Resources:*
-• Memory: ${mem.trim()} used
-• Disk: ${disk.trim()} used
-• Node.js: ${process.version}
+• RAM: ${mem.trim()}
+• Disk: ${disk.trim()}
+• Workspace: ${workspaceSize} (\`${WORKSPACE_PATH}\`)
+• Node.js: ${process.version} (PID ${process.pid})
 
 *Services:*
 • Telegram bot: online
 • Control API: port 9090
 • Gmail inbox: ${config.gmail_address ? 'polling' : 'disabled'}
-• Dashboard: ${redis ? 'connected' : 'local only'}
+• Slack: ${config.slack_token ? 'polling' : 'disabled'}
+• Dashboard: ${redis ? 'connected (Upstash)' : 'local only'}
+• DeepSeek: ${deepseekClient ? 'available' : 'disabled'}
+• OpenAI: ${openaiClient ? 'available' : 'disabled'}
 
-*Scheduled Tasks:* ${tasks.length > 0 ? tasks.map(t => `\`${t}\``).join(', ') : 'None active'}
-*Learn Mode:* ${learnModeChats.has(chatId) ? 'on' : 'off'}
-*Workspace:* \`${WORKSPACE_PATH}\``;
+*ALEX Process:*
+• Running for: ${processUpStr}
+• API calls today: ${todayCalls}
+• Cost today: ${todayCost}
+• Conversations tracked: ${convCount}
+• Session tasks: ${sessionTasks} | Activity entries: ${sessionActivity}
+
+*Your Settings:*
+• Model: ${modelOverrides.has(chatId) ? modelOverrides.get(chatId) : 'Auto (smart routing)'}
+• Modes: ${modes.length > 0 ? modes.join(', ') : 'none'}
+
+_Use /duties for task schedules, /tokens for usage breakdown, /spend for full costs._`;
 
             await bot.sendMessage(chatId, status, { parse_mode: 'Markdown' });
         } catch (error) {
@@ -303,68 +408,161 @@ Just message me naturally — I'm here to help.
 
     bot.onText(/\/memory/, async (msg) => {
         const chatId = msg.chat.id;
-        const categories = ['user', 'projects', 'research', 'tasks', 'knowledge'];
-        let text = '*ALEX — Memory Banks*\n\n';
-        let totalEntries = 0;
-        for (const cat of categories) {
-            const content = await memory.getMemory(cat);
-            const lines = content.split('\n').filter(l => l.trim()).length;
-            totalEntries += lines;
-            const desc = { user: 'People and preferences', projects: 'Active projects and goals', research: 'Market data and findings', tasks: 'Task history and outcomes', knowledge: 'Accumulated facts and insights' };
-            text += `*${cat}* — ${desc[cat]}\n  ${lines} entries\n\n`;
+        try {
+            const categories = ['user', 'projects', 'research', 'tasks', 'knowledge'];
+            const desc = { user: 'People, preferences, contacts', projects: 'Active projects, goals, pipelines', research: 'Market data, findings, analysis', tasks: 'Task history, outcomes, schedules', knowledge: 'Accumulated facts, insights, learnings' };
+            let text = '*ALEX — Memory Banks*\n\n';
+            let totalEntries = 0;
+            let totalSize = 0;
+
+            for (const cat of categories) {
+                const content = await memory.getMemory(cat);
+                const lines = content.split('\n').filter(l => l.trim());
+                const lineCount = lines.length;
+                totalEntries += lineCount;
+                const sizeKb = Buffer.byteLength(content, 'utf-8') / 1024;
+                totalSize += sizeKb;
+
+                text += `*${cat}* — ${desc[cat]}\n`;
+                text += `  ${lineCount} entries (${sizeKb.toFixed(1)} KB)\n`;
+                // Show last 3 entries as preview
+                if (lines.length > 0) {
+                    const preview = lines.slice(-3);
+                    for (const line of preview) {
+                        text += `  > ${line.substring(0, 70)}${line.length > 70 ? '...' : ''}\n`;
+                    }
+                }
+                text += `\n`;
+            }
+
+            text += `*Total:* ${totalEntries} entries, ${totalSize.toFixed(1)} KB across ${categories.length} categories\n\n`;
+            text += `_Ask me to "remember [fact]" or "forget [topic]" to manage memory. Say "what do you know about [X]" to query it._`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error reading memory: ${error.message}`);
         }
-        text += `*Total:* ${totalEntries} entries across ${categories.length} categories\n\n`;
-        text += `_I remember everything we discuss. Ask me to save or forget anything._`;
-        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/skills/, async (msg) => {
         const chatId = msg.chat.id;
-        const allSkills = await skills.getAllSkills();
-        let text = '*ALEX — Learned Skills*\n\n';
-        if (allSkills.length === 0) {
-            text += `No custom skills yet.\n\n_Ask me to create a skill for any recurring task — I'll learn it and remember how to do it next time._`;
-        } else {
-            for (const skill of allSkills) {
-                text += `• \`${skill.name}\`\n`;
+        try {
+            const allSkills = await skills.getAllSkills();
+            let text = '*ALEX — Learned Skills*\n\n';
+            if (allSkills.length === 0) {
+                text += `No custom skills yet.\n\n_Ask me to create a skill for any recurring task — I'll learn it and remember how to do it next time._`;
+            } else {
+                for (const skill of allSkills) {
+                    // Read first line of skill definition for description
+                    let desc = '';
+                    try {
+                        const skillPath = path.join(WORKSPACE_PATH, 'skills', skill.name, 'SKILL.md');
+                        const content = await readFile(skillPath, 'utf-8');
+                        // Get first non-header, non-empty line as description
+                        const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+                        desc = lines[0]?.substring(0, 80) || '';
+                    } catch {}
+                    text += `• \`${skill.name}\`${desc ? `\n  ${desc}` : ''}\n`;
+                }
+                text += `\n*${allSkills.length} skill${allSkills.length !== 1 ? 's' : ''}* loaded into system prompt.\n\n_Skills are referenced automatically when relevant. Ask me to "create a skill for [task]" or "improve [skill name]" to manage them._`;
             }
-            text += `\n${allSkills.length} skill${allSkills.length !== 1 ? 's' : ''} available.\n\n_I can create new skills on request. Just describe what you need automated._`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error reading skills: ${error.message}`);
         }
-        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/tasks/, async (msg) => {
         const chatId = msg.chat.id;
-        const tasks = Array.from(scheduledTasks.entries());
+        try {
+            // Read all user-created tasks from disk with full detail
+            const taskDir = path.join(WORKSPACE_PATH, 'tasks');
+            const userTasks = [];
+            try {
+                const { readdir } = await import('fs/promises');
+                const files = await readdir(taskDir);
+                for (const f of files) {
+                    if (!f.endsWith('.json')) continue;
+                    try {
+                        const raw = await readFile(path.join(taskDir, f), 'utf-8');
+                        userTasks.push(JSON.parse(raw));
+                    } catch {}
+                }
+            } catch {}
 
-        let text = '*ALEX — Scheduled Tasks*\n\n';
-        if (tasks.length === 0) {
-            text += `No active scheduled tasks.\n\n_Ask me to schedule anything — briefings, reports, reminders, research runs. I'll set it up with system cron and run it automatically._`;
-        } else {
-            for (const [name] of tasks) {
-                text += `• \`${name}\`\n`;
+            const builtinCount = BUILTIN_TASKS.size;
+
+            let text = `*ALEX — All Tasks*\n\n`;
+            text += `*Built-in (${builtinCount}):*\n`;
+            for (const [name, def] of BUILTIN_TASKS) {
+                const shortDesc = def.task_description.split('\n')[0].substring(0, 70);
+                text += `• \`${name}\`\n  ${shortDesc}\n`;
             }
-            text += `\n${tasks.length} task${tasks.length !== 1 ? 's' : ''} scheduled.\n\n_Tasks run automatically via system cron. I can add, remove, or adjust schedules anytime._`;
+
+            if (userTasks.length > 0) {
+                text += `\n*Custom (${userTasks.length}):*\n`;
+                for (const t of userTasks) {
+                    const desc = t.task_description?.split('\n')[0]?.substring(0, 70) || 'No description';
+                    text += `• \`${t.name}\` — \`${t.cron_expression}\`\n  ${desc}\n`;
+                }
+            }
+
+            text += `\n*Total:* ${builtinCount + userTasks.length} tasks (${builtinCount} built-in + ${userTasks.length} custom)\n\n`;
+            text += `_Use /duties for schedule times and next-run. Ask me to "schedule [task]" to create new ones or "delete task [name]" to remove._`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error reading tasks: ${error.message}`);
         }
-        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/tokens/, async (msg) => {
         const chatId = msg.chat.id;
         try {
             const stats = await getDailyTokenStats();
+            const GBP = 0.79;
+            const totalTokens = stats.totalIn + stats.totalOut;
+            const totalTokFmt = totalTokens >= 1_000_000 ? `${(totalTokens / 1_000_000).toFixed(2)}M` : `${(totalTokens / 1_000).toFixed(1)}K`;
+
             let text = `*ALEX — Token Usage Today*\n\n`;
-            text += `*Total:* ${stats.totalCalls} API calls\n`;
-            text += `*Input:* ${stats.totalIn.toLocaleString()} tokens\n`;
-            text += `*Output:* ${stats.totalOut.toLocaleString()} tokens\n\n`;
+            text += `*Totals:*\n`;
+            text += `• API calls: ${stats.totalCalls}\n`;
+            text += `• Input: ${stats.totalIn.toLocaleString()} tokens\n`;
+            text += `• Output: ${stats.totalOut.toLocaleString()} tokens\n`;
+            text += `• Combined: ${totalTokFmt}\n\n`;
+
             if (Object.keys(stats.byModel).length > 0) {
+                let totalCostGbp = 0;
                 text += `*By Model:*\n`;
+                const modelRows = [];
                 for (const [model, data] of Object.entries(stats.byModel)) {
-                    const shortName = model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.includes('deepseek') ? 'DeepSeek' : model;
-                    text += `• ${shortName}: ${data.calls} calls — ${data.input.toLocaleString()} in / ${data.output.toLocaleString()} out\n`;
+                    const shortName = model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.includes('deepseek') ? 'DeepSeek' : model.includes('gpt') ? 'GPT-4o' : model;
+                    let costUsd = 0;
+                    if (model.includes('haiku')) costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
+                    else if (model.includes('deepseek')) costUsd = data.input / 1e6 * 0.14 + data.output / 1e6 * 0.28;
+                    else if (model.includes('gpt')) costUsd = data.input / 1e6 * 2.5 + data.output / 1e6 * 10;
+                    else costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    const costGbp = costUsd * GBP;
+                    totalCostGbp += costGbp;
+                    const pct = stats.totalCalls > 0 ? ((data.calls / stats.totalCalls) * 100).toFixed(0) : 0;
+                    modelRows.push({ name: shortName, calls: data.calls, pct, input: data.input, output: data.output, costGbp });
+                }
+                // Sort by cost descending
+                modelRows.sort((a, b) => b.costGbp - a.costGbp);
+                for (const r of modelRows) {
+                    const tokFmt = (r.input + r.output) >= 1_000_000 ? `${((r.input + r.output) / 1_000_000).toFixed(1)}M` : `${((r.input + r.output) / 1_000).toFixed(1)}K`;
+                    text += `• ${r.name}: ${r.calls} calls (${r.pct}%) — ${tokFmt} tokens — £${r.costGbp.toFixed(4)}\n`;
+                }
+
+                text += `\n*Today's cost:* £${totalCostGbp.toFixed(4)}\n`;
+
+                // Efficiency metric
+                if (stats.totalCalls > 0) {
+                    const avgPerCall = Math.round(totalTokens / stats.totalCalls);
+                    const costPerCall = totalCostGbp / stats.totalCalls;
+                    text += `*Avg per call:* ${avgPerCall.toLocaleString()} tokens (£${costPerCall.toFixed(4)})\n`;
                 }
             }
-            text += `\n_For full cost breakdown, use /spend_`;
+
+            text += `\n_Use /spend for lifetime costs, /projection for forecasts._`;
             await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
         } catch (error) {
             await bot.sendMessage(chatId, `Error getting token stats: ${error.message}`);
@@ -466,43 +664,442 @@ Just message me naturally — I'm here to help.
         }
     });
 
+    bot.onText(/\/projection/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            const GBP_RATE = 0.79;
+            const stats = await getLifetimeTokenStats();
+            if (!stats.firstDay || stats.totalDays < 1) {
+                await bot.sendMessage(chatId, 'Not enough usage data yet. Check back after a few days of operation.');
+                return;
+            }
+
+            const totalCostUsd = stats.totalCostGbp / GBP_RATE;
+            const dailyCostGbp = stats.avgCostPerDay;
+            const dailyCostUsd = dailyCostGbp / GBP_RATE;
+            const monthlyCostGbp = dailyCostGbp * 30;
+            const monthlyCostUsd = dailyCostUsd * 30;
+            const yearlyCostGbp = dailyCostGbp * 365;
+            const yearlyCostUsd = dailyCostUsd * 365;
+
+            // Pi running cost (12W, UK avg 28p/kWh)
+            const piDailyGbp = (12 / 1000) * 24 * 0.28;
+            const piMonthlyGbp = piDailyGbp * 30;
+            const piYearlyGbp = piDailyGbp * 365;
+
+            const totalMonthlyGbp = monthlyCostGbp + piMonthlyGbp;
+            const totalYearlyGbp = yearlyCostGbp + piYearlyGbp;
+
+            // Human equivalent cost (UK mid-level economist + overhead)
+            const humanYearlyGbp = 50000;
+            const humanMonthlyGbp = humanYearlyGbp / 12;
+            const savingsYearlyGbp = humanYearlyGbp - totalYearlyGbp;
+            const savingsPercent = ((savingsYearlyGbp / humanYearlyGbp) * 100).toFixed(1);
+
+            // Balance and runway
+            const balanceUsd = config.anthropic_balance_usd || 0;
+            const daysRemaining = dailyCostUsd > 0 ? Math.floor(balanceUsd / dailyCostUsd) : 0;
+
+            let text = `*ALEX — Cost Projection*\n\n`;
+            text += `Based on ${stats.totalDays} day${stats.totalDays !== 1 ? 's' : ''} of real usage data\n\n`;
+
+            text += `*API Costs (Anthropic + OpenAI):*\n`;
+            text += `• Daily: £${dailyCostGbp.toFixed(2)} ($${dailyCostUsd.toFixed(2)})\n`;
+            text += `• Monthly: £${monthlyCostGbp.toFixed(2)} ($${monthlyCostUsd.toFixed(2)})\n`;
+            text += `• Yearly: £${yearlyCostGbp.toFixed(2)} ($${yearlyCostUsd.toFixed(2)})\n\n`;
+
+            text += `*Hardware (Raspberry Pi 5, 12W):*\n`;
+            text += `• Monthly: £${piMonthlyGbp.toFixed(2)}\n`;
+            text += `• Yearly: £${piYearlyGbp.toFixed(2)}\n\n`;
+
+            text += `*Total Cost to Run ALEX:*\n`;
+            text += `• Monthly: £${totalMonthlyGbp.toFixed(2)}\n`;
+            text += `• *Yearly: £${totalYearlyGbp.toFixed(2)}*\n\n`;
+
+            text += `*ROI vs Human Equivalent:*\n`;
+            text += `• Human economist (UK): £${humanYearlyGbp.toLocaleString()} / year\n`;
+            text += `• ALEX: £${totalYearlyGbp.toFixed(2)} / year\n`;
+            text += `• *Savings: £${savingsYearlyGbp.toFixed(2)} / year (${savingsPercent}%)*\n\n`;
+
+            if (balanceUsd > 0 && daysRemaining > 0) {
+                text += `*Wallet Runway:*\n`;
+                text += `• Balance: $${balanceUsd.toFixed(2)}\n`;
+                text += `• At current rate: ~${daysRemaining} days remaining\n`;
+                const nextTopUpDate = new Date();
+                nextTopUpDate.setDate(nextTopUpDate.getDate() + daysRemaining);
+                text += `• Next top-up needed: ~${nextTopUpDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+            }
+
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error generating projection: ${error.message}`);
+        }
+    });
+
     bot.onText(/\/clear/, async (msg) => {
         const chatId = msg.chat.id;
         await memory.saveConversation(chatId, []);
-        learnModeChats.delete(chatId);
-        await bot.sendMessage(chatId, `*Conversation cleared.*\n\nStarting fresh. My long-term memory (people, projects, research) is still intact — only the chat history was wiped.`, { parse_mode: 'Markdown' });
+        // Clear all modes for this chat
+        const cleared = [];
+        if (learnModeChats.delete(chatId)) cleared.push('Learn');
+        if (mathModeChats.delete(chatId)) cleared.push('Mathematician');
+        if (strategistModeChats.delete(chatId)) cleared.push('Strategist');
+        if (voiceModeChats.delete(chatId)) cleared.push('Voice');
+        if (modelOverrides.delete(chatId)) cleared.push('Model lock');
+
+        let text = `*Conversation cleared.*\n\nChat history wiped and starting fresh.`;
+        if (cleared.length > 0) {
+            text += `\nModes cleared: ${cleared.join(', ')}.`;
+        }
+        text += `\n\n*Still intact:*\n• Long-term memory (people, projects, research, knowledge)\n• Learned skills (${(await skills.getAllSkills()).length} skills)\n• Scheduled tasks and cron jobs\n\n_Everything I've learned about you persists. Only the conversation thread was reset._`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/alex/, async (msg) => {
+        const chatId = msg.chat.id;
+        const text = `*ALEX — Quick Reference*
+
+/alex — This command list
+/inbox — Email queue (not\_started by default)
+/email 1 — Full email details
+/action 1 reply — Act on an email
+/status — System health and uptime
+/duties — All duties, schedules, performance
+/brief — Recent activity summary
+/news — Latest gathered news
+
+*Modes (toggle on/off):*
+/mathematician — Quantitative and computational
+/strategist — Strategic frameworks and analysis
+/learn — Educational mode (What/How/Why)
+/voice — Voice message replies
+/mode — Show active modes
+/exit — Turn off all active modes
+
+*Tools:*
+/stocks AAPL — Quick stock quote
+/models — Switch AI model
+/research [topic] — Deep research on demand
+
+*Info:*
+/memory — Browse memory banks
+/skills — View learned skills
+/tasks — Scheduled tasks
+/tokens — Today's API usage
+/spend — Lifetime cost report
+/projection — Cost projection and ROI
+/id — Your chat and user ID
+/dashboard — Live dashboard link
+/clear — Wipe chat history
+/help — Full guide with tips
+
+Just message me naturally for anything else.`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/stocks(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const symbol = match[1]?.trim();
+        if (!symbol) {
+            await bot.sendMessage(chatId, 'Usage: /stocks AAPL');
+            return;
+        }
+        const apiKey = config.alphavantage_api_key;
+        if (!apiKey) {
+            await bot.sendMessage(chatId, 'Alpha Vantage API key not configured.');
+            return;
+        }
+        try {
+            const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data['Note']) {
+                await bot.sendMessage(chatId, 'Rate limited — try again in 60s.');
+                return;
+            }
+            const q = data['Global Quote'];
+            if (!q || !q['05. price']) {
+                await bot.sendMessage(chatId, `No quote data found for ${symbol.toUpperCase()}`);
+                return;
+            }
+            const price = parseFloat(q['05. price']).toFixed(2);
+            const change = parseFloat(q['09. change']).toFixed(2);
+            const pct = q['10. change percent'];
+            const volume = parseInt(q['06. volume']).toLocaleString();
+            const date = q['07. latest trading day'];
+            const arrow = parseFloat(change) >= 0 ? '📈' : '📉';
+            const sign = parseFloat(change) >= 0 ? '+' : '';
+            const text = `${arrow} *${symbol.toUpperCase()}*\nPrice: $${price} (${sign}${change}, ${pct})\nVolume: ${volume}\nLast updated: ${date}`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error fetching quote: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/id/, async (msg) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        const username = msg.from.username ? `@${msg.from.username}` : 'not set';
+        const firstName = msg.from.first_name || 'unknown';
+        const lastName = msg.from.last_name || '';
+        const isAuthorised = !config.telegram_authorized_users?.length || config.telegram_authorized_users.includes(userId);
+        const isOwner = config.telegram_owner_id && config.telegram_owner_id === chatId;
+        const chatType = msg.chat.type || 'private';
+
+        let text = `*Your Identity*\n\n`;
+        text += `• Name: ${firstName} ${lastName}\n`;
+        text += `• Username: ${username}\n`;
+        text += `• User ID: \`${userId}\`\n`;
+        text += `• Chat ID: \`${chatId}\`\n`;
+        text += `• Chat type: ${chatType}\n`;
+        text += `• Authorised: ${isAuthorised ? 'yes' : 'no'}\n`;
+        text += `• Owner: ${isOwner ? 'yes' : 'no'}\n`;
+        text += `\n_User ID is needed for \`telegram_authorized_users\` in config. Chat ID is needed for \`telegram_owner_id\` (receives scheduled briefings)._`;
+
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/dashboard/, async (msg) => {
+        const chatId = msg.chat.id;
+        const lastUpdated = dashState.last_updated ? new Date(dashState.last_updated).toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' GMT' : 'unknown';
+
+        let text = `*ALEX Dashboard*\n\n`;
+        text += `[alexnavada.xyz](https://alexnavada.xyz)\n\n`;
+        text += `*Live data:*\n`;
+        text += `• Status: ${dashState.status}\n`;
+        text += `• Tasks: ${dashState.summary.total_tasks} total (${dashState.summary.completed} done, ${dashState.summary.failed} failed)\n`;
+        text += `• News items: ${dashState.news.length}\n`;
+        text += `• Activity entries: ${dashState.activity_log.length}\n`;
+        text += `• Last sync: ${lastUpdated}\n`;
+        text += `• Redis: ${redis ? 'connected' : 'disconnected'}\n`;
+        text += `\n_Dashboard refreshes every 15s. Data pushed via Upstash Redis. Hourly deep sync via cron._`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/mathematician/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (mathModeChats.has(chatId)) {
+            mathModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Mathematician mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
+        } else {
+            mathModeChats.add(chatId);
+            await bot.sendMessage(chatId, `*Mathematician mode on.*\n\nI'll now approach everything with quantitative rigour:\n\n• Full calculations shown step by step\n• Financial models, NPV, IRR, CAGR, ratios\n• Micro and macro economic frameworks\n• Statistical analysis and probability\n• Supply/demand, elasticity, equilibrium\n• Game theory, optimisation, forecasting\n\nAsk me anything. Send /exit to return to normal.`, { parse_mode: 'Markdown' });
+        }
+    });
+
+    bot.onText(/\/strategist/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (strategistModeChats.has(chatId)) {
+            strategistModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Strategist mode off.*\n\nBack to standard responses.`, { parse_mode: 'Markdown' });
+        } else {
+            strategistModeChats.add(chatId);
+            await bot.sendMessage(chatId, `*Strategist mode on.*\n\nI'll now frame everything through strategic lenses:\n\n• SWOT, Porter's Five Forces, PESTLE\n• Competitive positioning and moats\n• Market entry, pricing, and growth strategy\n• Risk assessment and scenario planning\n• First-principles reasoning\n• Decision frameworks with trade-offs\n\nAsk me anything. Send /exit to return to normal.`, { parse_mode: 'Markdown' });
+        }
+    });
+
+    bot.onText(/\/voice/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (voiceModeChats.has(chatId)) {
+            voiceModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Voice mode off.*\n\nI'll reply with text from here.`, { parse_mode: 'Markdown' });
+        } else {
+            voiceModeChats.add(chatId);
+            await bot.sendMessage(chatId, `*Voice mode on.*\n\nI'll now reply with voice messages. Send /exit to switch back to text.`, { parse_mode: 'Markdown' });
+        }
+    });
+
+    bot.onText(/\/brief/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            const processUpSec = Math.floor(process.uptime());
+            const pHours = Math.floor(processUpSec / 3600);
+            const pMins = Math.floor((processUpSec % 3600) / 60);
+            const sessionStr = pHours > 0 ? `${pHours}h ${pMins}m` : `${pMins}m`;
+
+            const completedTasks = dashState.tasks.filter(t => t.status === 'completed');
+            const failedTasks = dashState.tasks.filter(t => t.status === 'failed');
+            const heartbeatTasks = dashState.tasks.filter(t => t.category === 'heartbeat');
+            const userRequests = dashState.tasks.filter(t => t.category === 'user-request');
+
+            let text = `*ALEX — Session Brief*\n\n`;
+            text += `Session running: ${sessionStr}\n`;
+            text += `Tasks: ${completedTasks.length} completed, ${failedTasks.length} failed\n`;
+            text += `Heartbeats: ${heartbeatTasks.length} | User requests: ${userRequests.length}\n`;
+            text += `Activity entries: ${dashState.activity_log.length}\n`;
+            text += `News items: ${dashState.news.length}\n\n`;
+
+            // Recent completed tasks
+            const recentTasks = completedTasks.slice(0, 8);
+            if (recentTasks.length > 0) {
+                text += `*Recent tasks:*\n`;
+                for (const t of recentTasks) {
+                    const icon = t.category === 'heartbeat' ? '[cron]' : '[user]';
+                    text += `• ${t.time || ''} ${icon} ${t.name?.substring(0, 55) || 'unnamed'}\n`;
+                }
+                text += `\n`;
+            }
+
+            // Failed tasks (important to surface)
+            if (failedTasks.length > 0) {
+                text += `*Failed:*\n`;
+                for (const t of failedTasks.slice(0, 5)) {
+                    text += `• ${t.time || ''} \`${t.name?.substring(0, 55) || 'unnamed'}\`\n`;
+                }
+                text += `\n`;
+            }
+
+            // Recent activity (condensed)
+            const recentActivity = dashState.activity_log.slice(0, 10);
+            if (recentActivity.length > 0) {
+                text += `*Activity log:*\n`;
+                for (const a of recentActivity) {
+                    text += `• ${a.time || ''} ${a.text?.substring(0, 70) || ''}\n`;
+                }
+            }
+
+            if (dashState.activity_log.length === 0 && completedTasks.length === 0) {
+                text += `No activity yet this session.`;
+            }
+
+            text += `\n_Since last restart. Full history on /dashboard._`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error getting brief: ${error.message}`);
+        }
+    });
+
+    bot.onText(/\/news/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            const news = dashState.news.slice(0, 15);
+            let text = `*ALEX — Latest News & Findings*\n\n`;
+            if (news.length === 0) {
+                text += `No news gathered yet this session.\n\n*When news appears:*\nNews is collected automatically during scheduled research runs (midday-research, morning-briefing, market-alerts, africa-tech-monitor) and any time I discover significant developments.\n\n*Next research run:* check /duties for schedule.\n\n_You can also trigger /research [topic] for on-demand research._`;
+            } else {
+                text += `${news.length} item${news.length !== 1 ? 's' : ''} this session:\n\n`;
+                for (const item of news) {
+                    const severity = item.severity === 'high' ? '[!]' : item.severity === 'warning' ? '[!]' : '';
+                    const source = item.source ? ` (${item.source})` : '';
+                    text += `• ${item.time || ''} ${severity}*${item.headline || 'Untitled'}*${source}\n  ${item.summary?.substring(0, 140) || ''}\n\n`;
+                }
+                text += `_News is saved to memory automatically. Ask me to dig deeper into any item._`;
+            }
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error getting news: ${error.message}`);
+        }
+    });
+
+    bot.onText(/\/research (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const topic = match[1].trim();
+        if (!topic) {
+            await bot.sendMessage(chatId, `Usage: /research [topic]\n\nExample: /research African fintech funding Q1 2026`);
+            return;
+        }
+        await bot.sendMessage(chatId, `*Research task queued.*\n\nTopic: ${topic}\n\nI'll run a deep research pass and send findings when done.`, { parse_mode: 'Markdown' });
+        // Fire research through the chat system asynchronously
+        chatSystem.chat(`research-${chatId}`, `[RESEARCH REQUEST from Lee]\n\nConduct thorough research on: ${topic}\n\nSearch the web, analyse findings, save key facts to memory, and provide a comprehensive summary. Use charts or data tables where helpful.`, msg.from, { modelOverride: modelOverrides.get(chatId) })
+            .then(async (response) => {
+                const parts = smartSplit(response, 4000);
+                for (const part of parts) {
+                    await bot.sendMessage(chatId, part, { parse_mode: 'Markdown' });
+                }
+                // Send any queued files
+                const files = pendingCharts.splice(0);
+                for (const file of files) {
+                    try {
+                        if (file.type === 'document') await bot.sendDocument(chatId, file.path, { caption: file.caption || undefined });
+                        else if (file.type === 'photo') await bot.sendPhoto(chatId, file.path, { caption: file.caption || undefined });
+                    } catch {}
+                }
+            })
+            .catch(async (err) => {
+                console.error('[RESEARCH] Failed:', err.message);
+                await bot.sendMessage(chatId, `Research failed: ${err.message}`);
+            });
+    });
+
+    bot.onText(/\/mode/, async (msg) => {
+        const chatId = msg.chat.id;
+        const active = [];
+        if (learnModeChats.has(chatId)) active.push({ name: 'Educational', cmd: '/learn', impact: 'Structures all answers as What / How / Why. Adds ~200 tokens to each prompt.' });
+        if (mathModeChats.has(chatId)) active.push({ name: 'Mathematician', cmd: '/mathematician', impact: 'Full calculations, micro/macro frameworks, sensitivity analysis. Adds ~350 tokens to each prompt. Responses are longer and more detailed.' });
+        if (strategistModeChats.has(chatId)) active.push({ name: 'Strategist', cmd: '/strategist', impact: 'SWOT, Porter, PESTLE frameworks applied. Adds ~250 tokens to each prompt.' });
+        if (voiceModeChats.has(chatId)) active.push({ name: 'Voice', cmd: '/voice', impact: 'Replies as voice messages via TTS. Adds OpenAI Whisper cost per response.' });
+        const modelLock = modelOverrides.get(chatId);
+
+        let text = `*ALEX — Mode Control Panel*\n\n`;
+        if (active.length === 0 && !modelLock) {
+            text += `No modes active. Standard operation.\n\n`;
+        } else {
+            text += `*Active:*\n`;
+            for (const m of active) {
+                text += `• *${m.name}* (${m.cmd})\n  ${m.impact}\n`;
+            }
+            if (modelLock) {
+                const label = MODEL_OPTIONS.find(o => o.model === modelLock)?.label || modelLock;
+                text += `• *Model lock:* ${label} (all messages use this model)\n`;
+            }
+            if (active.length > 1) {
+                text += `\n_Modes are stacked — all prefixes are injected together._\n`;
+            }
+            text += `\nUse /exit to clear all modes.\n`;
+        }
+
+        text += `\n*Available modes:*\n`;
+        text += `• /mathematician — Quantitative economist. Calculations, financial models, micro/macro economics, statistics, game theory.\n`;
+        text += `• /strategist — Strategy consultant. SWOT, Porter, PESTLE, competitive analysis, recommendations.\n`;
+        text += `• /learn — Educational. What / How / Why structure.\n`;
+        text += `• /voice — Voice replies via TTS.\n`;
+        text += `• /models — Lock a specific AI model.\n`;
+        text += `\n_Modes can be combined. /mathematician + /strategist = quantitative strategic analysis._`;
+        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/help/, async (msg) => {
         const chatId = msg.chat.id;
-        const help = `*ALEX — Command Reference*
+        const help = `*ALEX — Full Guide*
 
-*Core:*
-/start — Introduction and overview
-/help — This reference guide
+*Quick:*
+/alex — Compact command list
+/mode — Show active modes
+
+*Modes (toggle on/off, /exit clears all):*
+/mathematician — Quantitative mode. Full calculations, financial models (NPV, IRR, DCF), micro/macro economics (elasticity, multipliers, IS-LM), statistics, game theory, optimisation. Shows all workings step by step.
+/strategist — Strategic mode. SWOT, Porter's Five Forces, PESTLE, competitive analysis, scenario planning. Every response framed through strategic frameworks with actionable recommendations.
+/learn — Educational mode. Structures every answer as What / How / Why.
+/voice — Voice mode. Replies as voice messages.
 
 *Intelligence:*
-/learn — Enter educational mode (What / How / Why)
-/exit — Leave educational mode
+/research [topic] — Trigger deep research on any topic. Runs in background and sends findings when done.
+/brief — Summary of recent ALEX activity this session
+/news — Latest news gathered from research runs
 /memory — Browse my memory banks
 /skills — View custom skills I've learned
 
 *Operations:*
 /status — System health, hardware, services
+/duties — All cron duties, schedules, next runs, performance
 /tasks — Scheduled and recurring tasks
 /tokens — Today's API usage by model
 /spend — Full lifetime cost report
+/projection — Cost projection and ROI
 
 *Utility:*
+/models — Lock a specific AI model (or restore auto)
+/id — Your Telegram user and chat ID
+/dashboard — Live dashboard link
 /clear — Wipe chat history (keeps long-term memory)
+/exit — Turn off all active modes
 
 *Tips:*
 • Just message naturally — no commands needed for most things
+• Stack modes: /mathematician + /strategist gives quantitative strategic analysis
+• /research runs in the background — keep chatting while it works
 • Ask me to remember facts, preferences, or instructions
 • I can draft emails, generate PDFs, create charts, and schedule tasks
-• Say "use deepseek" or "use haiku" to switch models for a message
-• I monitor Gmail and auto-reply to new contacts
-• I run scheduled briefings and research autonomously
 • Everything I do is logged to the live dashboard
 
 *About ALEX:*
@@ -510,6 +1107,309 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 [alexnavada.xyz](https://alexnavada.xyz) · [navada.space](https://www.navada.space)`;
 
         await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+    });
+
+    // ========================================================================
+    // EMAIL INBOX COMMANDS
+    // ========================================================================
+
+    bot.onText(/\/inbox(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        try {
+            const statusFilter = (match?.[1] || 'not_started').trim().toLowerCase();
+            const validStatuses = ['not_started', 'in_progress', 'done', 'all'];
+            if (!validStatuses.includes(statusFilter)) {
+                await bot.sendMessage(chatId, `Invalid status. Use: /inbox [not_started|in_progress|done|all]`);
+                return;
+            }
+
+            const emails = await getEmailsByStatus(statusFilter);
+            const priorityEmoji = { high: '🔴', medium: '🟡', low: '🔵', spam: '⚪' };
+
+            if (emails.length === 0) {
+                await bot.sendMessage(chatId, `*Inbox — ${statusFilter.replace(/_/g, ' ')}*\n\nNo emails.`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            let text = `*Inbox — ${statusFilter.replace(/_/g, ' ')}* (${emails.length})\n\n`;
+            for (const e of emails.slice(0, 20)) {
+                const emoji = priorityEmoji[e.triage?.priority] || '⚪';
+                const ago = timeAgo(e.received_at);
+                text += `${emoji} *#${e.display_number}* ${e.from_name || e.from_address}\n`;
+                text += `  ${e.subject.substring(0, 60)}\n`;
+                text += `  ${ago}\n\n`;
+            }
+            if (emails.length > 20) text += `... and ${emails.length - 20} more\n`;
+            text += `\nUse /email 1 for details, /action 1 reply to act.`;
+
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/email\s+(\d+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        try {
+            const num = parseInt(match[1]);
+            const email = await getEmailByNumber(num);
+            if (!email) {
+                await bot.sendMessage(chatId, `Email #${num} not found.`);
+                return;
+            }
+
+            const priorityEmoji = { high: '🔴', medium: '🟡', low: '🔵', spam: '⚪' };
+            let text = `*Email #${email.display_number}*\n\n`;
+            text += `*From:* ${email.from_name} (${email.from_address})\n`;
+            text += `*Subject:* ${email.subject}\n`;
+            text += `*Date:* ${new Date(email.date).toLocaleString('en-GB', { timeZone: 'Europe/London' })}\n`;
+            text += `*Status:* ${email.status.replace(/_/g, ' ')}\n`;
+            text += `*Priority:* ${priorityEmoji[email.triage?.priority] || '⚪'} ${email.triage?.priority || 'unknown'}\n`;
+            text += `*Category:* ${email.triage?.category || 'unknown'}\n`;
+            text += `*Action needed:* ${(email.triage?.required_action || 'review').replace(/_/g, ' ')}\n`;
+            text += `*Can handle autonomously:* ${email.triage?.can_handle_autonomously ? 'Yes' : 'No'}\n`;
+            text += `*Auto-replied:* ${email.auto_replied ? 'Yes' : 'No'}\n\n`;
+
+            if (email.triage?.summary) {
+                text += `*Assessment:* ${email.triage.summary}\n`;
+            }
+            if (email.triage?.suggested_response) {
+                text += `*Suggested action:* ${email.triage.suggested_response}\n`;
+            }
+
+            text += `\n*Preview:*\n${(email.body_preview || '').substring(0, 500)}\n`;
+
+            if (email.actions?.length > 0) {
+                text += `\n*Action history:*\n`;
+                for (const a of email.actions.slice(-5)) {
+                    text += `• ${a.description} (${new Date(a.timestamp).toLocaleTimeString('en-GB', { timeZone: 'Europe/London' })})\n`;
+                }
+            }
+
+            text += `\nUse /action ${num} [instruction] to act on this email.`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/action\s+(\d+)(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        try {
+            const num = parseInt(match[1]);
+            const instruction = match[2]?.trim() || null;
+            const email = await getEmailByNumber(num);
+            if (!email) {
+                await bot.sendMessage(chatId, `Email #${num} not found.`);
+                return;
+            }
+
+            await bot.sendMessage(chatId, `*Working on email #${num}...*\n\nFrom: ${email.from_name || email.from_address}\nSubject: ${email.subject}\n${instruction ? `Instruction: ${instruction}` : 'Using suggested action'}`, { parse_mode: 'Markdown' });
+
+            const typingInterval = setInterval(() => {
+                bot.sendChatAction(chatId, 'typing').catch(() => {});
+            }, 4000);
+
+            try {
+                const result = await actionEmail(email.id, instruction, chatId);
+                clearInterval(typingInterval);
+
+                if (result.success) {
+                    await bot.sendMessage(chatId, `*Email #${num} — Done*\n\n${result.response?.substring(0, 2000) || 'Completed.'}`, { parse_mode: 'Markdown' });
+                } else {
+                    await bot.sendMessage(chatId, `*Email #${num} — Failed*\n\n${result.error}`, { parse_mode: 'Markdown' });
+                }
+            } catch (actionErr) {
+                clearInterval(typingInterval);
+                await bot.sendMessage(chatId, `Action failed: ${actionErr.message}`);
+            }
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/duties/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            // --- Uptime & last-alive ---
+            const { stdout: uptime } = await execAsync('uptime -p');
+            let lastAliveStr = 'unknown';
+            try {
+                const raw = await readFile(path.join(WORKSPACE_PATH, 'logs', '.last-alive'), 'utf-8');
+                const d = new Date(raw.trim());
+                lastAliveStr = d.toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' GMT';
+            } catch {}
+
+            // --- Parse cron log for last results per task ---
+            const lastResults = new Map();
+            const taskRunCounts = new Map(); // task -> { ok: n, fail: n }
+            try {
+                const logContent = await readFile(path.join(WORKSPACE_PATH, 'logs', 'cron.log'), 'utf-8');
+                const entries = logContent.replace(/\}\{/g, '}\n{').split('\n').filter(l => l.trim());
+                for (const line of entries) {
+                    try {
+                        const e = JSON.parse(line);
+                        if (e.task) {
+                            lastResults.set(e.task, e.success ? 'ok' : 'failed');
+                            if (!taskRunCounts.has(e.task)) taskRunCounts.set(e.task, { ok: 0, fail: 0 });
+                            const c = taskRunCounts.get(e.task);
+                            if (e.success) c.ok++; else c.fail++;
+                        }
+                    } catch {}
+                }
+            } catch {}
+
+            // --- Today's token stats ---
+            let todayCalls = 0, todayCostGbp = 0;
+            try {
+                const stats = await getDailyTokenStats();
+                todayCalls = stats.totalCalls;
+                const GBP = 0.79;
+                for (const [model, data] of Object.entries(stats.byModel)) {
+                    let costUsd = 0;
+                    if (model.includes('haiku')) costUsd = data.input / 1e6 * 0.8 + data.output / 1e6 * 4;
+                    else if (model.includes('deepseek')) costUsd = data.input / 1e6 * 0.14 + data.output / 1e6 * 0.28;
+                    else costUsd = data.input / 1e6 * 3 + data.output / 1e6 * 15;
+                    todayCostGbp += costUsd * GBP;
+                }
+            } catch {}
+
+            // --- Format cron expression to human-readable ---
+            function cronToHuman(expr) {
+                const [min, hour, dom, mon, dow] = expr.split(' ');
+                const dayMap = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
+                let time = `${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+                if (hour === '*' && min === '0') time = 'every hour';
+                else if (hour.startsWith('*/')) time = `every ${hour.slice(2)}h`;
+
+                let days = 'daily';
+                if (dow !== '*') {
+                    days = dow.split(',').map(d => dayMap[d] || d).join(', ');
+                }
+                return `${time} ${days}`;
+            }
+
+            // --- Built-in tasks ---
+            const builtinSchedule = [
+                { name: 'morning-briefing', cron: '0 8 * * *', desc: 'Daily morning briefing' },
+                { name: 'midmorning-checkin', cron: '0 11 * * *', desc: 'Mid-morning check-in' },
+                { name: 'midday-research', cron: '0 13 * * *', desc: 'Economic research scan' },
+                { name: 'afternoon-checkin', cron: '0 16 * * *', desc: 'Afternoon check-in' },
+                { name: 'evening-summary', cron: '0 18 * * *', desc: 'Evening summary' },
+                { name: 'weekly-self-review', cron: '0 22 * * 0', desc: 'Weekly self-improvement review' },
+                { name: 'dashboard-sync', cron: '0 * * * *', desc: 'Hourly dashboard metrics sync' },
+                { name: 'cleanup', cron: '0 3 * * *', desc: 'Conversation memory cleanup' },
+            ];
+
+            // --- User tasks from disk ---
+            const userTasks = [];
+            try {
+                const taskDir = path.join(WORKSPACE_PATH, 'tasks');
+                const { readdir } = await import('fs/promises');
+                const files = await readdir(taskDir);
+                for (const f of files) {
+                    if (!f.endsWith('.json')) continue;
+                    try {
+                        const raw = await readFile(path.join(taskDir, f), 'utf-8');
+                        const t = JSON.parse(raw);
+                        userTasks.push({ name: t.name, cron: t.cron_expression, desc: t.task_description?.substring(0, 60) || 'No description' });
+                    } catch {}
+                }
+            } catch {}
+
+            // --- Next duty calculation ---
+            function getNextRun(cronExpr) {
+                const [min, hour, , , dow] = cronExpr.split(' ');
+                const now = new Date();
+                const nowLondon = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
+
+                if (hour === '*' || hour.startsWith('*/')) {
+                    // Hourly task — next full hour
+                    const next = new Date(nowLondon);
+                    next.setMinutes(parseInt(min) || 0, 0, 0);
+                    if (next <= nowLondon) next.setHours(next.getHours() + (hour.startsWith('*/') ? parseInt(hour.slice(2)) : 1));
+                    return next;
+                }
+
+                const targetHour = parseInt(hour);
+                const targetMin = parseInt(min);
+                const dows = dow === '*' ? [0,1,2,3,4,5,6] : dow.split(',').map(Number);
+
+                for (let offset = 0; offset < 8; offset++) {
+                    const candidate = new Date(nowLondon);
+                    candidate.setDate(candidate.getDate() + offset);
+                    candidate.setHours(targetHour, targetMin, 0, 0);
+                    if (candidate > nowLondon && dows.includes(candidate.getDay())) return candidate;
+                }
+                return null;
+            }
+
+            // --- Build output ---
+            const totalRuns = [...taskRunCounts.values()].reduce((s, c) => s + c.ok + c.fail, 0);
+            const totalFails = [...taskRunCounts.values()].reduce((s, c) => s + c.fail, 0);
+
+            let text = `*ALEX — Duties & Performance*\n\n`;
+            text += `System: ${uptime.trim()}\n`;
+            text += `Last heartbeat: ${lastAliveStr}\n`;
+            text += `Today: ${todayCalls} API calls, £${todayCostGbp.toFixed(4)} spent\n`;
+            text += `Cron history: ${totalRuns} runs logged (${totalFails} failures)\n\n`;
+
+            function formatDuty(t) {
+                const lastStatus = lastResults.has(t.name) ? (lastResults.get(t.name) === 'ok' ? 'OK' : 'FAIL') : '--';
+                const runs = taskRunCounts.get(t.name);
+                const runStr = runs ? `${runs.ok}/${runs.ok + runs.fail} success` : 'no runs';
+                const schedule = cronToHuman(t.cron);
+                const next = getNextRun(t.cron);
+                const nextStr = next ? next.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+                return `• \`${t.name}\` [${lastStatus}]\n  ${t.desc}\n  ${schedule}${nextStr ? ` | next: ${nextStr}` : ''} | ${runStr}\n`;
+            }
+
+            text += `*Built-in (${builtinSchedule.length}):*\n`;
+            for (const t of builtinSchedule) {
+                text += formatDuty(t);
+            }
+
+            if (userTasks.length > 0) {
+                text += `\n*Custom (${userTasks.length}):*\n`;
+                for (const t of userTasks) {
+                    text += formatDuty(t);
+                }
+            }
+
+            text += `\n*${builtinSchedule.length + userTasks.length} total duties.* All run via system cron with 3x retry and startup catch-up.\n`;
+            text += `_Ask me to "schedule [task]" to add new duties or "delete task [name]" to remove._`;
+
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await bot.sendMessage(chatId, `Error getting duties: ${error.message}`);
+        }
+    });
+
+    const MODEL_OPTIONS = [
+        { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku for greetings, Sonnet for research, DeepSeek for deep analysis', price: '' },
+        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Best for quick questions and simple tasks', price: '$0.80/$4.00 per 1M tokens' },
+        { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Balanced power. Research, reports, emails, tool use', price: '$3.00/$15.00 per 1M tokens' },
+        { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. No tool use (text only)', price: '$0.14/$0.28 per 1M tokens' },
+        { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'OpenAI fallback. No tool use (text only)', price: '$2.50/$10.00 per 1M tokens' },
+    ];
+
+    function buildModelMenu(chatId) {
+        const current = modelOverrides.get(chatId);
+        const currentLabel = current ? MODEL_OPTIONS.find(o => o.model === current)?.label || current : 'Auto';
+        let text = `*ALEX — Model Selection*\n\nCurrent: *${currentLabel}*\n\n`;
+        MODEL_OPTIONS.forEach((opt, i) => {
+            const marker = (opt.model === current || (!current && opt.key === 'auto')) ? ' [active]' : '';
+            text += `*${i + 1}. ${opt.label}*${marker}\n  ${opt.desc}\n`;
+            if (opt.price) text += `  ${opt.price}\n`;
+        });
+        text += `\nReply with a *number* (1-5) or *name* (e.g. haiku) to switch.\nModel lock persists until you change it or select Auto.`;
+        return text;
+    }
+
+    bot.onText(/\/(models|agents)/, async (msg) => {
+        const chatId = msg.chat.id;
+        await bot.sendMessage(chatId, buildModelMenu(chatId), { parse_mode: 'Markdown' });
+        awaitingModelSelect.add(chatId);
     });
 
     // Main message handler — with dedup to prevent double-processing
@@ -537,6 +1437,26 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
             }
         }
 
+        // Handle model selection reply
+        if (awaitingModelSelect.has(chatId) && msg.text) {
+            awaitingModelSelect.delete(chatId);
+            const input = msg.text.trim().toLowerCase();
+            const byNumber = MODEL_OPTIONS[parseInt(input) - 1];
+            const byName = MODEL_OPTIONS.find(o => o.key === input || o.label.toLowerCase() === input);
+            const match = byNumber || byName;
+            if (match) {
+                if (match.model) {
+                    modelOverrides.set(chatId, match.model);
+                } else {
+                    modelOverrides.delete(chatId);
+                }
+                await bot.sendMessage(chatId, `Model set to *${match.label}*. ${match.model ? 'All messages will use this model.' : 'Smart routing restored.'}`, { parse_mode: 'Markdown' });
+            } else {
+                await bot.sendMessage(chatId, `Unknown model. Use /models to try again.`);
+            }
+            return;
+        }
+
         await bot.sendChatAction(chatId, 'typing');
 
         try {
@@ -558,6 +1478,21 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                         { type: 'text', text: caption }
                     ];
                     userMessage = caption;
+
+                    // Save photo to disk for email attachments
+                    try {
+                        const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
+                        await mkdir(uploadsDir, { recursive: true });
+                        const filename = `photo_${Date.now()}.jpg`;
+                        const filePath = path.join(uploadsDir, filename);
+                        await writeFile(filePath, imgBuffer);
+                        const uploads = recentUploads.get(chatId) || [];
+                        uploads.push({ path: filePath, filename, timestamp: Date.now() });
+                        recentUploads.set(chatId, uploads);
+                        console.log(`[PHOTO] Saved to ${filePath}`);
+                    } catch (saveErr) {
+                        console.error('[PHOTO] Save to disk failed:', saveErr.message);
+                    }
                 } catch (dlErr) {
                     console.error('[PHOTO] Download failed:', dlErr.message);
                     userMessage = `[User sent a photo but download failed: ${dlErr.message}]`;
@@ -666,20 +1601,124 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                 bot.sendChatAction(chatId, 'typing').catch(() => {});
             }, 4000);
 
-            // Inject learn mode instruction if active
+            // Inject mode prefixes if active
             let chatInput = contentBlocks || userMessage;
+            let modePrefix = '';
+
             if (learnModeChats.has(chatId)) {
-                const learnPrefix = '[LEARN MODE ACTIVE] Structure your entire response in three clear sections:\n\nWhat — State the facts, define the concept or answer the question directly.\nHow — Explain how it works, how it applies, or how to do it in practice.\nWhy — Explain why it matters, the deeper reasoning, or the significance.\n\nKeep each section concise but thorough. Now answer this:\n\n';
+                modePrefix += `[LEARN MODE ACTIVE — OVERRIDE FORMATTING RULES]
+
+You MUST structure your response exactly like this, with clear section headers and blank lines between paragraphs. Use this exact format:
+
+WHAT
+
+[Write 1-3 clear paragraphs explaining the facts, definitions, and core concept. Separate each paragraph with a blank line. Be specific and educational.]
+
+HOW
+
+[Write 1-3 clear paragraphs explaining how it works in practice, real-world applications, mechanisms, or step-by-step processes. Separate each paragraph with a blank line.]
+
+WHY
+
+[Write 1-3 clear paragraphs explaining why this matters, the deeper significance, implications, and what the user should take away. Separate each paragraph with a blank line.]
+
+Rules for Learn Mode:
+- Always use the three section headers: WHAT, HOW, WHY — each on its own line
+- Leave a blank line before and after each header
+- Leave a blank line between every paragraph
+- Write in full, clear sentences — not bullet points
+- Be educational and thorough — teach the user something valuable
+- Use plain text only, no markdown symbols, no bold, no bullets
+- Each section should be substantive (not just one sentence)
+- If the topic is simple, go deeper — add context, history, or nuance
+
+`;
+            }
+
+            if (mathModeChats.has(chatId)) {
+                modePrefix += `[MATHEMATICIAN MODE ACTIVE — QUANTITATIVE OVERRIDE]
+
+You are operating as a senior quantitative economist and mathematician. Apply rigorous mathematical and computational thinking to every response.
+
+Structure your response with:
+
+ANALYSIS — Frame the problem mathematically. Define variables, identify the model or framework.
+
+CALCULATION — Show full step-by-step workings. Never skip steps. Use proper notation.
+- Financial: NPV, IRR, CAGR, DCF, WACC, Sharpe ratio, Monte Carlo, option pricing (Black-Scholes)
+- Microeconomics: Supply/demand curves, elasticity (PED, YED, XED), marginal cost/revenue, profit maximisation, consumer/producer surplus, utility functions, indifference curves, budget constraints, Cobb-Douglas production
+- Macroeconomics: GDP calculation (expenditure/income/output), multiplier effects, IS-LM model, Phillips curve, quantity theory of money (MV=PQ), Solow growth model, balance of payments, exchange rate models
+- Statistics: Regression, correlation, confidence intervals, hypothesis testing, Bayesian analysis, standard deviation, z-scores
+- Optimisation: Linear programming, Lagrange multipliers, game theory (Nash equilibrium, dominant strategies, payoff matrices)
+
+RESULT — State the answer clearly with units. Interpret what the numbers mean in business/economic terms.
+
+SENSITIVITY — How do results change if key assumptions shift by 10-20%? Flag the most sensitive variables.
+
+Rules for Mathematician Mode:
+- Show ALL calculations — never say "the result is X" without showing how you got there
+- Use proper mathematical notation where possible
+- Always state assumptions explicitly
+- Provide confidence ranges, not just point estimates
+- If data is missing, state what you'd need and work with reasonable assumptions
+- Round final answers appropriately but keep intermediate calculations precise
+- Apply dimensional analysis — always track units
+
+`;
+            }
+
+            if (strategistModeChats.has(chatId)) {
+                modePrefix += `[STRATEGIST MODE ACTIVE — STRATEGIC OVERRIDE]
+
+You are operating as a senior strategy consultant. Frame every response through strategic lenses.
+
+Structure your response with:
+
+SITUATION — Current state, key facts, market context.
+
+ANALYSIS — Apply the most relevant framework(s):
+- SWOT (Strengths, Weaknesses, Opportunities, Threats)
+- Porter's Five Forces (rivalry, new entrants, substitutes, buyer power, supplier power)
+- PESTLE (Political, Economic, Social, Technological, Legal, Environmental)
+- Value Chain Analysis
+- BCG Matrix / Ansoff Matrix
+- Blue Ocean vs Red Ocean
+- Jobs-to-be-Done
+- First-principles decomposition
+
+RECOMMENDATION — Clear, prioritised actions. State what to do, why, and in what order.
+
+RISKS — What could go wrong. Mitigations for each risk.
+
+Rules for Strategist Mode:
+- Always name the framework(s) you are applying
+- Be specific and actionable — no vague advice
+- Quantify where possible (market size, probability, impact)
+- Consider second-order effects and competitive responses
+- Present trade-offs honestly — every strategy has a cost
+
+`;
+            }
+
+            if (voiceModeChats.has(chatId)) {
+                modePrefix += `[VOICE MODE ACTIVE]
+
+After formulating your response, you MUST use the send_voice_message tool to deliver it as a voice message. Keep responses conversational and concise — optimised for listening, not reading. Still provide a brief text summary alongside the voice.
+
+`;
+            }
+
+            if (modePrefix) {
                 if (typeof chatInput === 'string') {
-                    chatInput = learnPrefix + chatInput;
+                    chatInput = modePrefix + 'Now answer this:\n\n' + chatInput;
                 } else if (Array.isArray(chatInput)) {
-                    chatInput = [{ type: 'text', text: learnPrefix }, ...chatInput];
+                    chatInput = [{ type: 'text', text: modePrefix + 'Now answer this:\n\n' }, ...chatInput];
                 }
             }
 
             let response;
             try {
-                response = await chatSystem.chat(chatId, chatInput, msg.from);
+                response = await chatSystem.chat(chatId, chatInput, msg.from, { modelOverride: modelOverrides.get(chatId) });
             } finally {
                 clearInterval(typingInterval);
             }
@@ -1174,9 +2213,17 @@ async function init() {
     // Setup Control API on port 9090
     setupControlAPI();
 
+    // Setup email filing system
+    setupEmailFiling({ config, bot, anthropic, postDashboard, memory });
+    setEmailFilingChatSystem(chatSystem);
+
     // Start Gmail inbox polling
     setupInbox({ config, bot, postDashboard, anthropic, openaiClient });
     startInboxPolling();
+
+    // Start Slack polling
+    await setupSlack({ config, chatSystem, postDashboard, smartSplit, learnModeChats, modelOverrides });
+    startSlackPolling();
 
     // Check for missed scheduled tasks during downtime
     await catchUpMissedTasks();
@@ -1189,6 +2236,7 @@ async function init() {
         { name: 'Upstash Redis', port: 'cloud', status: 'online' },
         { name: 'Telegram Bot', port: 'polling', status: 'online' },
         { name: 'Gmail Inbox', port: 'IMAP', status: config.gmail_address ? 'online' : 'disabled' },
+        { name: 'Slack Bot', port: 'polling', status: config.slack_token ? 'online' : 'disabled' },
     ]});
 
     // Write alive marker every 60s so catch-up knows when we were last running

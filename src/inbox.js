@@ -9,6 +9,7 @@ import nodemailer from 'nodemailer';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { WORKSPACE_PATH } from './config.js';
+import { fileEmail } from './email-filing.js';
 
 import { unlink } from 'fs/promises';
 
@@ -298,7 +299,7 @@ function escapeMarkdown(text) {
     return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
 
-async function sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested = false, voiceSent = false) {
+async function sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested = false, voiceSent = false, filedEmail = null) {
     if (!bot || !config.telegram_owner_id) {
         console.error('[INBOX] Cannot notify — bot or owner_id missing');
         return;
@@ -323,17 +324,35 @@ async function sendTelegramNotification(fromName, fromAddress, subject, date, bo
     }
 
     // Use plain Markdown (not V2) for reliability
-    let msg = `*New Email Handled*\n\n`;
+    const triage = filedEmail?.triage;
+    const emailNum = filedEmail?.display_number;
+    const priorityEmoji = { high: '🔴', medium: '🟡', low: '🔵', spam: '⚪' };
+
+    let msg = emailNum ? `*New Email Filed* (#${emailNum})\n\n` : `*New Email Handled*\n\n`;
     msg += `From: ${fromName || 'Unknown'} (${fromAddress})\n`;
     msg += `Subject: ${subject}\n`;
-    msg += `Received: ${dateFmt}\n`;
-    msg += `Action: ${replyStatus}\n\n`;
 
-    if (aiSummary) {
+    if (triage) {
+        msg += `Priority: ${priorityEmoji[triage.priority] || '⚪'} ${(triage.priority || 'medium').toUpperCase()}\n`;
+        msg += `Category: ${triage.category || 'other'}\n`;
+        msg += `Action: ${(triage.required_action || 'review').replace(/_/g, ' ')}\n`;
+        msg += `Alex can handle: ${triage.can_handle_autonomously ? 'Yes' : 'No'}\n`;
+    }
+
+    msg += `Received: ${dateFmt}\n`;
+    msg += `Auto-reply: ${replyStatus}\n\n`;
+
+    if (triage?.summary) {
+        msg += `*ALEX's assessment:*\n${triage.summary}\n\n`;
+    } else if (aiSummary) {
         msg += `*ALEX's assessment:*\n${aiSummary}\n\n`;
     }
 
-    msg += `*Email preview:*\n${emailPreview}`;
+    if (emailNum) {
+        msg += `Reply /action ${emailNum} to instruct me, or /inbox to see queue.`;
+    } else {
+        msg += `*Email preview:*\n${emailPreview}`;
+    }
 
     try {
         await bot.sendMessage(config.telegram_owner_id, msg, { parse_mode: 'Markdown' });
@@ -405,6 +424,9 @@ async function pollInbox() {
                             const subject = parsed.subject || '(No subject)';
                             const date = parsed.date || new Date();
                             const bodyText = parsed.text || '';
+                            const messageId = parsed.messageId || '';
+                            const inReplyTo = parsed.inReplyTo || '';
+                            const references = (Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references) || '';
 
                             console.log(`[INBOX] Processing: ${fromAddress} — ${subject}`);
 
@@ -463,9 +485,21 @@ async function pollInbox() {
                                 console.log(`[INBOX] Skipped reply for ${fromAddress} (filtered)`);
                             }
 
-                            // Always notify Lee via Telegram with AI summary
+                            // File email in the inbox system
+                            let filedEmail = null;
                             try {
-                                await sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested, voiceSent);
+                                filedEmail = await fileEmail({
+                                    uid, fromName, fromAddress, subject, bodyText,
+                                    date, messageId, inReplyTo, references,
+                                    autoReplied,
+                                });
+                            } catch (fileErr) {
+                                console.error(`[INBOX] Filing failed:`, fileErr.message);
+                            }
+
+                            // Always notify Lee via Telegram with AI summary + triage info
+                            try {
+                                await sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested, voiceSent, filedEmail);
                                 console.log(`[INBOX] Telegram notification sent for: ${subject}`);
                             } catch (notifyErr) {
                                 console.error(`[INBOX] Telegram notification failed:`, notifyErr.message);

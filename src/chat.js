@@ -442,6 +442,18 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
                 if (hasOrphan) return false;
             }
             return true;
+        }).map(msg => {
+            // Fix empty text content blocks — Anthropic rejects these
+            if (Array.isArray(msg.content)) {
+                const fixed = msg.content.map(b =>
+                    b.type === 'text' && !b.text ? { ...b, text: '(empty)' } : b
+                );
+                return { ...msg, content: fixed };
+            }
+            if (typeof msg.content === 'string' && !msg.content) {
+                return { ...msg, content: '(empty)' };
+            }
+            return msg;
         });
     }
 
@@ -642,7 +654,7 @@ ${contextBlock}
         return finalText;
     }
 
-    async function chat(chatId, userMessage, userInfo) {
+    async function chat(chatId, userMessage, userInfo, options = {}) {
         const conv = await memory.getConversation(chatId);
         let allMessages = conv.messages;
         let summary = conv.summary;
@@ -662,7 +674,7 @@ ${contextBlock}
             : (Array.isArray(userMessage) ? userMessage.filter(b => b.type === 'text').map(b => b.text).join(' ') : '');
 
         const systemPrompt = await buildSystemPrompt(userText);
-        const model = selectModel(userText);
+        const model = options.modelOverride || selectModel(userText);
 
         // Sliding window + summary: compress old messages, keep recent ones verbatim
         const prepared = await prepareMessages(allMessages, summary);

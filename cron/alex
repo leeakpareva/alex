@@ -23,5 +23,8 @@ PATH=/usr/local/bin:/usr/bin:/bin
 # Sunday 10pm — Weekly self-review
 0 22 * * 0   head  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"weekly-self-review"}' >> /home/head/.alex/logs/cron.log 2>&1
 
+# 10am, 3pm — Inbox review
+0 10,15 * * * head  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"inbox-review"}' >> /home/head/.alex/logs/cron.log 2>&1
+
 # 3am — Conversation memory cleanup
 0 3 * * *    head  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"cleanup"}' >> /home/head/.alex/logs/cron.log 2>&1
