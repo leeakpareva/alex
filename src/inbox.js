@@ -10,10 +10,13 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { WORKSPACE_PATH } from './config.js';
 
+import { unlink } from 'fs/promises';
+
 let config = null;
 let bot = null;
 let postDashboard = null;
 let anthropic = null;
+let openaiClient = null;
 
 const SEEN_FILE = path.join(WORKSPACE_PATH, 'logs', 'inbox-seen.json');
 const POLL_INTERVAL = 2 * 60 * 1000;
@@ -25,7 +28,8 @@ export function setupInbox(deps) {
     bot = deps.bot;
     postDashboard = deps.postDashboard;
     anthropic = deps.anthropic;
-    console.log('[INBOX] Setup complete — AI replies enabled');
+    openaiClient = deps.openaiClient;
+    console.log(`[INBOX] Setup complete — AI replies enabled, voice ${openaiClient ? 'enabled' : 'disabled'}`);
 }
 
 export function startInboxPolling() {
@@ -101,7 +105,7 @@ const SIG_HTML = `<table cellpadding="0" cellspacing="0" border="0" width="100%"
     </td></tr>
 </table>`;
 
-async function generateAIReply(fromName, fromAddress, subject, bodyText) {
+async function generateAIReply(fromName, fromAddress, subject, bodyText, voiceRequested = false) {
     if (!anthropic) {
         console.error('[INBOX] No Anthropic client — falling back to static reply');
         return null;
@@ -126,7 +130,8 @@ Write a professional, warm, and helpful email reply. Rules:
 - Keep it concise (2-4 paragraphs), professional but personable
 - Sign off with "Best regards" or similar — your name and title are in the signature block
 - Do NOT make up specific commitments, dates, or promises
-- Do NOT include any markdown formatting — only HTML`;
+- Do NOT include any markdown formatting — only HTML
+${voiceRequested ? '- The sender has requested a voice response. Mention naturally in your reply that you have attached an audio version of your response for their convenience. Keep the written reply full and complete — the voice is a bonus, not a replacement.' : ''}`;
 
     try {
         const response = await anthropic.messages.create({
@@ -159,7 +164,65 @@ function buildFallbackReplyHtml() {
         <p>In the meantime, you can learn more about our work at <a href="https://www.navada.space" style="color: #1a1a1a;">navada.space</a>.</p>`);
 }
 
-async function sendReplyEmail(toAddress, originalSubject, htmlBody) {
+// ============================================================================
+// VOICE DETECTION + TTS
+// ============================================================================
+
+const VOICE_PATTERNS = [
+    /voice/i, /audio/i, /speak/i, /talk to me/i, /hear you/i,
+    /voice\s*(message|response|reply|note|memo)/i,
+    /send.*voice/i, /reply.*voice/i, /respond.*voice/i,
+    /say it/i, /tell me.*out\s*loud/i, /read.*aloud/i,
+    /listen/i, /spoken/i, /recording/i,
+];
+
+function wantsVoiceReply(subject, bodyText) {
+    const combined = `${subject} ${bodyText}`.toLowerCase();
+    return VOICE_PATTERNS.some(pat => pat.test(combined));
+}
+
+async function generateVoiceFile(text) {
+    if (!openaiClient) {
+        console.error('[INBOX] No OpenAI client — cannot generate voice');
+        return null;
+    }
+
+    // Strip HTML tags to get plain text for TTS
+    const plainText = text
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&bull;/g, ', ')
+        .replace(/&[a-z]+;/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!plainText || plainText.length < 5) return null;
+
+    try {
+        const speech = await openaiClient.audio.speech.create({
+            model: 'tts-1',
+            voice: 'onyx',
+            input: plainText.substring(0, 4000),
+            response_format: 'mp3',
+        });
+
+        const buffer = Buffer.from(await speech.arrayBuffer());
+        const voicePath = path.join(WORKSPACE_PATH, 'voice', `inbox_reply_${Date.now()}.mp3`);
+        await mkdir(path.dirname(voicePath), { recursive: true });
+        await writeFile(voicePath, buffer);
+        console.log(`[INBOX] Voice file generated: ${voicePath} (${buffer.length} bytes)`);
+        return voicePath;
+    } catch (err) {
+        console.error('[INBOX] Voice generation failed:', err.message);
+        return null;
+    }
+}
+
+// ============================================================================
+// EMAIL SENDING
+// ============================================================================
+
+async function sendReplyEmail(toAddress, originalSubject, htmlBody, attachments = []) {
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: { user: config.gmail_address, pass: config.gmail_app_password },
@@ -172,6 +235,7 @@ async function sendReplyEmail(toAddress, originalSubject, htmlBody) {
         to: toAddress,
         subject: reSubject,
         html: htmlBody,
+        attachments,
     });
 }
 
@@ -179,8 +243,21 @@ async function sendReplyEmail(toAddress, originalSubject, htmlBody) {
 // AI-POWERED TELEGRAM SUMMARY
 // ============================================================================
 
-async function generateActionSummary(fromName, fromAddress, subject, bodyText, replyText, autoReplied) {
+async function generateActionSummary(fromName, fromAddress, subject, bodyText, replyText, autoReplied, voiceRequested, voiceSent) {
     if (!anthropic) return null;
+
+    let actionDesc = '';
+    if (autoReplied && voiceSent) {
+        actionDesc = `You replied with a text email AND an attached voice response (MP3):\n${replyText?.substring(0, 800) || 'a standard acknowledgement'}`;
+    } else if (autoReplied) {
+        actionDesc = `You replied with:\n${replyText?.substring(0, 1000) || 'a standard acknowledgement'}`;
+    } else {
+        actionDesc = 'You did NOT auto-reply (filtered address).';
+    }
+
+    if (voiceRequested && !voiceSent) {
+        actionDesc += '\nNote: Sender requested a voice response but voice generation was unavailable.';
+    }
 
     const prompt = `You are ALEX reporting to Lee (your boss at NAVADA) via Telegram about an email you just handled.
 
@@ -189,11 +266,11 @@ Email received:
 - Subject: ${subject}
 - Body: ${bodyText.substring(0, 1500)}
 
-${autoReplied ? `You replied with:\n${replyText?.substring(0, 1000) || 'a standard acknowledgement'}` : 'You did NOT auto-reply (filtered address).'}
+${actionDesc}
 
 Write a brief Telegram-style summary (3-5 lines, no markdown formatting, plain text) covering:
 1. Who emailed and what they want (1 line)
-2. What you did — replied / didn't reply and why (1 line)
+2. What you did — replied / didn't reply and why, mention voice if you sent one (1 line)
 3. What action Lee should take, if any (1 line)
 4. Your assessment of priority: low / medium / high (1 line)
 
@@ -221,7 +298,7 @@ function escapeMarkdown(text) {
     return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
 
-async function sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText) {
+async function sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested = false, voiceSent = false) {
     if (!bot || !config.telegram_owner_id) {
         console.error('[INBOX] Cannot notify — bot or owner_id missing');
         return;
@@ -232,15 +309,18 @@ async function sendTelegramNotification(fromName, fromAddress, subject, date, bo
         : 'Unknown';
 
     // Generate AI action summary
-    const aiSummary = await generateActionSummary(fromName, fromAddress, subject, bodyText, replyText, autoReplied);
+    const aiSummary = await generateActionSummary(fromName, fromAddress, subject, bodyText, replyText, autoReplied, voiceRequested, voiceSent);
 
     const emailPreview = bodyText
         ? bodyText.substring(0, 300).replace(/\n{3,}/g, '\n\n').trim()
         : '(No text content)';
 
-    const replyStatus = autoReplied
-        ? 'Replied'
-        : 'No reply (filtered)';
+    let replyStatus = 'No reply (filtered)';
+    if (autoReplied && voiceSent) {
+        replyStatus = 'Replied with text + voice attachment';
+    } else if (autoReplied) {
+        replyStatus = 'Replied';
+    }
 
     // Use plain Markdown (not V2) for reliability
     let msg = `*New Email Handled*\n\n`;
@@ -328,20 +408,54 @@ async function pollInbox() {
 
                             console.log(`[INBOX] Processing: ${fromAddress} — ${subject}`);
 
+                            // Detect if sender wants a voice response
+                            const voiceRequested = wantsVoiceReply(subject, bodyText);
+                            if (voiceRequested) {
+                                console.log(`[INBOX] Voice response requested by ${fromAddress}`);
+                            }
+
                             // Generate AI reply and send if appropriate
                             let autoReplied = false;
                             let replyText = '';
+                            let voiceSent = false;
                             if (shouldAutoReply(fromAddress)) {
                                 try {
-                                    const aiReplyHtml = await generateAIReply(fromName, fromAddress, subject, bodyText);
+                                    const aiReplyHtml = await generateAIReply(fromName, fromAddress, subject, bodyText, voiceRequested);
                                     const finalHtml = aiReplyHtml
                                         ? buildReplyHtml(aiReplyHtml)
                                         : buildFallbackReplyHtml();
                                     replyText = aiReplyHtml || 'Standard acknowledgement';
 
-                                    await sendReplyEmail(fromAddress, subject, finalHtml);
+                                    // Generate voice attachment if requested
+                                    const attachments = [];
+                                    let voicePath = null;
+                                    if (voiceRequested) {
+                                        voicePath = await generateVoiceFile(replyText);
+                                        if (voicePath) {
+                                            attachments.push({
+                                                filename: 'alex-voice-response.mp3',
+                                                path: voicePath,
+                                                contentType: 'audio/mpeg',
+                                            });
+                                            voiceSent = true;
+                                        }
+                                    }
+
+                                    // Add note about voice in the email body if voice is attached
+                                    let emailHtml = finalHtml;
+                                    if (voiceSent) {
+                                        const voiceNote = `<p style="margin-top: 16px; padding: 12px; background: #f8f8f8; border-left: 3px solid #1a1a2e; font-size: 13px; color: #555;">🎙 I've attached a voice version of this response as requested. You can listen to it in the attached MP3 file.</p>`;
+                                        emailHtml = finalHtml.replace(SIG_HTML, voiceNote + SIG_HTML);
+                                    }
+
+                                    await sendReplyEmail(fromAddress, subject, emailHtml, attachments);
                                     autoReplied = true;
-                                    console.log(`[INBOX] AI reply sent to ${fromAddress}`);
+                                    console.log(`[INBOX] AI reply sent to ${fromAddress}${voiceSent ? ' (with voice)' : ''}`);
+
+                                    // Clean up voice file after sending
+                                    if (voicePath) {
+                                        unlink(voicePath).catch(() => {});
+                                    }
                                 } catch (replyErr) {
                                     console.error(`[INBOX] Reply failed for ${fromAddress}:`, replyErr.message);
                                 }
@@ -351,7 +465,7 @@ async function pollInbox() {
 
                             // Always notify Lee via Telegram with AI summary
                             try {
-                                await sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText);
+                                await sendTelegramNotification(fromName, fromAddress, subject, date, bodyText, autoReplied, replyText, voiceRequested, voiceSent);
                                 console.log(`[INBOX] Telegram notification sent for: ${subject}`);
                             } catch (notifyErr) {
                                 console.error(`[INBOX] Telegram notification failed:`, notifyErr.message);
@@ -366,7 +480,8 @@ async function pollInbox() {
                             newCount++;
 
                             if (postDashboard) {
-                                postDashboard('add_activity', { entry: `Email from ${fromName || fromAddress}: ${subject.substring(0, 60)} — ${autoReplied ? 'replied' : 'notified'}` });
+                                const action = autoReplied ? (voiceSent ? 'replied + voice' : 'replied') : 'notified';
+                                postDashboard('add_activity', { entry: `Email from ${fromName || fromAddress}: ${subject.substring(0, 60)} — ${action}` });
                             }
                         } catch (msgErr) {
                             console.error(`[INBOX] Error processing UID ${uid}:`, msgErr.message);

@@ -224,7 +224,8 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /tasks — Scheduled and recurring tasks
 /tokens — Today's API usage breakdown
 /spend — Full lifetime cost and spending report
-/learn — Toggle educational mode (structured answers)
+/learn — Enter educational mode (structured answers)
+/exit — Leave educational mode
 /clear — Wipe conversation history
 /help — Full command list with tips
 
@@ -243,7 +244,17 @@ Just message me naturally — I'm here to help.
             await bot.sendMessage(chatId, `*Educational mode off.*\n\nI'll respond normally from here.`, { parse_mode: 'Markdown' });
         } else {
             learnModeChats.add(chatId);
-            await bot.sendMessage(chatId, `*Educational mode on.*\n\nI'll now structure every answer in three parts:\n\n*What* — The facts and core concept\n*How* — How it works or applies in practice\n*Why* — Why it matters and the deeper reasoning\n\nAsk me anything. Send /learn again to switch back.`, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, `*Educational mode on.*\n\nI'll now structure every answer in three parts:\n\n*What* — The facts and core concept\n*How* — How it works or applies in practice\n*Why* — Why it matters and the deeper reasoning\n\nAsk me anything. Send /exit to leave educational mode.`, { parse_mode: 'Markdown' });
+        }
+    });
+
+    bot.onText(/\/exit/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (learnModeChats.has(chatId)) {
+            learnModeChats.delete(chatId);
+            await bot.sendMessage(chatId, `*Educational mode off.*\n\nBack to normal.`, { parse_mode: 'Markdown' });
+        } else {
+            await bot.sendMessage(chatId, `No active mode to exit.`);
         }
     });
 
@@ -369,14 +380,60 @@ Just message me naturally — I'm here to help.
                 return;
             }
 
+            const GBP_RATE = 0.79;
+
             // Format first day nicely
             const firstDate = new Date(stats.firstDay + 'T00:00:00');
             const firstDayFmt = firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-            let text = `*ALEX Spending Report*\n\n`;
-            text += `Operational since: ${firstDayFmt} (${stats.totalDays} day${stats.totalDays !== 1 ? 's' : ''})\n`;
-            text += `Total API calls: ${stats.totalCalls}\n\n`;
-            text += `*Total Cost: £${stats.totalCostGbp.toFixed(4)}*\n\n`;
+            const totalCostUsd = stats.totalCostGbp / GBP_RATE;
+
+            // Balance tracking
+            const balanceUsd = config.anthropic_balance_usd || 0;
+            const balanceDate = config.anthropic_balance_date || stats.firstDay;
+
+            // Calculate spend since balance was set
+            let spentSinceBalanceGbp = 0;
+            if (stats.byDay) {
+                for (const day of stats.byDay) {
+                    if (day.date >= balanceDate) {
+                        spentSinceBalanceGbp += day.costGbp;
+                    }
+                }
+            }
+            const spentSinceBalanceUsd = spentSinceBalanceGbp / GBP_RATE;
+            const remainingUsd = balanceUsd - spentSinceBalanceUsd;
+            const remainingGbp = remainingUsd * GBP_RATE;
+
+            // Estimate days remaining at current burn rate
+            const avgDailyCostUsd = stats.byDay.length > 0 ? totalCostUsd / stats.byDay.length : 0;
+            const daysRemaining = avgDailyCostUsd > 0 ? Math.floor(remainingUsd / avgDailyCostUsd) : 0;
+
+            // Today's cost
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = stats.byDay.find(d => d.date === today);
+            const todayCostGbp = todayData ? todayData.costGbp : 0;
+
+            let text = `*ALEX — Spending Report*\n\n`;
+
+            // Wallet section
+            text += `*Anthropic Wallet:*\n`;
+            text += `• Loaded: $${balanceUsd.toFixed(2)} (${balanceDate})\n`;
+            text += `• Spent since: $${spentSinceBalanceUsd.toFixed(2)} / £${spentSinceBalanceGbp.toFixed(2)}\n`;
+            text += `• *Remaining: $${remainingUsd.toFixed(2)} / £${remainingGbp.toFixed(2)}*\n`;
+            if (daysRemaining > 0) {
+                text += `• Runway: ~${daysRemaining} days at current rate\n`;
+            }
+            text += `\n`;
+
+            // Today
+            text += `*Today's Cost:* £${todayCostGbp.toFixed(4)}\n\n`;
+
+            // Lifetime
+            text += `*Lifetime:*\n`;
+            text += `• Operational since: ${firstDayFmt} (${stats.totalDays} day${stats.totalDays !== 1 ? 's' : ''})\n`;
+            text += `• Total calls: ${stats.totalCalls}\n`;
+            text += `• Total cost: £${stats.totalCostGbp.toFixed(4)} / $${totalCostUsd.toFixed(4)}\n\n`;
 
             // By model (sorted by cost descending)
             const models = Object.entries(stats.byModel).sort((a, b) => b[1].costGbp - a[1].costGbp);
@@ -398,8 +455,8 @@ Just message me naturally — I'm here to help.
             // Averages
             const avgTokensPerCall = stats.totalCalls > 0 ? stats.totalTokens / stats.totalCalls : 0;
             const avgTokFmt = avgTokensPerCall >= 1_000_000 ? `${(avgTokensPerCall / 1_000_000).toFixed(1)}M` : `${(avgTokensPerCall / 1_000).toFixed(1)}K`;
-            text += `\n*Averages:*\n`;
-            text += `• £${stats.avgCostPerDay.toFixed(2)} / day\n`;
+            text += `\n*Daily Averages:*\n`;
+            text += `• £${stats.avgCostPerDay.toFixed(2)} / day ($${(stats.avgCostPerDay / GBP_RATE).toFixed(2)})\n`;
             text += `• £${stats.avgCostPerCall.toFixed(4)} / call\n`;
             text += `• ${avgTokFmt} tokens / call`;
 
@@ -425,7 +482,8 @@ Just message me naturally — I'm here to help.
 /help — This reference guide
 
 *Intelligence:*
-/learn — Toggle educational mode (What / How / Why)
+/learn — Enter educational mode (What / How / Why)
+/exit — Leave educational mode
 /memory — Browse my memory banks
 /skills — View custom skills I've learned
 
@@ -1117,7 +1175,7 @@ async function init() {
     setupControlAPI();
 
     // Start Gmail inbox polling
-    setupInbox({ config, bot, postDashboard, anthropic });
+    setupInbox({ config, bot, postDashboard, anthropic, openaiClient });
     startInboxPolling();
 
     // Check for missed scheduled tasks during downtime
