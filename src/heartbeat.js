@@ -189,10 +189,16 @@ export async function runDashboardSync() {
                 totalCalls++;
                 let costUsd = 0;
                 let modelName = 'Sonnet';
-                if (e.model?.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
-                else if (e.model?.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
-                else if (e.model?.includes('gpt')) { costUsd = inp / 1e6 * 2.5 + out / 1e6 * 10; modelName = 'GPT-4o'; }
-                else if (e.model?.includes('sonnet')) { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
+                const m = e.model || '';
+                if (m.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
+                else if (m.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
+                else if (m === 'o3') { costUsd = inp / 1e6 * 10 + out / 1e6 * 40; modelName = 'o3'; }
+                else if (m === 'o4-mini') { costUsd = inp / 1e6 * 1.1 + out / 1e6 * 4.4; modelName = 'o4-mini'; }
+                else if (m === 'gpt-4.1-nano') { costUsd = inp / 1e6 * 0.1 + out / 1e6 * 0.4; modelName = 'GPT-4.1 Nano'; }
+                else if (m === 'gpt-4.1-mini') { costUsd = inp / 1e6 * 0.4 + out / 1e6 * 1.6; modelName = 'GPT-4.1 Mini'; }
+                else if (m === 'gpt-4.1') { costUsd = inp / 1e6 * 2 + out / 1e6 * 8; modelName = 'GPT-4.1'; }
+                else if (m.includes('gpt')) { costUsd = inp / 1e6 * 2.5 + out / 1e6 * 10; modelName = 'GPT-4o'; }
+                else if (m.includes('sonnet')) { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
                 else { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; }
                 totalCostUsd += costUsd;
                 if (!byModel[modelName]) byModel[modelName] = { model: modelName, calls: 0, input_tokens: 0, output_tokens: 0, cost_gbp: 0 };

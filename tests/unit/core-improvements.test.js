@@ -60,7 +60,7 @@ describe('selectModel', () => {
 
     it('respects explicit overrides', () => {
         expect(selectModel('use sonnet for this')).toBe('claude-sonnet-4-20250514');
-        expect(selectModel('use gpt please')).toBe('gpt-4o');
+        expect(selectModel('use gpt please')).toBe('gpt-4.1');
         expect(selectModel('use haiku')).toBe('claude-3-5-haiku-20241022');
     });
 

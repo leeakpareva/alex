@@ -2247,11 +2247,20 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
     });
 
     const MODEL_OPTIONS = [
-        { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku default, DeepSeek for deep analysis. Sonnet only if you select it.', price: '' },
-        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Default for all tasks', price: '$0.80/$4.00 per 1M tokens' },
-        { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Most capable. Research, reports, emails, tool use. Use only when needed', price: '$3.00/$15.00 per 1M tokens' },
-        { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. No tool use (text only)', price: '$0.14/$0.28 per 1M tokens' },
-        { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'OpenAI fallback. No tool use (text only)', price: '$2.50/$10.00 per 1M tokens' },
+        { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku default, Sonnet for complex tasks', price: '' },
+        // Claude
+        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Default for simple tasks', price: '$0.80/$4.00 per 1M' },
+        { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Best all-rounder. Research, reports, tool use', price: '$3.00/$15.00 per 1M' },
+        { key: 'opus', label: 'Opus', model: 'claude-opus-4-5-20251101', desc: 'Maximum capability. Serious work only', price: '$15.00/$75.00 per 1M' },
+        // OpenAI
+        { key: 'o3', label: 'o3', model: 'o3', desc: 'Strongest reasoning. Multi-step problem solving', price: '$10.00/$40.00 per 1M' },
+        { key: 'o4-mini', label: 'o4-mini', model: 'o4-mini', desc: 'Fast reasoning. Great cost/performance', price: '$1.10/$4.40 per 1M' },
+        { key: 'gpt-4.1', label: 'GPT-4.1', model: 'gpt-4.1', desc: 'Best for coding and instruction following', price: '$2.00/$8.00 per 1M' },
+        { key: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', model: 'gpt-4.1-mini', desc: 'Balanced speed and quality', price: '$0.40/$1.60 per 1M' },
+        { key: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', model: 'gpt-4.1-nano', desc: 'Fastest and cheapest OpenAI', price: '$0.10/$0.40 per 1M' },
+        { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'Previous OpenAI flagship', price: '$2.50/$10.00 per 1M' },
+        // Other
+        { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. Text only', price: '$0.14/$0.28 per 1M' },
     ];
 
     function buildModelMenu(chatId) {

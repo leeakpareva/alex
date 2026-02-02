@@ -43,6 +43,12 @@ const MODEL_PRICING = {
     'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
     'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
     'deepseek-chat': { input: 0.14, output: 0.28 },
+    'gpt-4o': { input: 2.50, output: 10.00 },
+    'gpt-4.1': { input: 2.00, output: 8.00 },
+    'gpt-4.1-mini': { input: 0.40, output: 1.60 },
+    'gpt-4.1-nano': { input: 0.10, output: 0.40 },
+    'o3': { input: 10.00, output: 40.00 },
+    'o4-mini': { input: 1.10, output: 4.40 },
 };
 const USD_TO_GBP = 0.79;
 
@@ -51,6 +57,13 @@ function getModelPricing(model) {
     if (model.includes('haiku')) return MODEL_PRICING['claude-3-5-haiku-20241022'];
     if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
     if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
+    if (MODEL_PRICING[model]) return MODEL_PRICING[model];
+    if (model.includes('gpt-4.1-nano')) return MODEL_PRICING['gpt-4.1-nano'];
+    if (model.includes('gpt-4.1-mini')) return MODEL_PRICING['gpt-4.1-mini'];
+    if (model.includes('gpt-4.1')) return MODEL_PRICING['gpt-4.1'];
+    if (model.includes('gpt-4o')) return MODEL_PRICING['gpt-4o'];
+    if (model === 'o3') return MODEL_PRICING['o3'];
+    if (model === 'o4-mini') return MODEL_PRICING['o4-mini'];
     // Default to Haiku pricing for unknown models
     return MODEL_PRICING['claude-3-5-haiku-20241022'];
 }
@@ -65,6 +78,11 @@ function getModelLabel(model) {
     if (model.includes('haiku')) return 'Haiku';
     if (model.includes('sonnet')) return 'Sonnet';
     if (model.includes('deepseek')) return 'DeepSeek';
+    if (model === 'o3') return 'o3';
+    if (model === 'o4-mini') return 'o4-mini';
+    if (model === 'gpt-4.1-nano') return 'GPT-4.1 Nano';
+    if (model === 'gpt-4.1-mini') return 'GPT-4.1 Mini';
+    if (model === 'gpt-4.1') return 'GPT-4.1';
     if (model.includes('gpt')) return 'GPT-4o';
     return model;
 }
@@ -251,8 +269,17 @@ const DEEPSEEK_PATTERNS = [
 
 // Explicit model override patterns — checked first, highest priority
 const EXPLICIT_OVERRIDES = [
-    { pattern: /\buse (openai|gpt|gpt-?4o?)\b/i, model: 'gpt-4o', label: 'gpt-4o (explicit)' },
+    // OpenAI models — specific patterns first, generic "use gpt" last
+    { pattern: /\buse o3\b/i, model: 'o3', label: 'o3 (explicit)' },
+    { pattern: /\buse o4[- ]?mini\b/i, model: 'o4-mini', label: 'o4-mini (explicit)' },
+    { pattern: /\buse gpt[- ]?4\.1[- ]?nano\b/i, model: 'gpt-4.1-nano', label: 'gpt-4.1-nano (explicit)' },
+    { pattern: /\buse gpt[- ]?4\.1[- ]?mini\b/i, model: 'gpt-4.1-mini', label: 'gpt-4.1-mini (explicit)' },
+    { pattern: /\buse gpt[- ]?4\.1\b/i, model: 'gpt-4.1', label: 'gpt-4.1 (explicit)' },
+    { pattern: /\buse gpt[- ]?4o\b/i, model: 'gpt-4o', label: 'gpt-4o (explicit)' },
+    { pattern: /\buse (openai|gpt)\b/i, model: 'gpt-4.1', label: 'gpt-4.1 (explicit)' },
+    // DeepSeek
     { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
+    // Claude models
     { pattern: /\buse (claude|sonnet)\b/i, model: 'claude-sonnet-4-20250514', label: 'claude-sonnet-4 (explicit)' },
     { pattern: /\buse haiku\b/i, model: 'claude-3-5-haiku-20241022', label: 'claude-3.5-haiku (explicit)' },
     { pattern: /\buse opus\b/i, model: 'claude-opus-4-5-20251101', label: 'claude-opus-4.5 (explicit)' },
@@ -814,24 +841,36 @@ ${contextBlock}`;
             return text;
         }
 
-        // GPT-4o routing — text-only, no tool loop
-        if (model === 'gpt-4o' && openaiClient) {
-            console.log('[OPENAI] Calling gpt-4o (explicit request)...');
+        // OpenAI model routing — text-only, no tool loop
+        const OPENAI_MODELS = new Set(['gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o3', 'o4-mini']);
+        const REASONING_MODELS = new Set(['o3', 'o4-mini']);
+        if (OPENAI_MODELS.has(model) && openaiClient) {
+            console.log(`[OPENAI] Calling ${model} (explicit request)...`);
             const openaiMessages = apiMessages.map(m => {
                 if (typeof m.content === 'string') return { role: m.role, content: m.content };
                 const textParts = (Array.isArray(m.content) ? m.content : []).filter(b => b.type === 'text').map(b => b.text);
                 return { role: m.role, content: textParts.join('\n') || JSON.stringify(m.content) };
             });
-            openaiMessages.unshift({ role: 'system', content: typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt) });
-            const gptResponse = await openaiClient.chat.completions.create({
-                model: 'gpt-4o',
-                messages: openaiMessages,
-                max_tokens: 8192,
-            });
+            // Reasoning models (o3, o4-mini) don't support system messages — prepend as user context
+            if (REASONING_MODELS.has(model)) {
+                const sysContent = typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt);
+                openaiMessages.unshift({ role: 'user', content: `[System context]\n${sysContent}` });
+                openaiMessages.splice(1, 0, { role: 'assistant', content: 'Understood, I have the context.' });
+            } else {
+                openaiMessages.unshift({ role: 'system', content: typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt) });
+            }
+            const requestParams = { model, messages: openaiMessages };
+            // Reasoning models use max_completion_tokens, others use max_tokens
+            if (REASONING_MODELS.has(model)) {
+                requestParams.max_completion_tokens = 16384;
+            } else {
+                requestParams.max_tokens = model.includes('nano') ? 4096 : 8192;
+            }
+            const gptResponse = await openaiClient.chat.completions.create(requestParams);
             const text = gptResponse.choices?.[0]?.message?.content || '';
             const usage = { input_tokens: gptResponse.usage?.prompt_tokens || 0, output_tokens: gptResponse.usage?.completion_tokens || 0 };
-            logTokenUsage('gpt-4o', usage, callContext);
-            console.log('[OPENAI] gpt-4o response received');
+            logTokenUsage(model, usage, callContext);
+            console.log(`[OPENAI] ${model} response received`);
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;
