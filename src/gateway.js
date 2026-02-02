@@ -896,6 +896,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /disk — Disk usage breakdown
 /cleanup — Manual cleanup of old files
 /architecture — Full project structure
+/fixes — Recent changelog entries
 
 <b>Info:</b>
 /memory — Browse memory banks
@@ -1564,6 +1565,42 @@ Professional but personable. Proactive, warm, analytical, reliable. A senior col
         await bot.sendMessage(chatId, profile, { parse_mode: 'HTML' });
     });
 
+    bot.onText(/\/fixes/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const changelogPath = path.join(process.cwd(), 'Fixes', 'CHANGELOG.md');
+            const raw = await readFile(changelogPath, 'utf-8');
+            // Parse ## sections and take last 5
+            const sections = raw.split(/\n## /).filter(s => s.trim() && !s.startsWith('# '));
+            const recent = sections.slice(0, 5);
+            let html = '<b>ALEX — Recent Changes</b>\n';
+            for (const section of recent) {
+                const lines = section.split('\n');
+                const header = lines[0].trim();
+                const dateMatch = header.match(/^(\d{4}-\d{2}-\d{2})\s*—\s*`([^`]+)`\s*(.*)/);
+                if (dateMatch) {
+                    html += `\n<b>${dateMatch[1]}</b> <code>${dateMatch[2]}</code> ${dateMatch[3]}\n`;
+                } else {
+                    html += `\n<b>${header}</b>\n`;
+                }
+                // Get type and bullet lines
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('**Type:**')) {
+                        html += `<i>${line.replace(/\*\*/g, '')}</i>\n`;
+                    } else if (line.startsWith('- ')) {
+                        html += `• ${line.slice(2).replace(/\*\*/g, '').replace(/`/g, '')}\n`;
+                    }
+                }
+            }
+            html += `\n<i>${sections.length} total entries in changelog</i>`;
+            await bot.sendMessage(chatId, html, { parse_mode: 'HTML' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Failed to read changelog: ${err.message}`);
+        }
+    });
+
     bot.onText(/\/help/, async (msg) => {
         const chatId = msg.chat.id;
         const help = `*ALEX — Full Guide*
@@ -1600,6 +1637,7 @@ Professional but personable. Proactive, warm, analytical, reliable. A senior col
 /disk — Disk usage breakdown of ~/.alex/
 /cleanup — Manual cleanup (old files, stale conversations)
 /architecture — Full project and workspace structure
+/fixes — Recent changelog and improvements
 
 *Utility:*
 /profile — ALEX personal details, DOB, owner info
@@ -2501,7 +2539,12 @@ Call the send_email tool now with exactly these parameters.`;
                 await new Promise(r => setTimeout(r, 3000 + Math.random() * 3000));
             } else {
                 // For substantial messages: send acknowledgement then work
-                const acks = ['On it.', 'Give me a moment.', 'Looking into it.', 'One sec.', 'Let me check.'];
+                const acks = [
+                    'On it.', 'Give me a moment.', 'Looking into it.', 'One sec.',
+                    'Pulling that up now.', 'Sure thing.', 'Checking now.', 'Right, let me see.',
+                    'Good question — digging in.', 'Grabbing that for you.', 'Working on it.',
+                    'Bear with me.', 'Just a moment.', 'Coming right up.'
+                ];
                 const ack = acks[Math.floor(Math.random() * acks.length)];
                 await new Promise(r => setTimeout(r, 1500 + Math.random() * 2000));
                 await bot.sendMessage(chatId, ack, { parse_mode: 'Markdown' });
@@ -2753,32 +2796,46 @@ Rules for Python Mode:
 
     // Register commands with Telegram so they appear in the / menu
     bot.setMyCommands([
-        { command: 'alex', description: 'Full command reference' },
-        { command: 'inbox', description: 'Email queue (not_started by default)' },
-        { command: 'email', description: 'Full email details — /email 1' },
         { command: 'action', description: 'Act on email — /action 1 reply' },
-        { command: 'status', description: 'System health and uptime' },
-        { command: 'duties', description: 'All duties, schedules, performance' },
+        { command: 'alex', description: 'Full command reference' },
+        { command: 'architecture', description: 'Project and workspace structure' },
         { command: 'brief', description: 'Recent activity summary' },
-        { command: 'news', description: 'Latest gathered news' },
-        { command: 'python', description: 'Python data analysis mode' },
-        { command: 'mathematician', description: 'Quantitative and computational' },
-        { command: 'strategist', description: 'Strategic frameworks and analysis' },
-        { command: 'learn', description: 'Educational mode (What/How/Why)' },
-        { command: 'voice', description: 'Voice message replies' },
-        { command: 'mode', description: 'Show active modes' },
-        { command: 'exit', description: 'Turn off all active modes' },
-        { command: 'stocks', description: 'Quick stock quote — /stocks AAPL' },
-        { command: 'models', description: 'Switch AI model' },
-        { command: 'research', description: 'Deep research on demand' },
-        { command: 'memory', description: 'Browse memory banks' },
-        { command: 'skills', description: 'List and manage skills' },
-        { command: 'tasks', description: 'View scheduled tasks' },
-        { command: 'tokens', description: 'Today\'s token usage' },
-        { command: 'spend', description: 'Daily cost breakdown' },
-        { command: 'costs', description: 'Per-task cost attribution' },
-        { command: 'projection', description: 'Monthly cost projection' },
+        { command: 'cleanup', description: 'Manual cleanup of old files' },
         { command: 'clear', description: 'Clear conversation history' },
+        { command: 'costs', description: 'Per-task cost attribution' },
+        { command: 'dashboard', description: 'Live dashboard link' },
+        { command: 'disk', description: 'Disk usage breakdown' },
+        { command: 'duties', description: 'All duties, schedules, performance' },
+        { command: 'email', description: 'Full email details — /email 1' },
+        { command: 'errors', description: 'Today\'s errors from audit log' },
+        { command: 'exit', description: 'Turn off all active modes' },
+        { command: 'fixes', description: 'Recent changelog and improvements' },
+        { command: 'health', description: 'Quick system health overview' },
+        { command: 'help', description: 'Full guide with tips' },
+        { command: 'id', description: 'Your Telegram user and chat ID' },
+        { command: 'inbox', description: 'Email queue (not_started by default)' },
+        { command: 'learn', description: 'Educational mode (What/How/Why)' },
+        { command: 'logs', description: 'Recent audit log entries' },
+        { command: 'mathematician', description: 'Quantitative and computational' },
+        { command: 'memory', description: 'Browse memory banks' },
+        { command: 'mode', description: 'Show active modes' },
+        { command: 'models', description: 'Switch AI model' },
+        { command: 'news', description: 'Latest gathered news' },
+        { command: 'profile', description: 'ALEX personal details' },
+        { command: 'projection', description: 'Monthly cost projection' },
+        { command: 'python', description: 'Python data analysis mode' },
+        { command: 'research', description: 'Deep research on demand' },
+        { command: 'skills', description: 'List and manage skills' },
+        { command: 'spend', description: 'Daily cost breakdown' },
+        { command: 'start', description: 'Welcome message' },
+        { command: 'status', description: 'System health and uptime' },
+        { command: 'stocks', description: 'Quick stock quote — /stocks AAPL' },
+        { command: 'strategist', description: 'Strategic frameworks and analysis' },
+        { command: 'tasks', description: 'View scheduled tasks' },
+        { command: 'testreport', description: 'Full system health report' },
+        { command: 'tokens', description: 'Today\'s token usage' },
+        { command: 'tracked', description: 'View tracked tasks' },
+        { command: 'voice', description: 'Voice message replies' },
     ]).catch(err => console.error('[TELEGRAM] Failed to set commands:', err.message));
 
     console.log('[TELEGRAM] Bot started and listening...');

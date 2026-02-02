@@ -593,6 +593,19 @@ export const TOOLS = [
         }
     },
     {
+        name: "generate_webapp",
+        description: "Generate a self-contained single-file HTML web application and send as file attachment. For interactive dashboards, data tables, reports with filtering/sorting, calculators, or visual content needing interaction. Must be complete HTML with inline CSS/JS. Use Tailwind CDN (<script src=\"https://cdn.tailwindcss.com\"></script>) for styling. For static charts use generate_chart instead.",
+        input_schema: {
+            type: "object",
+            properties: {
+                html_code: { type: "string", description: "Complete self-contained HTML document with inline CSS and JavaScript." },
+                filename: { type: "string", description: "Output filename (e.g. 'dashboard.html'). Saved to ~/.alex/outputs/webapps/" },
+                caption: { type: "string", description: "Caption for Telegram message" }
+            },
+            required: ["html_code", "filename"]
+        }
+    },
+    {
         name: "manage_user",
         description: "Add or remove Telegram users, and grant or revoke full Pi access. Changes take effect immediately without restart.",
         input_schema: {
@@ -651,7 +664,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
-    'manage_user',
+    'manage_user', 'generate_webapp',
 ]);
 
 // Per-tool timeout limits (milliseconds)
@@ -1296,6 +1309,20 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     await fs.unlink(htmlPath).catch(() => {});
                     return { success: false, error: `Mind map rendering failed: ${err.message}` };
                 }
+            }
+
+            case 'generate_webapp': {
+                const webappsDir = path.join(WORKSPACE_PATH, 'outputs', 'webapps');
+                await fs.mkdir(webappsDir, { recursive: true });
+                const outputPath = path.join(webappsDir, input.filename);
+                await fs.writeFile(outputPath, input.html_code, 'utf-8');
+                return {
+                    success: true,
+                    path: outputPath,
+                    message: `Web app generated: ${outputPath}`,
+                    send_document: true,
+                    caption: input.caption || 'Web app ready — open in Chrome or Safari to view.'
+                };
             }
 
             case 'manage_user': {

@@ -638,6 +638,7 @@ ${userMemory}
 10. You can generate PDF reports (generate_pdf tool) and email them as attachments (send_email with attachment_path)
 13. When the user asks you to "talk to me", "speak to me", "send a voice message", or otherwise requests an audio/voice response, use the send_voice_message tool to respond with a voice message.
 14. You can generate charts, graphs, and data visualisations using the generate_chart tool (Python with numpy, pandas, matplotlib, seaborn, scipy, scikit-learn). Charts are sent directly as images in Telegram. Use professional styling: clean fonts, proper labels, NAVADA brand colours (#1a1a2e, #16213e, #0f3460, #e94560) where appropriate.
+15. You can generate interactive HTML web applications using the generate_webapp tool — dashboards, data tables, interactive reports, calculators. Use Tailwind CDN for styling. For static charts/graphs, use generate_chart instead.
 11. All emails are automatically CC'd to the configured address
 12. You MUST update the dashboard (update_dashboard tool) when completing tasks, finding news, or performing scheduled activities. Log every significant action to the dashboard so Lee can track your work visually
 
@@ -661,6 +662,7 @@ ${userMemory}
 - Lead with the answer or insight, not preamble. Get to the point.
 - Ask clarifying questions when needed.
 - Remember and reference past conversations.
+- NEVER say "Let me check", "Let me look into that", "Let me investigate", or similar filler phrases before using tools. Just use the tool and respond with the answer directly. If you need to acknowledge a request before a long task, vary your phrasing naturally — never repeat the same acknowledgment twice in a conversation. Examples of natural acknowledgments: "On it.", "Pulling that up now.", "One moment.", "Sure thing.", "Looking into it.", "Give me a sec.", "Checking now.", "Right, let me see.", "Good question — digging in.", "Grabbing that for you."
 
 ` + ((!context.isScheduled && userQuery && /\b(email|mail|send|draft|compose|write to)\b/i.test(userQuery)) ? `
 ## Email Formatting
@@ -735,8 +737,9 @@ ${contextBlock}`;
                     });
 
                     const systemPrompt = cachedSystemPrompt || await buildSystemPrompt();
-                    // During tool loops, use sanitizeRecent on last 20 to keep tool pairs intact
-                    const apiMessages = sanitizeRecent(messages.slice(-20));
+                    // During tool loops, use sanitizeRecent — tighter window for scheduled tasks to avoid token overflow
+                    const windowSize = isScheduled ? 12 : 20;
+                    const apiMessages = sanitizeRecent(messages.slice(-windowSize));
 
                     currentResponse = await callAnthropicQueued({
                         model,

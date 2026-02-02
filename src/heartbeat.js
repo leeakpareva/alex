@@ -138,11 +138,14 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         }
 
         if (config.telegram_notify_tasks && config.telegram_owner_id && finalText.trim() && bot) {
-            await bot.sendMessage(
-                config.telegram_owner_id,
-                `*${task.name}*\n\n${finalText.substring(0, 3500)}`,
-                { parse_mode: 'Markdown' }
-            );
+            const taskTitle = task.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const msgText = `<b>${taskTitle}</b>\n\n${finalText.substring(0, 3500)}`;
+            try {
+                await bot.sendMessage(config.telegram_owner_id, msgText, { parse_mode: 'HTML' });
+            } catch (parseErr) {
+                // HTML parse failed — send as plain text
+                await bot.sendMessage(config.telegram_owner_id, `${taskTitle}\n\n${finalText.substring(0, 3500)}`);
+            }
         }
     } catch (error) {
         console.error(`[CRON] Task '${task.name}' failed:`, error.message);

@@ -4,6 +4,12 @@ All improvements, bug fixes, and features since ALEX was born.
 
 ---
 
+## 2026-02-02 — generate_webapp Tool + /fixes Command
+**Type:** Feature
+- Added `generate_webapp` tool — generates self-contained HTML web apps (dashboards, calculators, interactive reports) and sends as Telegram file attachments
+- Added `/fixes` command — displays last 5 changelog entries in Telegram
+- Updated `/alex` and `/help` menus with new commands
+
 ## 2026-02-02 — `a1e398c` Directory Reorg, Email Menu & New Commands
 **Type:** Feature + Improvement
 - Reorganised `~/.alex/` directory structure (outputs/, files/, logs/audit/, logs/tokens/)
