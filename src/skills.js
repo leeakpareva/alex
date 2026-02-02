@@ -64,7 +64,7 @@ Manage files and directories on the Raspberry Pi.
 - Backup important data
 
 ## Common Operations
-- Reports: Save to ~/.alex/reports/
+- Reports: Save to ~/.alex/outputs/reports/
 - Research: Save to ~/.alex/research/
 - Code: Save to ~/.alex/projects/
 - Data: Save to ~/.alex/data/

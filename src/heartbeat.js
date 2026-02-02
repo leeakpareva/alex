@@ -172,7 +172,7 @@ export async function runDashboardSync() {
 
         // Token metrics from today's log
         const date = new Date().toISOString().split('T')[0];
-        const logFile = path.join(WORKSPACE_PATH, 'logs', `tokens_${date}.jsonl`);
+        const logFile = path.join(WORKSPACE_PATH, 'logs', 'tokens', `tokens_${date}.jsonl`);
         let totalIn = 0, totalOut = 0, totalCalls = 0, totalCostUsd = 0;
         const byModel = {};
         try {

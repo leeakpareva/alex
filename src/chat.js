@@ -18,7 +18,7 @@ export async function logTokenUsage(model, usage, context = {}) {
     if (!usage) return;
     try {
         const date = new Date().toISOString().split('T')[0];
-        const logDir = path.join(WORKSPACE_PATH, 'logs');
+        const logDir = path.join(WORKSPACE_PATH, 'logs', 'tokens');
         await fs.mkdir(logDir, { recursive: true });
         const logFile = path.join(logDir, `tokens_${date}.jsonl`);
         const entry = {
@@ -70,7 +70,7 @@ function getModelLabel(model) {
 }
 
 export async function getLifetimeTokenStats() {
-    const logDir = path.join(WORKSPACE_PATH, 'logs');
+    const logDir = path.join(WORKSPACE_PATH, 'logs', 'tokens');
     const files = await fs.readdir(logDir);
     const tokenFiles = files.filter(f => f.startsWith('tokens_') && f.endsWith('.jsonl')).sort();
 
@@ -135,7 +135,7 @@ export async function getLifetimeTokenStats() {
 export async function getDailyTokenStats() {
     try {
         const date = new Date().toISOString().split('T')[0];
-        const logFile = path.join(WORKSPACE_PATH, 'logs', `tokens_${date}.jsonl`);
+        const logFile = path.join(WORKSPACE_PATH, 'logs', 'tokens', `tokens_${date}.jsonl`);
         // Stream the file line-by-line instead of loading all at once
         const fileHandle = await fs.open(logFile, 'r');
         let totalIn = 0, totalOut = 0, totalCalls = 0;
@@ -162,7 +162,7 @@ export async function getDailyTokenStats() {
 }
 
 export async function getTokenStatsBySource() {
-    const logDir = path.join(WORKSPACE_PATH, 'logs');
+    const logDir = path.join(WORKSPACE_PATH, 'logs', 'tokens');
     const files = await fs.readdir(logDir);
     const tokenFiles = files.filter(f => f.startsWith('tokens_') && f.endsWith('.jsonl')).sort();
 
@@ -610,10 +610,10 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         let uploadsBlock = '';
         if (!context.isScheduled) {
             try {
-                const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
+                const uploadsDir = path.join(WORKSPACE_PATH, 'files', 'uploads');
                 const uploadFiles = await import('fs/promises').then(f => f.readdir(uploadsDir));
                 if (uploadFiles.length > 0) {
-                    uploadsBlock = `\n\n## Uploaded Files (${WORKSPACE_PATH}/uploads/)\n${uploadFiles.map(f => `- ${f}`).join('\n')}\nYou can read these files with read_file or bash. PDFs can be read with bash pdftotext.`;
+                    uploadsBlock = `\n\n## Uploaded Files (${WORKSPACE_PATH}/files/uploads/)\n${uploadFiles.map(f => `- ${f}`).join('\n')}\nYou can read these files with read_file or bash. PDFs can be read with bash pdftotext.`;
                 }
             } catch {}
         }

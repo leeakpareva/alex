@@ -377,7 +377,7 @@ export const TOOLS = [
             type: "object",
             properties: {
                 python_code: { type: "string", description: "Complete Python script. For visuals: use plt.savefig(output_path, dpi=150, bbox_inches='tight'). The variable 'output_path' is injected automatically. For text output: use print()." },
-                filename: { type: "string", description: "Output filename (e.g. 'analysis.png'). Saved to ~/.alex/charts/" },
+                filename: { type: "string", description: "Output filename (e.g. 'analysis.png'). Saved to ~/.alex/outputs/charts/" },
                 caption: { type: "string", description: "Caption to display with the output in Telegram" }
             },
             required: ["python_code", "filename"]
@@ -464,7 +464,7 @@ export const TOOLS = [
         input_schema: {
             type: "object",
             properties: {
-                path: { type: "string", description: "Absolute path to the file (e.g. /home/head/clawd/README.md, /home/head/.alex/images/image_123.png)" },
+                path: { type: "string", description: "Absolute path to the file (e.g. /home/head/clawd/README.md, /home/head/.alex/outputs/images/image_123.png)" },
                 caption: { type: "string", description: "Optional caption or description to show with the file" }
             },
             required: ["path"]
@@ -912,7 +912,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             case 'generate_pdf': {
                 const timestamp = Date.now();
                 const filename = input.filename || `report_${timestamp}.pdf`;
-                const reportsDir = path.join(WORKSPACE_PATH, 'reports');
+                const reportsDir = path.join(WORKSPACE_PATH, 'outputs', 'reports');
                 await fs.mkdir(reportsDir, { recursive: true });
                 const outputPath = path.join(reportsDir, filename);
 
@@ -1002,7 +1002,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     response_format: 'b64_json'
                 });
                 const imgData = imgResponse.data[0].b64_json;
-                const imagesDir = path.join(WORKSPACE_PATH, 'images');
+                const imagesDir = path.join(WORKSPACE_PATH, 'outputs', 'images');
                 await fs.mkdir(imagesDir, { recursive: true });
                 const imgFilename = `image_${Date.now()}.png`;
                 const outputPath = path.join(imagesDir, imgFilename);
@@ -1011,7 +1011,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'generate_chart': {
-                const chartsDir = path.join(WORKSPACE_PATH, 'charts');
+                const chartsDir = path.join(WORKSPACE_PATH, 'outputs', 'charts');
                 await fs.mkdir(chartsDir, { recursive: true });
                 const chartFilename = input.filename || `chart_${Date.now()}.png`;
                 const outputPath = path.join(chartsDir, chartFilename);
@@ -1241,7 +1241,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
 
 
             case 'generate_diagram': {
-                const diagramsDir = path.join(WORKSPACE_PATH, 'diagrams');
+                const diagramsDir = path.join(WORKSPACE_PATH, 'outputs', 'diagrams');
                 await fs.mkdir(diagramsDir, { recursive: true });
                 const mmdFilename = `diagram_${Date.now()}.mmd`;
                 const mmdPath = path.join(diagramsDir, mmdFilename);
@@ -1259,7 +1259,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'generate_mindmap': {
-                const mindmapsDir = path.join(WORKSPACE_PATH, 'mindmaps');
+                const mindmapsDir = path.join(WORKSPACE_PATH, 'outputs', 'mindmaps');
                 await fs.mkdir(mindmapsDir, { recursive: true });
                 const mdFilename = `mindmap_${Date.now()}.md`;
                 const mdPath = path.join(mindmapsDir, mdFilename);

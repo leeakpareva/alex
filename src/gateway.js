@@ -42,7 +42,7 @@ import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPos
 import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
 import { setupInbox, startInboxPolling } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
-import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone } from './email-filing.js';
+import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
 
 // ============================================================================
@@ -192,7 +192,7 @@ function heartbeatDeps() {
 async function auditLog(entry) {
     try {
         const date = new Date().toISOString().split('T')[0];
-        const logDir = path.join(WORKSPACE_PATH, 'logs');
+        const logDir = path.join(WORKSPACE_PATH, 'logs', 'audit');
         await mkdir(logDir, { recursive: true });
         const logFile = path.join(logDir, `audit_${date}.jsonl`);
         await appendFile(logFile, JSON.stringify({ ...entry, timestamp: new Date().toISOString() }) + '\n');
@@ -864,6 +864,10 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 
 /alex — This command list
 /inbox — Email queue (not_started by default)
+/inbox clear [done|all] — Clear emails
+/inbox done all — Mark all as done
+/inbox delete 1 — Delete email #1
+/inbox mark 1 done — Change email status
 /email 1 — Full email details
 /action 1 reply — Act on an email
 /status — System health and uptime
@@ -884,6 +888,14 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /stocks AAPL — Quick stock quote
 /models — Switch AI model
 /research topic — Deep research on demand
+
+<b>System:</b>
+/health — System health overview
+/logs — Recent audit log entries
+/errors — Today's errors
+/disk — Disk usage breakdown
+/cleanup — Manual cleanup of old files
+/architecture — Full project structure
 
 <b>Info:</b>
 /memory — Browse memory banks
@@ -1223,6 +1235,275 @@ Just message me naturally for anything else.`;
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
+    // ========================================================================
+    // NEW COMMANDS: /architecture, /logs, /disk, /cleanup, /errors, /health
+    // ========================================================================
+
+    bot.onText(/\/architecture/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        const arch = `<b>ALEX — Architecture Overview</b>
+
+<b>Source Code:</b> /home/head/navada-1/src/
+• gateway.js — Entry point, Telegram bot, control API (port 9090)
+• chat.js — Chat system, model routing, summarisation, API calls
+• tools.js — 31 tool definitions + executeTool switch
+• queue.js — Priority request queue with 429 cooldown
+• heartbeat.js — Scheduled tasks, dashboard sync
+• memory.js — Conversations, categorised memory, knowledge base
+• skills.js — Skill CRUD, 7 default skills
+• config.js — Config loader, path validation
+• keyword-index.js — Inverted keyword index with TF scoring
+• alerts.js — Stock/service alert threshold monitoring
+• slack.js — Slack Web API polling
+• inbox.js — Gmail inbox monitoring, AI replies
+• email-filing.js — Email filing/categorisation
+
+<b>Workspace:</b> ~/.alex/
+• config.json, IDENTITY.md, USER.md, KNOWLEDGE.md — Core config
+• logs/audit/ — Audit logs (daily JSONL)
+• logs/tokens/ — Token usage logs (daily JSONL)
+• logs/ — cron.log, scheduler.log, .last-alive
+• outputs/charts/ — Generated charts (matplotlib)
+• outputs/diagrams/ — Mermaid diagrams
+• outputs/mindmaps/ — Markmap mind maps
+• outputs/images/ — DALL-E generated images
+• outputs/reports/ — Generated PDFs
+• files/uploads/ — Files received via Telegram
+• files/documents/ — Stored documents (e.g. exec summary)
+• conversations/ — Per-chat JSON (messages + summary)
+• memory/ — Categorised memory (user, projects, research, tasks)
+• tasks/ — Scheduled task JSON definitions
+• skills/ — Skill definitions (SKILL.md per skill)
+• templates/ — Email templates
+• scripts/ — Utility scripts
+• inbox/ — Email filing data
+
+<b>Flow:</b>
+Telegram → gateway.js (dedup + auth) → chat.js (model select → build prompt → API call → process response → tool loop) → Telegram reply
+
+<b>Model routing:</b> Haiku (short/simple) → Sonnet (default) → DeepSeek (deep research) → GPT-4o (fallback)`;
+        await bot.sendMessage(chatId, arch, { parse_mode: 'HTML' });
+    });
+
+    bot.onText(/\/logs/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const auditDir = path.join(WORKSPACE_PATH, 'logs', 'audit');
+            const date = new Date().toISOString().split('T')[0];
+            let recentEvents = [];
+            let todayErrors = [];
+            try {
+                const auditFile = path.join(auditDir, `audit_${date}.jsonl`);
+                const content = await readFile(auditFile, 'utf-8');
+                const lines = content.trim().split('\n').filter(l => l.trim());
+                recentEvents = lines.slice(-10).map(l => {
+                    try {
+                        const e = JSON.parse(l);
+                        const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '??:??';
+                        return `${time} ${e.type}${e.tool ? ` [${e.tool}]` : ''}${e.error ? ' ❌' : ''}`;
+                    } catch { return null; }
+                }).filter(Boolean);
+                todayErrors = lines.filter(l => {
+                    try { const e = JSON.parse(l); return e.error || e.success === false; } catch { return false; }
+                }).map(l => {
+                    try {
+                        const e = JSON.parse(l);
+                        const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '??:??';
+                        return `${time} ${e.type}${e.tool ? ` [${e.tool}]` : ''}: ${(e.error || 'failed').substring(0, 80)}`;
+                    } catch { return null; }
+                }).filter(Boolean);
+            } catch {}
+
+            let diskUsage = 'unknown';
+            try {
+                const { stdout } = await execAsync(`du -sh ${WORKSPACE_PATH}/logs/ 2>/dev/null | awk '{print $1}'`);
+                diskUsage = stdout.trim();
+            } catch {}
+
+            let text = `*ALEX — Recent Logs*\n\n`;
+            text += `*Last 10 audit events:*\n`;
+            text += recentEvents.length > 0 ? recentEvents.map(e => `• ${e}`).join('\n') : '(none today)';
+            text += `\n\n*Errors today:* ${todayErrors.length}`;
+            if (todayErrors.length > 0) {
+                text += '\n' + todayErrors.slice(-5).map(e => `• ${e}`).join('\n');
+                if (todayErrors.length > 5) text += `\n_(${todayErrors.length - 5} more)_`;
+            }
+            text += `\n\n*Logs disk usage:* ${diskUsage}`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/disk/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const { stdout } = await execAsync(`du -sh ${WORKSPACE_PATH}/*/ ${WORKSPACE_PATH}/*.json ${WORKSPACE_PATH}/*.md 2>/dev/null | sort -rh`);
+            const { stdout: total } = await execAsync(`du -sh ${WORKSPACE_PATH} 2>/dev/null | awk '{print $1}'`);
+            const { stdout: diskFree } = await execAsync(`df -h / | tail -1 | awk '{print "Used: " $3 " / " $2 " (" $5 " full)"}'`);
+            let text = `*ALEX — Disk Usage*\n\n`;
+            text += `*~/.alex/ total:* ${total.trim()}\n\n`;
+            text += stdout.trim().split('\n').map(line => {
+                const [size, p] = line.split('\t');
+                const name = p.replace(/.*\.alex\//, '').replace(/\/$/, '');
+                return `• ${name}: ${size}`;
+            }).join('\n');
+            text += `\n\n*System disk:* ${diskFree.trim()}`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/cleanup/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const results = [];
+            const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+            // Archive old done emails
+            try {
+                const archived = await archiveOldDone(30);
+                if (archived > 0) results.push(`Archived ${archived} done emails (>30 days)`);
+            } catch {}
+
+            // Delete old output files (charts, images, diagrams, mindmaps > 90 days)
+            for (const subdir of ['charts', 'diagrams', 'mindmaps', 'images']) {
+                try {
+                    const dir = path.join(WORKSPACE_PATH, 'outputs', subdir);
+                    const files = await import('fs/promises').then(f => f.readdir(dir));
+                    let deleted = 0;
+                    for (const file of files) {
+                        if (file.startsWith('_')) continue;
+                        const stat = await import('fs/promises').then(f => f.stat(path.join(dir, file)));
+                        if (stat.mtimeMs < ninetyDaysAgo) {
+                            await import('fs/promises').then(f => f.unlink(path.join(dir, file)));
+                            deleted++;
+                        }
+                    }
+                    if (deleted > 0) results.push(`Deleted ${deleted} old files from outputs/${subdir}/`);
+                } catch {}
+            }
+
+            // Prune old conversations (archive those with no messages in 60 days)
+            try {
+                const convDir = path.join(WORKSPACE_PATH, 'conversations');
+                const files = await import('fs/promises').then(f => f.readdir(convDir));
+                const sixtyDaysAgo = Date.now() - 60 * 24 * 60 * 60 * 1000;
+                let pruned = 0;
+                for (const file of files) {
+                    if (!file.endsWith('.json')) continue;
+                    const stat = await import('fs/promises').then(f => f.stat(path.join(convDir, file)));
+                    if (stat.mtimeMs < sixtyDaysAgo) {
+                        const archiveDir = path.join(WORKSPACE_PATH, 'conversations', '_archive');
+                        await mkdir(archiveDir, { recursive: true });
+                        await import('fs/promises').then(f => f.rename(path.join(convDir, file), path.join(archiveDir, file)));
+                        pruned++;
+                    }
+                }
+                if (pruned > 0) results.push(`Archived ${pruned} stale conversations (>60 days)`);
+            } catch {}
+
+            const text = results.length > 0
+                ? `*ALEX — Cleanup Results*\n\n${results.map(r => `✓ ${r}`).join('\n')}`
+                : `*ALEX — Cleanup*\n\nNothing to clean up — everything looks tidy.`;
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/errors/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const date = new Date().toISOString().split('T')[0];
+            const auditFile = path.join(WORKSPACE_PATH, 'logs', 'audit', `audit_${date}.jsonl`);
+            let errors = [];
+            try {
+                const content = await readFile(auditFile, 'utf-8');
+                for (const line of content.trim().split('\n')) {
+                    if (!line.trim()) continue;
+                    try {
+                        const e = JSON.parse(line);
+                        if (e.error || e.success === false) {
+                            const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '??:??';
+                            errors.push(`*${time}* — ${e.type}${e.tool ? ` [${e.tool}]` : ''}\n  ${(e.error || 'failed').substring(0, 120)}`);
+                        }
+                    } catch {}
+                }
+            } catch {}
+
+            let text = `*ALEX — Today's Errors (${date})*\n\n`;
+            if (errors.length === 0) {
+                text += 'No errors today. All clear.';
+            } else {
+                text += `${errors.length} error(s):\n\n`;
+                text += errors.slice(-15).join('\n\n');
+                if (errors.length > 15) text += `\n\n_(showing last 15 of ${errors.length})_`;
+            }
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/health/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const { stdout: uptime } = await execAsync('uptime -p');
+            const { stdout: temp } = await execAsync('vcgencmd measure_temp 2>/dev/null || echo "temp=N/A"');
+            const { stdout: disk } = await execAsync("df -h / | tail -1 | awk '{print $3 \" / \" $2 \" (\" $5 \")\"}'");
+            const { stdout: mem } = await execAsync("free -m | awk '/Mem:/ {printf \"%dMB / %dMB (%.1f%%)\", $3, $2, $3/$2 * 100}'");
+            const { stdout: loadavg } = await execAsync("cat /proc/loadavg | awk '{print $1, $2, $3}'");
+
+            const processUpSec = Math.floor(process.uptime());
+            const pDays = Math.floor(processUpSec / 86400);
+            const pHours = Math.floor((processUpSec % 86400) / 3600);
+            const pMins = Math.floor((processUpSec % 3600) / 60);
+            const processUpStr = pDays > 0 ? `${pDays}d ${pHours}h ${pMins}m` : pHours > 0 ? `${pHours}h ${pMins}m` : `${pMins}m`;
+
+            // Circuit breaker states
+            const cbStates = [];
+            if (chatSystem?.getCircuitState) {
+                const state = chatSystem.getCircuitState();
+                cbStates.push(`Anthropic: ${state}`);
+            }
+
+            // Queue size
+            const queueSize = dashState.activity_log.length;
+
+            const health = `*ALEX — System Health*
+
+*Uptime:* ${uptime.trim()}
+*ALEX process:* ${processUpStr}
+*Temperature:* ${temp.trim().replace('temp=', '')}
+*Load:* ${loadavg.trim()}
+*Memory:* ${mem.trim()}
+*Disk:* ${disk.trim()}
+
+*Services:*
+• Telegram: online
+• Control API: port 9090
+• Gmail: ${config.gmail_address ? 'polling' : 'disabled'}
+• Slack: ${config.slack_token ? 'polling' : 'disabled'}
+• Redis: ${redis ? 'connected' : 'local only'}
+• DeepSeek: ${deepseekClient ? 'available' : 'disabled'}
+• OpenAI: ${openaiClient ? 'available' : 'disabled'}
+
+*Queue/Activity:* ${queueSize} entries
+${cbStates.length > 0 ? `*Circuit breakers:* ${cbStates.join(', ')}` : ''}`;
+            await bot.sendMessage(chatId, health, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
     bot.onText(/\/help/, async (msg) => {
         const chatId = msg.chat.id;
         const help = `*ALEX — Full Guide*
@@ -1248,11 +1529,17 @@ Just message me naturally for anything else.`;
 
 *Operations:*
 /status — System health, hardware, services
+/health — Quick system health overview
 /duties — All cron duties, schedules, next runs, performance
 /tasks — Scheduled and recurring tasks
 /tokens — Today's API usage by model
 /spend — Full lifetime cost report
 /projection — Cost projection and ROI
+/logs — Recent audit log entries
+/errors — Today's errors from audit log
+/disk — Disk usage breakdown of ~/.alex/
+/cleanup — Manual cleanup (old files, stale conversations)
+/architecture — Full project and workspace structure
 
 *Utility:*
 /models — Lock a specific AI model (or restore auto)
@@ -1302,9 +1589,11 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
             const statusFilter = (match?.[1] || 'not_started').trim().toLowerCase();
+            // Subcommands handled by dedicated handlers — skip here
+            if (/^(clear|done\s+all|delete|mark)\b/.test(statusFilter)) return;
             const validStatuses = ['not_started', 'in_progress', 'done', 'all'];
             if (!validStatuses.includes(statusFilter)) {
-                await bot.sendMessage(chatId, `Invalid status. Use: /inbox [not_started|in_progress|done|all]`);
+                await bot.sendMessage(chatId, `Invalid status. Use: /inbox [not_started|in_progress|done|all]\n\nManage: /inbox clear | /inbox done all | /inbox delete N | /inbox mark N status`);
                 return;
             }
 
@@ -1325,9 +1614,97 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                 text += `  ${ago}\n\n`;
             }
             if (emails.length > 20) text += `... and ${emails.length - 20} more\n`;
-            text += `\nUse /email 1 for details, /action 1 reply to act.`;
+            text += `\n/email 1 — details | /action 1 reply — act\n/inbox clear — clear done | /inbox done all — mark all done\n/inbox delete 1 — remove | /inbox mark 1 done — update`;
 
             await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    bot.onText(/\/email$/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        await bot.sendMessage(chatId, '<b>ALEX — Email Menu</b>\n\nTap an action below:', {
+            parse_mode: 'HTML',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '📥 Inbox (New)', callback_data: 'em_inbox' }, { text: '⏳ In Progress', callback_data: 'em_inprog' }],
+                    [{ text: '✅ Done', callback_data: 'em_done' }, { text: '📋 All Emails', callback_data: 'em_all' }],
+                    [{ text: '✅ Mark All Done', callback_data: 'em_doneall' }, { text: '🧹 Clear Done', callback_data: 'em_cleardone' }],
+                    [{ text: '🗑️ Clear All', callback_data: 'em_clearall' }],
+                ]
+            }
+        });
+    });
+
+    // Handle email menu inline button callbacks
+    bot.on('callback_query', async (query) => {
+        const chatId = query.message.chat.id;
+        const userId = query.from.id;
+        if (!isAuthorizedUser(userId)) {
+            await bot.answerCallbackQuery(query.id, { text: 'Not authorized' });
+            return;
+        }
+        const data = query.data;
+        if (!data?.startsWith('em_')) return;
+
+        await bot.answerCallbackQuery(query.id);
+        const priorityEmoji = { high: '🔴', medium: '🟡', low: '🔵', spam: '⚪' };
+
+        const formatEmails = (emails, label) => {
+            if (emails.length === 0) return `*Inbox — ${label}*\n\nNo emails.`;
+            let text = `*Inbox — ${label}* (${emails.length})\n\n`;
+            for (const e of emails.slice(0, 20)) {
+                const emoji = priorityEmoji[e.triage?.priority] || '⚪';
+                const ago = timeAgo(e.received_at);
+                text += `${emoji} *#${e.display_number}* ${e.from_name || e.from_address}\n`;
+                text += `  ${e.subject.substring(0, 60)}\n`;
+                text += `  ${ago}\n\n`;
+            }
+            if (emails.length > 20) text += `... and ${emails.length - 20} more\n`;
+            text += `\n/email 1 — details | /action 1 reply — act`;
+            return text;
+        };
+
+        try {
+            switch (data) {
+                case 'em_inbox': {
+                    const emails = await getEmailsByStatus('not_started');
+                    await sendMarkdown(chatId, formatEmails(emails, 'not started'));
+                    break;
+                }
+                case 'em_inprog': {
+                    const emails = await getEmailsByStatus('in_progress');
+                    await sendMarkdown(chatId, formatEmails(emails, 'in progress'));
+                    break;
+                }
+                case 'em_done': {
+                    const emails = await getEmailsByStatus('done');
+                    await sendMarkdown(chatId, formatEmails(emails, 'done'));
+                    break;
+                }
+                case 'em_all': {
+                    const emails = await getEmailsByStatus('all');
+                    await sendMarkdown(chatId, formatEmails(emails, 'all'));
+                    break;
+                }
+                case 'em_doneall': {
+                    const result = await bulkUpdateStatus('not_started', 'done');
+                    await bot.sendMessage(chatId, `✅ Marked ${result} email(s) as done.`);
+                    break;
+                }
+                case 'em_cleardone': {
+                    const result = await clearEmailsByStatus('done');
+                    await bot.sendMessage(chatId, `🧹 Cleared ${result} done email(s).`);
+                    break;
+                }
+                case 'em_clearall': {
+                    const result = await clearEmailsByStatus('all');
+                    await bot.sendMessage(chatId, `🗑️ Cleared ${result} email(s).`);
+                    break;
+                }
+            }
         } catch (err) {
             await bot.sendMessage(chatId, `Error: ${err.message}`);
         }
@@ -1410,6 +1787,72 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                 clearInterval(typingInterval);
                 await bot.sendMessage(chatId, `Action failed: ${actionErr.message}`);
             }
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    // /inbox clear [done|not_started|in_progress|all] — bulk clear emails
+    bot.onText(/\/inbox\s+clear(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const status = (match?.[1] || 'done').trim().toLowerCase();
+            const valid = ['done', 'not_started', 'in_progress', 'all'];
+            if (!valid.includes(status)) {
+                await bot.sendMessage(chatId, `Usage: /inbox clear [done|not_started|in_progress|all]\nDefaults to clearing done emails.`);
+                return;
+            }
+            const count = await clearEmailsByStatus(status);
+            await bot.sendMessage(chatId, `Cleared ${count} ${status === 'all' ? '' : status.replace(/_/g, ' ') + ' '}email${count !== 1 ? 's' : ''} from inbox.`);
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    // /inbox done all — mark all not_started as done
+    bot.onText(/\/inbox\s+done\s+all/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const count = await bulkUpdateStatus('not_started', 'done');
+            await bot.sendMessage(chatId, `Marked ${count} email${count !== 1 ? 's' : ''} as done.`);
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    // /inbox delete <num> — delete a single email
+    bot.onText(/\/inbox\s+delete\s+(\d+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const num = parseInt(match[1]);
+            const found = await deleteEmailByNumber(num);
+            if (found) {
+                await bot.sendMessage(chatId, `Deleted email #${num}.`);
+            } else {
+                await bot.sendMessage(chatId, `Email #${num} not found.`);
+            }
+        } catch (err) {
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    // /inbox mark <num> <status> — change status of a single email
+    bot.onText(/\/inbox\s+mark\s+(\d+)\s+(done|not_started|in_progress)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        try {
+            const num = parseInt(match[1]);
+            const newStatus = match[2];
+            const email = await getEmailByNumber(num);
+            if (!email) {
+                await bot.sendMessage(chatId, `Email #${num} not found.`);
+                return;
+            }
+            await updateEmailStatus(email.id, newStatus, `Manually set to ${newStatus} via /inbox mark`);
+            await bot.sendMessage(chatId, `Email #${num} marked as ${newStatus.replace(/_/g, ' ')}.`);
         } catch (err) {
             await bot.sendMessage(chatId, `Error: ${err.message}`);
         }
@@ -1715,7 +2158,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 <p>If you would like to discuss how these findings apply to your organisation, please don't hesitate to get in touch.</p>
 <p>Best regards,<br><strong>Lee Akpareva</strong><br>Founder & CEO, NAVADA<br>AI Strategy & Implementation Consulting</p>
 </div>
-- attachment_path: /home/head/.alex/documents/NAVADA_Executive_Summary.pdf
+- attachment_path: /home/head/.alex/files/documents/NAVADA_Executive_Summary.pdf
 
 Call the send_email tool now with exactly these parameters.`;
                 const response = await chatSystem.chat(chatId, execSummaryPrompt, msg.from, { modelOverride: modelOverrides.get(chatId) }, { chatId, source: 'telegram' });
@@ -1757,7 +2200,7 @@ Call the send_email tool now with exactly these parameters.`;
 
                     // Save photo to disk for email attachments
                     try {
-                        const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
+                        const uploadsDir = path.join(WORKSPACE_PATH, 'files', 'uploads');
                         await mkdir(uploadsDir, { recursive: true });
                         const filename = `photo_${Date.now()}.jpg`;
                         const filePath = path.join(uploadsDir, filename);
@@ -2116,6 +2559,36 @@ Rules for Python Mode:
         }
     });
 
+    // Register commands with Telegram so they appear in the / menu
+    bot.setMyCommands([
+        { command: 'alex', description: 'Full command reference' },
+        { command: 'inbox', description: 'Email queue (not_started by default)' },
+        { command: 'email', description: 'Full email details — /email 1' },
+        { command: 'action', description: 'Act on email — /action 1 reply' },
+        { command: 'status', description: 'System health and uptime' },
+        { command: 'duties', description: 'All duties, schedules, performance' },
+        { command: 'brief', description: 'Recent activity summary' },
+        { command: 'news', description: 'Latest gathered news' },
+        { command: 'python', description: 'Python data analysis mode' },
+        { command: 'mathematician', description: 'Quantitative and computational' },
+        { command: 'strategist', description: 'Strategic frameworks and analysis' },
+        { command: 'learn', description: 'Educational mode (What/How/Why)' },
+        { command: 'voice', description: 'Voice message replies' },
+        { command: 'mode', description: 'Show active modes' },
+        { command: 'exit', description: 'Turn off all active modes' },
+        { command: 'stocks', description: 'Quick stock quote — /stocks AAPL' },
+        { command: 'models', description: 'Switch AI model' },
+        { command: 'research', description: 'Deep research on demand' },
+        { command: 'memory', description: 'Browse memory banks' },
+        { command: 'skills', description: 'List and manage skills' },
+        { command: 'tasks', description: 'View scheduled tasks' },
+        { command: 'tokens', description: 'Today\'s token usage' },
+        { command: 'spend', description: 'Daily cost breakdown' },
+        { command: 'costs', description: 'Per-task cost attribution' },
+        { command: 'projection', description: 'Monthly cost projection' },
+        { command: 'clear', description: 'Clear conversation history' },
+    ]).catch(err => console.error('[TELEGRAM] Failed to set commands:', err.message));
+
     console.log('[TELEGRAM] Bot started and listening...');
 }
 
@@ -2247,7 +2720,7 @@ function setupControlAPI() {
 <p>If you would like to discuss how these findings apply to your organisation, please don't hesitate to get in touch.</p>
 <p>Best regards,<br><strong>Lee Akpareva</strong><br>Founder & CEO, NAVADA<br>AI Strategy & Implementation Consulting</p>
 </div>
-- attachment_path: /home/head/.alex/documents/NAVADA_Executive_Summary.pdf
+- attachment_path: /home/head/.alex/files/documents/NAVADA_Executive_Summary.pdf
 
 Call the send_email tool now with exactly these parameters.`;
                         const execResponse = await chatSystem.chat(controlChatId, execPrompt, { first_name: 'Control API', username: 'api' }, {}, { source: 'api' });
@@ -2336,7 +2809,7 @@ Call the send_email tool now with exactly these parameters.`;
         } else if (req.method === 'GET' && req.url === '/api/users') {
             // List known Telegram users from audit logs
             try {
-                const logsDir = path.join(WORKSPACE_PATH, 'logs');
+                const logsDir = path.join(WORKSPACE_PATH, 'logs', 'audit');
                 const files = await import('fs/promises').then(f => f.default?.readdir?.(logsDir) || f.readdir(logsDir));
                 const users = new Map();
 
@@ -2383,7 +2856,7 @@ Call the send_email tool now with exactly these parameters.`;
                     }
 
                     // Get all known chat IDs from audit logs
-                    const logsDir = path.join(WORKSPACE_PATH, 'logs');
+                    const logsDir = path.join(WORKSPACE_PATH, 'logs', 'audit');
                     const files = await import('fs/promises').then(f => f.default?.readdir?.(logsDir) || f.readdir(logsDir));
                     const chatIds = new Set();
                     for (const file of files) {
