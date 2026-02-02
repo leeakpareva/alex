@@ -38,7 +38,7 @@ import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
 import { SkillsSystem } from './skills.js';
-import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost } from './tools.js';
+import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost, FULL_ACCESS_USERS } from './tools.js';
 import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
 import { setupInbox, startInboxPolling } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
@@ -2503,6 +2503,12 @@ async function init() {
 
     // Load configuration (with schema validation)
     config = await loadConfig();
+
+    // Hydrate FULL_ACCESS_USERS from persisted config
+    if (Array.isArray(config.full_access_users)) {
+        for (const uid of config.full_access_users) FULL_ACCESS_USERS.add(uid);
+        console.log(`[AUTH] Full access users: ${[...FULL_ACCESS_USERS].join(', ')}`);
+    }
 
     // Initialize API clients
     anthropic = new Anthropic({ apiKey: config.anthropic_api_key });

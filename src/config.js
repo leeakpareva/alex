@@ -76,6 +76,9 @@ export async function loadConfig() {
         config.auto_cc_email = 'lee@navada.info';
     }
 
+    // Store config path for tools that need to write back
+    config._configPath = CONFIG_PATH;
+
     console.log('[CONFIG] Loaded and validated');
     return config;
 }

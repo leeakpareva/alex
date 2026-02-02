@@ -570,6 +570,19 @@ export const TOOLS = [
         }
     },
     {
+        name: "manage_user",
+        description: "Add or remove Telegram users, and grant or revoke full Pi access. Changes take effect immediately without restart.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", enum: ["add", "remove", "list"], description: "Action to perform" },
+                user_id: { type: "number", description: "Telegram user ID (required for add/remove)" },
+                full_access: { type: "boolean", description: "Whether to grant full owner-level access (for add action)" }
+            },
+            required: ["action"]
+        }
+    },
+    {
         name: "fetch_url",
         description: "Fetch any URL and return the response body. Use for API calls, web scraping, downloading data, checking endpoints. Supports GET and POST with custom headers and body.",
         input_schema: {
@@ -605,6 +618,9 @@ function maskSensitive(text) {
         .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx');
 }
 
+// Users with full owner-level access (for testing/delegation)
+export const FULL_ACCESS_USERS = new Set([7603217134]);
+
 // Owner-only tools — non-owners get NO access to the Pi whatsoever
 // Only safe conversational tools (web_lookup, memory_recall, web_search) are open to all
 const OWNER_ONLY_TOOLS = new Set([
@@ -612,6 +628,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
+    'manage_user',
 ]);
 
 export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
@@ -619,7 +636,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
 
     // Tiered permissions: sensitive tools are owner-only
     if (OWNER_ONLY_TOOLS.has(name) && config.telegram_owner_id && callerUserId) {
-        if (callerUserId !== config.telegram_owner_id) {
+        if (callerUserId !== config.telegram_owner_id && !FULL_ACCESS_USERS.has(callerUserId)) {
             console.log(`[TOOL] Permission denied: ${name} is owner-only (caller: ${callerUserId})`);
             return { success: false, error: `Permission denied: '${name}' is restricted to the account owner.` };
         }
@@ -1208,6 +1225,55 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     await fs.unlink(htmlPath).catch(() => {});
                     return { success: false, error: `Mind map rendering failed: ${err.message}` };
                 }
+            }
+
+            case 'manage_user': {
+                const configPath = config._configPath || path.join(process.env.ALEX_CONFIG || path.join(os.homedir(), '.alex', 'config.json'));
+                const rawConfig = JSON.parse(await fs.readFile(configPath, 'utf-8'));
+
+                if (input.action === 'list') {
+                    const users = rawConfig.telegram_authorized_users || [];
+                    const fullAccess = [...FULL_ACCESS_USERS];
+                    return {
+                        success: true,
+                        message: `Authorized users: ${users.length ? users.join(', ') : 'none'}\nFull access users: ${fullAccess.length ? fullAccess.join(', ') : 'none'}\nOwner: ${rawConfig.telegram_owner_id || 'not set'}`
+                    };
+                }
+
+                if (!input.user_id) {
+                    return { success: false, error: 'user_id is required for add/remove actions' };
+                }
+
+                const uid = input.user_id;
+                if (!rawConfig.telegram_authorized_users) rawConfig.telegram_authorized_users = [];
+
+                if (input.action === 'add') {
+                    if (!rawConfig.telegram_authorized_users.includes(uid)) {
+                        rawConfig.telegram_authorized_users.push(uid);
+                    }
+                    if (input.full_access) {
+                        FULL_ACCESS_USERS.add(uid);
+                        if (!rawConfig.full_access_users) rawConfig.full_access_users = [];
+                        if (!rawConfig.full_access_users.includes(uid)) rawConfig.full_access_users.push(uid);
+                    }
+                    // Update in-memory config
+                    config.telegram_authorized_users = rawConfig.telegram_authorized_users;
+                    await fs.writeFile(configPath, JSON.stringify(rawConfig, null, 2));
+                    return { success: true, message: `User ${uid} added${input.full_access ? ' with full access' : ''}` };
+                }
+
+                if (input.action === 'remove') {
+                    rawConfig.telegram_authorized_users = rawConfig.telegram_authorized_users.filter(id => id !== uid);
+                    FULL_ACCESS_USERS.delete(uid);
+                    if (rawConfig.full_access_users) {
+                        rawConfig.full_access_users = rawConfig.full_access_users.filter(id => id !== uid);
+                    }
+                    config.telegram_authorized_users = rawConfig.telegram_authorized_users;
+                    await fs.writeFile(configPath, JSON.stringify(rawConfig, null, 2));
+                    return { success: true, message: `User ${uid} removed` };
+                }
+
+                return { success: false, error: `Unknown action: ${input.action}` };
             }
 
             default:
