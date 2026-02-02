@@ -388,6 +388,56 @@ function briefEmail(e) {
 }
 
 // ============================================================================
+// BULK INBOX MANAGEMENT
+// ============================================================================
+
+/**
+ * Clear emails by status. Returns count removed.
+ * status: 'done' | 'not_started' | 'in_progress' | 'all'
+ */
+export async function clearEmailsByStatus(status) {
+    const store = await loadStore();
+    const before = store.emails.length;
+    if (status === 'all') {
+        store.emails = [];
+    } else {
+        store.emails = store.emails.filter(e => e.status !== status);
+    }
+    const removed = before - store.emails.length;
+    if (removed > 0) await saveStore(store);
+    return removed;
+}
+
+/**
+ * Mark all emails with a given status to a new status. Returns count updated.
+ */
+export async function bulkUpdateStatus(fromStatus, toStatus) {
+    const store = await loadStore();
+    let count = 0;
+    for (const e of store.emails) {
+        if (e.status === fromStatus) {
+            e.status = toStatus;
+            e.updated_at = new Date().toISOString();
+            count++;
+        }
+    }
+    if (count > 0) await saveStore(store);
+    return count;
+}
+
+/**
+ * Delete a single email by display number. Returns true if found.
+ */
+export async function deleteEmailByNumber(num) {
+    const store = await loadStore();
+    const idx = store.emails.findIndex(e => e.display_number === num);
+    if (idx === -1) return false;
+    store.emails.splice(idx, 1);
+    await saveStore(store);
+    return true;
+}
+
+// ============================================================================
 // ARCHIVE OLD DONE EMAILS (called by cleanup heartbeat)
 // ============================================================================
 

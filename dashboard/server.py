@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime
 
 PORT = 8080
-DIRECTORY = "/home/head/clawd/dashboard"
+DIRECTORY = "/home/head/navada-1/dashboard"
 DATA_FILE = os.path.join(DIRECTORY, "dashboard_data.json")
 BACKUP_FILE = os.path.join(DIRECTORY, "dashboard_data.backup.json")
 
