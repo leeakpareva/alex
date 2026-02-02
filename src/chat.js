@@ -212,11 +212,28 @@ const HAIKU_PATTERNS = [
     /^(good )?(morning|afternoon|evening|night)/i,
     /^how are you/i,
     /^\/?(status|help|memory|skills|tasks|clear|tokens)\b/i,
+    /^(sounds good|perfect|great|awesome|nice|cool|noted|understood|will do|on it)\b/i,
+    /^(what|who|where|when|how much|how many)\b.{0,60}$/i,
+    /^(show|tell|list|give)\s(me|us)\b.{0,60}$/i,
 ];
 
-// Sonnet is now opt-in only — these patterns are no longer used for auto-routing
-// Sonnet is only used when explicitly requested via "use sonnet" or /models
-const SONNET_PATTERNS = [];
+// Sonnet auto-routes for complex building/creation tasks that Haiku can't handle well
+const SONNET_PATTERNS = [
+    // Building / creating things
+    /\b(build|create|design|develop|implement|set up|make)\b.{0,30}\b(dashboard|app|website|page|site|interface|system|tool|server|api|bot|script|service|platform|database|pipeline|workflow|frontend|backend)\b/i,
+    /\b(dashboard|app|website|page|site|interface|system|tool|server|api|bot|script|service|platform|database|pipeline|workflow|frontend|backend)\b.{0,30}\b(build|create|design|develop|implement|set up|make)\b/i,
+    // Writing substantial content
+    /\b(write|draft|compose|prepare)\b.{0,20}\b(report|proposal|business plan|strategy|whitepaper|analysis document|brief|memo|pitch)\b/i,
+    // Refactoring / rewriting code
+    /\b(refactor|rewrite|restructure|redesign|overhaul|migrate)\b/i,
+    // Multi-step instructions
+    /\b(step[- ]by[- ]step|full|complete|end[- ]to[- ]end|from scratch|whole|entire)\b.{0,20}\b(build|create|design|develop|implement|guide|setup|solution)\b/i,
+    // Debugging complex issues
+    /\b(debug|fix|troubleshoot|diagnose)\b.{0,30}\b(issue|bug|error|problem|crash)\b.{0,30}\b(in|with|across)\b/i,
+    // Visual output requests (charts, graphs, diagrams, images, PDFs)
+    /\b(chart|graph|plot|diagram|visuali[sz]e|infographic|mindmap|mind map|dashboard)\b/i,
+    /\b(generate|create|make|draw|show|send).{0,20}\b(image|picture|pic|photo|pdf|report)\b/i,
+];
 
 export const IMAGE_PATTERNS = [
     /\b(generate|create|make|draw|design)\b.*\b(image|picture|photo|illustration|logo|icon|graphic|visual|artwork)\b/i,
@@ -241,7 +258,7 @@ const EXPLICIT_OVERRIDES = [
     { pattern: /\buse opus\b/i, model: 'claude-opus-4-5-20251101', label: 'claude-opus-4.5 (explicit)' },
 ];
 
-function selectModel(userMessage) {
+export function selectModel(userMessage) {
     const msg = (userMessage || '').trim();
 
     // 1. Explicit user overrides — always respected
@@ -260,7 +277,15 @@ function selectModel(userMessage) {
         }
     }
 
-    // 3. Haiku for short simple messages
+    // 3. Sonnet for complex building/creation/visual tasks (check BEFORE Haiku)
+    for (const pattern of SONNET_PATTERNS) {
+        if (pattern.test(msg)) {
+            console.log(`[MODEL] Selected claude-sonnet (complex task pattern) for: "${msg.substring(0, 50)}"`);
+            return 'claude-sonnet-4-20250514';
+        }
+    }
+
+    // 4. Haiku for short simple messages
     if (msg.length < 80) {
         for (const pattern of HAIKU_PATTERNS) {
             if (pattern.test(msg)) {
@@ -270,9 +295,13 @@ function selectModel(userMessage) {
         }
     }
 
-    // 4. Sonnet is now opt-in only — skip auto-routing to Sonnet
+    // 5. Sonnet for longer, complex messages (200+ chars likely need reasoning)
+    if (msg.length >= 200) {
+        console.log(`[MODEL] Selected claude-sonnet (long message: ${msg.length} chars) for: "${msg.substring(0, 50)}"`);
+        return 'claude-sonnet-4-20250514';
+    }
 
-    // Default to Haiku (cost-efficient) — use "use sonnet" for Sonnet
+    // Default to Haiku (cost-efficient for simple/short messages)
     console.log(`[MODEL] Selected claude-3.5-haiku (default) for: "${msg.substring(0, 50)}"`);
     return 'claude-3-5-haiku-20241022';
 }
@@ -281,7 +310,7 @@ function selectModel(userMessage) {
 // CIRCUIT BREAKER
 // ============================================================================
 
-class CircuitBreaker {
+export class CircuitBreaker {
     constructor(maxFailures = 5, resetTimeMs = 5 * 60 * 1000) {
         this.failures = 0;
         this.maxFailures = maxFailures;
@@ -317,6 +346,8 @@ class CircuitBreaker {
 export function createChatSystem({ anthropic, openaiClient, deepseekClient, memory, skills, executeTool, TOOLS }) {
     const requestQueue = new RequestQueue();
     const circuitBreaker = new CircuitBreaker();
+    const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+    const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
 
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
         if (circuitBreaker.isOpen()) {
@@ -348,7 +379,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         }
 
         // Fallback to OpenAI
-        if (openaiClient) {
+        if (openaiClient && !openaiBreaker.isOpen()) {
             console.log('[FALLBACK] Anthropic failed after all retries, attempting OpenAI GPT-4o...');
             try {
                 const openaiMessages = (params.messages || []).map(m => {
@@ -367,6 +398,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
                 const text = openaiResponse.choices?.[0]?.message?.content || '';
                 console.log('[FALLBACK] OpenAI GPT-4o succeeded');
                 circuitBreaker.recordSuccess();
+                openaiBreaker.recordSuccess();
                 return {
                     content: [{ type: 'text', text }],
                     stop_reason: 'end_turn',
@@ -375,6 +407,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             } catch (fallbackError) {
                 console.error('[FALLBACK] OpenAI also failed:', fallbackError.message);
                 circuitBreaker.recordFailure();
+                openaiBreaker.recordFailure();
             }
         }
     }
@@ -384,7 +417,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
     }
 
     // How many recent messages to keep verbatim in the API window
-    const RECENT_WINDOW = 12;
+    const RECENT_WINDOW = 8;
 
     /**
      * Extract plain text from a message (handles both string and block-array content)
@@ -410,13 +443,13 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         if (!digest.trim()) return existingSummary || '';
 
         const prompt = existingSummary
-            ? `Here is the existing conversation summary:\n${existingSummary}\n\nHere are new messages to incorporate:\n${digest}\n\nWrite an updated summary (max 400 words). Focus on: what the user asked for, what actions were taken (emails sent, reports generated, etc.), key facts discussed. Do NOT include tool IDs or JSON. Write in past tense.`
-            : `Summarize this conversation (max 400 words). Focus on: what the user asked for, what actions were taken (emails sent, reports generated, etc.), key facts discussed. Do NOT include tool IDs or JSON. Write in past tense.\n\n${digest}`;
+            ? `Here is the existing conversation summary:\n${existingSummary}\n\nHere are new messages to incorporate:\n${digest}\n\nWrite an updated summary (max 600 words). Focus on: what the user asked for, what tools were used and their outcomes, key decisions made, any facts or preferences learned. Do NOT include tool IDs or JSON. Write in past tense.`
+            : `Summarize this conversation (max 600 words). Focus on: what the user asked for, what tools were used and their outcomes, key decisions made, any facts or preferences learned. Do NOT include tool IDs or JSON. Write in past tense.\n\n${digest}`;
 
         try {
             const result = await callAnthropicQueued({
                 model: 'claude-3-5-haiku-20241022',
-                max_tokens: 600,
+                max_tokens: 800,
                 messages: [{ role: 'user', content: prompt }]
             }, 0); // lowest priority
 
@@ -496,6 +529,9 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
     }
 
     async function callDeepSeek(messages, systemPrompt, context = {}) {
+        if (deepseekBreaker.isOpen()) {
+            throw new Error('DeepSeek circuit breaker open — temporarily unavailable');
+        }
         const openaiMessages = messages.map(m => {
             if (typeof m.content === 'string') return { role: m.role, content: m.content };
             const textParts = (Array.isArray(m.content) ? m.content : []).filter(b => b.type === 'text').map(b => b.text);
@@ -510,11 +546,18 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             role: 'user',
             content: 'IMPORTANT: Respond with plain text only. Do NOT output any JSON, tool_use blocks, or function calls. Write your research findings as readable prose.'
         });
-        const dsResponse = await deepseekClient.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: openaiMessages,
-            max_tokens: 8192,
-        });
+        let dsResponse;
+        try {
+            dsResponse = await deepseekClient.chat.completions.create({
+                model: 'deepseek-chat',
+                messages: openaiMessages,
+                max_tokens: 8192,
+            });
+            deepseekBreaker.recordSuccess();
+        } catch (err) {
+            deepseekBreaker.recordFailure();
+            throw err;
+        }
         const text = dsResponse.choices?.[0]?.message?.content || '';
         const usage = {
             input_tokens: dsResponse.usage?.prompt_tokens || 0,
@@ -529,7 +572,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
         };
     }
 
-    async function buildSystemPrompt(userQuery = null) {
+    async function buildSystemPrompt(userQuery = null, context = {}) {
         const identity = await memory.getIdentity();
         const userMemory = await memory.getUserMemory();
 
@@ -563,27 +606,23 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             contextBlock += `\n\n## Available Skills\n${skillNames.join(', ')}`;
         }
 
-        // List uploaded files for context
+        // List uploaded files for context (skip for scheduled tasks)
         let uploadsBlock = '';
-        try {
-            const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
-            const uploadFiles = await import('fs/promises').then(f => f.readdir(uploadsDir));
-            if (uploadFiles.length > 0) {
-                uploadsBlock = `\n\n## Uploaded Files (${WORKSPACE_PATH}/uploads/)\n${uploadFiles.map(f => `- ${f}`).join('\n')}\nYou can read these files with read_file or bash. PDFs can be read with bash pdftotext.`;
-            }
-        } catch {}
+        if (!context.isScheduled) {
+            try {
+                const uploadsDir = path.join(WORKSPACE_PATH, 'uploads');
+                const uploadFiles = await import('fs/promises').then(f => f.readdir(uploadsDir));
+                if (uploadFiles.length > 0) {
+                    uploadsBlock = `\n\n## Uploaded Files (${WORKSPACE_PATH}/uploads/)\n${uploadFiles.map(f => `- ${f}`).join('\n')}\nYou can read these files with read_file or bash. PDFs can be read with bash pdftotext.`;
+                }
+            } catch {}
+        }
 
-        return `${identity}
-
-## Current Context
-${timeContext}
-Workspace: ${WORKSPACE_PATH}
-System: Raspberry Pi (${os.platform()} ${os.arch()})${uploadsBlock}
+        // Build system prompt as array of content blocks for prompt caching
+        const staticBlock = `${identity}
 
 ## User Information
 ${userMemory}
-
-${contextBlock}
 
 ## Core Directives
 1. You are ALEX, Global Economist at NAVADA
@@ -603,6 +642,7 @@ ${contextBlock}
 12. You MUST update the dashboard (update_dashboard tool) when completing tasks, finding news, or performing scheduled activities. Log every significant action to the dashboard so Lee can track your work visually
 
 ## Critical Rules
+- Lee's email is lee@navada.info. Never use any other email address for Lee.
 - ONLY act on the CURRENT (latest) user message. NEVER re-execute actions from earlier messages in the conversation history.
 - If the user asks you to introduce yourself, give a brief, natural intro (2-3 sentences max). Do NOT send emails or perform any other action unless the current message explicitly asks for it.
 - Conversation history is for context only — never repeat or redo past actions (emails sent, tasks created, etc.)
@@ -622,13 +662,27 @@ ${contextBlock}
 - Ask clarifying questions when needed.
 - Remember and reference past conversations.
 
+` + ((!context.isScheduled && userQuery && /\b(email|mail|send|draft|compose|write to)\b/i.test(userQuery)) ? `
 ## Email Formatting
 - When sending emails via the send_email tool, ALWAYS write the body in clean, well-structured HTML.
 - Use proper HTML tags: <h2> for section headings, <p> for paragraphs, <ul>/<li> for lists, <br> for line breaks, <strong> for emphasis.
 - Include proper spacing between sections. Emails must look professional and polished.
 - Never send raw text or markdown as email body — always use HTML.
 - Structure emails with: greeting, clear sections with headings, data/analysis, conclusion, sign-off.
-- Example structure: <h2>Section Title</h2><p>Content with proper paragraph spacing.</p><ul><li>Key point one</li><li>Key point two</li></ul>`;
+- Example structure: <h2>Section Title</h2><p>Content with proper paragraph spacing.</p><ul><li>Key point one</li><li>Key point two</li></ul>` : '');
+
+        const dynamicBlock = `## Current Context
+${timeContext}
+Workspace: ${WORKSPACE_PATH}
+System: Raspberry Pi (${os.platform()} ${os.arch()})${uploadsBlock}
+
+${contextBlock}`;
+
+        // Return as array of content blocks for prompt caching
+        return [
+            { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: dynamicBlock },
+        ];
     }
 
     async function processResponse(response, chatId, isScheduled = false, cachedSystemPrompt = null, modelId = null, existingSummary = null) {
@@ -647,7 +701,24 @@ ${contextBlock}
                 if (block.type === 'text') {
                     finalText += block.text;
                 } else if (block.type === 'tool_use') {
-                    const toolResult = await executeTool(block.name, block.input);
+                    let toolResult = await executeTool(block.name, block.input);
+
+                    // Truncate large tool outputs to save tokens
+                    const TOOL_OUTPUT_LIMITS = { bash: 15000, read_file: 20000, fetch_url: 15000, grep: 10000 };
+                    const outputLimit = TOOL_OUTPUT_LIMITS[block.name] || 8000;
+                    const resultStr = JSON.stringify(toolResult);
+                    if (resultStr.length > outputLimit) {
+                        const truncated = resultStr.substring(0, outputLimit);
+                        try { toolResult = JSON.parse(truncated + '"}'); } catch {
+                            toolResult = { ...toolResult, _truncated: true, _note: `[truncated from ${resultStr.length} to ${outputLimit} chars]` };
+                            // Truncate string fields
+                            for (const key of Object.keys(toolResult)) {
+                                if (typeof toolResult[key] === 'string' && toolResult[key].length > outputLimit) {
+                                    toolResult[key] = toolResult[key].substring(0, outputLimit) + `\n[truncated from ${toolResult[key].length} to ${outputLimit} chars]`;
+                                }
+                            }
+                        }
+                    }
 
                     messages.push({
                         role: 'assistant',
@@ -776,6 +847,31 @@ ${contextBlock}
 
         await memory.saveConversation(chatId, allMessages, summary);
         const finalText = await processResponse(response, chatId, false, systemPrompt, model, summary);
+
+        // Auto-detect reminders and deadlines in user messages
+        const reminderPatterns = /\b(remind me|don'?t forget|i need to|remember to|deadline|due by|due on|by tomorrow|by monday|by friday|follow up)\b/i;
+        if (typeof userMessage === 'string' && reminderPatterns.test(userText)) {
+            memory.appendMemory('tasks', `[Auto-detected reminder] ${userText.substring(0, 300)} — detected ${new Date().toISOString()}`).catch(() => {});
+        }
+
+        // Auto-extract key facts every 20 messages (fire-and-forget)
+        if (allMessages.length > 0 && allMessages.length % 20 === 0) {
+            const recentText = allMessages.slice(-20).map(m => {
+                const t = messageToText(m);
+                return `${m.role}: ${t.substring(0, 200)}`;
+            }).join('\n');
+            callAnthropicQueued({
+                model: 'claude-3-5-haiku-20241022',
+                max_tokens: 400,
+                messages: [{ role: 'user', content: `Extract 2-5 novel, important facts from this conversation that are worth remembering long-term (user preferences, decisions, project details, key data). Return ONLY the facts as a bulleted list. If nothing notable, return "None".\n\n${recentText}` }]
+            }, 0, { source: 'fact-extraction' }).then(async (result) => {
+                const facts = result?.content?.[0]?.text || '';
+                if (facts && !facts.toLowerCase().includes('none')) {
+                    await memory.appendKnowledge(facts).catch(() => {});
+                }
+            }).catch(() => {});
+        }
+
         return finalText;
     }
 

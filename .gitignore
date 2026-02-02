@@ -1,2 +1,5 @@
 node_modules/
 .env.local
+dashboard/dashboard.log
+reports/*.html
+reports/*.json

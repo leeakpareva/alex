@@ -56,21 +56,44 @@ export function reindexRAG() {
 
 export async function queryRAG(text) {
     if (!ragAvailable || ragIndexing) return null;
-    try {
-        const scriptPath = path.join(WORKSPACE_PATH, 'scripts/rag_manager.py');
-        const { stdout } = await new Promise((resolve, reject) => {
-            execFile('python3', [scriptPath, 'query', text], { timeout: 10000 }, (err, stdout, stderr) => {
-                if (err) reject(err);
-                else resolve({ stdout, stderr });
+
+    // Attempt ChromaDB query with 2 retries
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const scriptPath = path.join(WORKSPACE_PATH, 'scripts/rag_manager.py');
+            const { stdout } = await new Promise((resolve, reject) => {
+                execFile('python3', [scriptPath, 'query', text], { timeout: 10000 }, (err, stdout, stderr) => {
+                    if (err) reject(err);
+                    else resolve({ stdout, stderr });
+                });
             });
-        });
-        const result = JSON.parse(stdout.trim());
-        if (result.results && result.results.length > 0) {
-            return result.results.map(r => r.text).join('\n\n---\n\n');
+            const result = JSON.parse(stdout.trim());
+            if (result.results && result.results.length > 0) {
+                return result.results.map(r => r.text).join('\n\n---\n\n');
+            }
+            break; // Success but no results — don't retry
+        } catch (err) {
+            console.error(`[RAG] Query error (attempt ${attempt + 1}/2):`, err.message);
+            if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
         }
-    } catch (err) {
-        console.error('[RAG] Query error:', err.message);
     }
+
+    // Fallback: keyword search on KNOWLEDGE.md
+    try {
+        const knowledgePath = path.join(WORKSPACE_PATH, 'KNOWLEDGE.md');
+        const knowledge = await fs.readFile(knowledgePath, 'utf-8');
+        const queryWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const sections = knowledge.split(/\n## /).filter(s => s.trim());
+        const scored = sections.map(s => {
+            const lower = s.toLowerCase();
+            const score = queryWords.reduce((sum, w) => sum + (lower.includes(w) ? 1 : 0), 0);
+            return { text: s.substring(0, 500), score };
+        }).filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+        if (scored.length > 0) {
+            return scored.map(s => s.text).join('\n\n---\n\n');
+        }
+    } catch {}
+
     return null;
 }
 
@@ -605,7 +628,7 @@ export const TOOLS = [
 /**
  * Mask sensitive values in tool output (API keys, passwords, tokens, secrets)
  */
-function maskSensitive(text) {
+export function maskSensitive(text) {
     if (typeof text !== 'string') return text;
     return text
         .replace(/\b(sk-ant-[a-zA-Z0-9_-]{6})[a-zA-Z0-9_-]+/g, '$1xxxxxxxxxxxx')
@@ -619,7 +642,7 @@ function maskSensitive(text) {
 }
 
 // Users with full owner-level access (for testing/delegation)
-export const FULL_ACCESS_USERS = new Set([7603217134]);
+export const FULL_ACCESS_USERS = new Set();
 
 // Owner-only tools — non-owners get NO access to the Pi whatsoever
 // Only safe conversational tools (web_lookup, memory_recall, web_search) are open to all
@@ -630,6 +653,28 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
     'manage_user',
 ]);
+
+// Per-tool timeout limits (milliseconds)
+const TOOL_TIMEOUTS = {
+    bash: 300000,
+    generate_chart: 180000,
+    generate_diagram: 60000,
+    generate_mindmap: 60000,
+    generate_image: 60000,
+    generate_pdf: 30000,
+    fetch_url: 30000,
+};
+const DEFAULT_TOOL_TIMEOUT = 30000;
+
+function withTimeout(name, promise) {
+    const timeout = TOOL_TIMEOUTS[name] || DEFAULT_TOOL_TIMEOUT;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Tool '${name}' timed out after ${timeout / 1000}s`)), timeout)
+        )
+    ]);
+}
 
 export async function executeTool(name, input, { memory, skills, config, scheduledTasks, handleScheduledTask, openaiClient, bot, callerUserId }) {
     console.log(`[TOOL] Executing: ${name}`, JSON.stringify(input).substring(0, 200));
@@ -643,11 +688,34 @@ export async function executeTool(name, input, { memory, skills, config, schedul
     }
 
     try {
+        // Tools that manage their own timeouts internally (bash, generate_chart) skip the outer wrapper
+        const needsOuterTimeout = !['bash', 'generate_chart', 'generate_diagram', 'generate_mindmap'].includes(name);
+        const executeSwitch = async () => {
         switch (name) {
             case 'bash': {
-                // Guardrail: block destructive file operations without password
+                // Guardrail: block destructive and dangerous operations
                 const cmd = input.command;
                 const destructivePatterns = /\brm\s|rmdir\s|unlink\s|shred\s|\brm\b.*-rf|\brm\b.*-r/i;
+                const dangerousPatterns = [
+                    /\bmkfs\b/i,
+                    /\bdd\b.*\bof\s*=\s*\/dev\//i,
+                    /\bcurl\b.*\|\s*(ba)?sh\b/i,
+                    /\bwget\b.*\|\s*(ba)?sh\b/i,
+                    /\bsudo\s+rm\b/i,
+                    /\breboot\b/i,
+                    /\bshutdown\b/i,
+                    /\bpoweroff\b/i,
+                    /\bsystemctl\s+(stop|disable)\s+alex\b/i,
+                    /\b>\s*\/dev\/sd[a-z]/i,
+                    /\bchmod\s+777\s+\//i,
+                    /\bchown\s.*\s+\//i,
+                ];
+                if (dangerousPatterns.some(p => p.test(cmd))) {
+                    return {
+                        success: false,
+                        error: 'BLOCKED: This command is considered dangerous and has been blocked for safety.'
+                    };
+                }
                 if (destructivePatterns.test(cmd)) {
                     return {
                         success: false,
@@ -753,6 +821,9 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'send_email': {
+                if (input.to && input.to.endsWith('@navada.ai')) {
+                    return { success: false, error: 'Invalid domain. Use lee@navada.info instead.' };
+                }
                 if (input.attachment_path && !isPathAllowed(input.attachment_path, ALLOWED_ATTACHMENT_PATHS)) {
                     return { success: false, error: `Attachment denied: path must be within ${ALLOWED_ATTACHMENT_PATHS.join(' or ')}` };
                 }
@@ -1279,6 +1350,9 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             default:
                 return { success: false, error: `Unknown tool: ${name}` };
         }
+        }; // end executeSwitch
+
+        return needsOuterTimeout ? await withTimeout(name, executeSwitch()) : await executeSwitch();
     } catch (error) {
         return { success: false, error: error.message, stderr: error.stderr };
     }

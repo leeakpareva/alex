@@ -64,4 +64,25 @@ export class RequestQueue {
 
         this.processing = false;
     }
+
+    /**
+     * Drain the queue: wait for current processing to finish, reject remaining items
+     */
+    async drain(timeoutMs = 10000) {
+        console.log(`[QUEUE] Draining (${this.queue.length} items pending, processing: ${this.processing})...`);
+        const start = Date.now();
+        while (this.processing && (Date.now() - start) < timeoutMs) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+        // Reject any remaining queued items
+        const remaining = this.queue.splice(0);
+        for (const item of remaining) {
+            item.reject(new Error('Queue draining — server shutting down'));
+        }
+        console.log(`[QUEUE] Drained. Rejected ${remaining.length} pending items.`);
+    }
+
+    get size() {
+        return this.queue.length;
+    }
 }

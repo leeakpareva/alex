@@ -52,6 +52,7 @@ export class MemorySystem {
         this.userPath = path.join(workspacePath, 'USER.md');
         this.identityPath = path.join(workspacePath, 'IDENTITY.md');
         this.knowledgePath = path.join(workspacePath, 'KNOWLEDGE.md');
+        this.userPrefsPath = path.join(workspacePath, 'memory', 'user-prefs.json');
     }
 
     async init() {
@@ -130,9 +131,50 @@ ${data.lastUpdated}
 
     async saveConversation(chatId, messages, summary = null) {
         const convFile = path.join(this.conversationPath, `${chatId}.json`);
+
+        // Archive overflow messages before trimming
+        if (messages.length > 100) {
+            const overflow = messages.slice(0, -100);
+            if (overflow.length > 0) {
+                try {
+                    const archiveDir = path.join(this.conversationPath, 'archive');
+                    await fs.mkdir(archiveDir, { recursive: true });
+                    const archiveFile = path.join(archiveDir, `${chatId}-${Date.now()}.json`);
+                    await fs.writeFile(archiveFile, JSON.stringify({ messages: overflow, archived_at: new Date().toISOString() }));
+                    console.log(`[MEMORY] Archived ${overflow.length} messages for chat ${chatId}`);
+                } catch (err) {
+                    console.error('[MEMORY] Archive error:', err.message);
+                }
+            }
+        }
+
         const trimmed = messages.slice(-100);
         const data = { messages: trimmed, summary: summary || null };
         await fs.writeFile(convFile, JSON.stringify(data, null, 2));
+    }
+
+    async searchArchive(chatId, query) {
+        try {
+            const archiveDir = path.join(this.conversationPath, 'archive');
+            const files = await fs.readdir(archiveDir);
+            const chatFiles = files.filter(f => f.startsWith(`${chatId}-`)).sort().reverse();
+            const results = [];
+            const queryLower = query.toLowerCase();
+            for (const file of chatFiles.slice(0, 5)) { // Check last 5 archives
+                const raw = await fs.readFile(path.join(archiveDir, file), 'utf-8');
+                const data = JSON.parse(raw);
+                for (const msg of data.messages) {
+                    const text = typeof msg.content === 'string' ? msg.content :
+                        Array.isArray(msg.content) ? msg.content.filter(b => b.type === 'text').map(b => b.text).join(' ') : '';
+                    if (text.toLowerCase().includes(queryLower)) {
+                        results.push({ role: msg.role, text: text.substring(0, 300), file });
+                    }
+                }
+            }
+            return results.slice(0, 10);
+        } catch {
+            return [];
+        }
     }
 
     async getConversation(chatId) {
@@ -155,6 +197,37 @@ ${data.lastUpdated}
             return await fs.readFile(this.identityPath, 'utf-8');
         } catch {
             return IDENTITY_TEMPLATE;
+        }
+    }
+
+    async getUserPrefs(userId) {
+        try {
+            const raw = await fs.readFile(this.userPrefsPath, 'utf-8');
+            const prefs = JSON.parse(raw);
+            return prefs[String(userId)] || {};
+        } catch {
+            return {};
+        }
+    }
+
+    async setUserPref(userId, key, value) {
+        let prefs = {};
+        try {
+            const raw = await fs.readFile(this.userPrefsPath, 'utf-8');
+            prefs = JSON.parse(raw);
+        } catch {}
+        if (!prefs[String(userId)]) prefs[String(userId)] = {};
+        prefs[String(userId)][key] = value;
+        prefs[String(userId)].lastUpdated = new Date().toISOString();
+        await fs.writeFile(this.userPrefsPath, JSON.stringify(prefs, null, 2));
+    }
+
+    async getAllUserPrefs() {
+        try {
+            const raw = await fs.readFile(this.userPrefsPath, 'utf-8');
+            return JSON.parse(raw);
+        } catch {
+            return {};
         }
     }
 
@@ -211,5 +284,25 @@ ${data.lastUpdated}
         } catch (err) {
             console.error('[MEMORY] Cleanup error:', err.message);
         }
+
+        // Clean up archives older than 90 days
+        try {
+            const archiveDir = path.join(this.conversationPath, 'archive');
+            const archiveFiles = await fs.readdir(archiveDir);
+            const archiveCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            let archiveCleaned = 0;
+            for (const file of archiveFiles) {
+                if (!file.endsWith('.json')) continue;
+                const filePath = path.join(archiveDir, file);
+                const stat = await fs.stat(filePath);
+                if (stat.mtimeMs < archiveCutoff) {
+                    await fs.unlink(filePath);
+                    archiveCleaned++;
+                }
+            }
+            if (archiveCleaned > 0) {
+                console.log(`[MEMORY] Cleaned up ${archiveCleaned} archived conversations older than 90 days`);
+            }
+        } catch {}
     }
 }

@@ -83,6 +83,7 @@ const pythonModeChats = new Set(); // Track chats with /python active
 const modelOverrides = new Map(); // Track per-chat model locks
 const awaitingModelSelect = new Set(); // Chats waiting for model selection reply
 const recentUploads = new Map(); // chatId → [{ path, filename, timestamp }]
+let lastOwnerMessageTime = Date.now(); // Track owner activity for idle starters
 
 // In-memory dashboard state (mirrors dash:data in Redis)
 const dashState = {
@@ -134,17 +135,33 @@ function getUploadedFiles(chatId) {
 let currentCallerUserId = null;
 
 async function execToolWithDeps(name, input) {
-    const result = await executeTool(name, input, {
-        memory,
-        skills,
-        config,
-        scheduledTasks,
-        handleScheduledTask: (task) => handleScheduledTask(task, heartbeatDeps()),
-        openaiClient,
-        bot,
-        getUploadedFiles,
-        callerUserId: currentCallerUserId,
-    });
+    const toolStart = Date.now();
+    let result, toolError;
+    try {
+        result = await executeTool(name, input, {
+            memory,
+            skills,
+            config,
+            scheduledTasks,
+            handleScheduledTask: (task) => handleScheduledTask(task, heartbeatDeps()),
+            openaiClient,
+            bot,
+            getUploadedFiles,
+            callerUserId: currentCallerUserId,
+        });
+    } catch (err) {
+        toolError = err;
+        throw err;
+    } finally {
+        auditLog({
+            type: 'tool_execution',
+            tool: name,
+            user_id: currentCallerUserId,
+            duration_ms: Date.now() - toolStart,
+            success: !toolError && !(result && result.success === false),
+            error: toolError ? toolError.message : (result && result.success === false ? result.error : undefined),
+        }).catch(() => {});
+    }
     // Queue files for sending after response completes
     if (result && result.send_photo && result.path) {
         pendingCharts.push({ type: 'photo', path: result.path, caption: result.caption || '' });
@@ -1584,6 +1601,33 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         awaitingModelSelect.add(chatId);
     });
 
+    // Per-user Telegram rate limiting
+    const userRateLimits = new Map(); // userId → { count, resetAt }
+    const RATE_LIMIT_WINDOW = 60000; // 60s
+    const RATE_LIMIT_OWNER = 40;
+    const RATE_LIMIT_USER = 20;
+    const MAX_MESSAGE_LENGTH = 50000;
+
+    function checkUserRateLimit(userId) {
+        const now = Date.now();
+        let entry = userRateLimits.get(userId);
+        if (!entry || now > entry.resetAt) {
+            entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+            userRateLimits.set(userId, entry);
+        }
+        entry.count++;
+        const limit = (String(userId) === String(config.telegram_owner_id)) ? RATE_LIMIT_OWNER : RATE_LIMIT_USER;
+        return entry.count <= limit;
+    }
+
+    // Clean up stale rate limit entries every 5 minutes
+    setInterval(() => {
+        const now = Date.now();
+        for (const [uid, entry] of userRateLimits) {
+            if (now > entry.resetAt) userRateLimits.delete(uid);
+        }
+    }, 300000);
+
     // Main message handler — with dedup to prevent double-processing
     const processedMessages = new Set();
     bot.on('message', async (msg) => {
@@ -1600,6 +1644,23 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
 
         const chatId = msg.chat.id;
         const userId = msg.from.id;
+
+        // Track owner activity for idle starter
+        if (String(userId) === String(config.telegram_owner_id)) {
+            lastOwnerMessageTime = Date.now();
+        }
+
+        // Per-user rate limiting
+        if (!checkUserRateLimit(userId)) {
+            await bot.sendMessage(chatId, 'You\'re sending messages too quickly. Please wait a moment before trying again.');
+            return;
+        }
+
+        // Message length limit
+        if (msg.text && msg.text.length > MAX_MESSAGE_LENGTH) {
+            await bot.sendMessage(chatId, `Message too long (${msg.text.length} chars). Please keep messages under ${MAX_MESSAGE_LENGTH.toLocaleString()} characters.`);
+            return;
+        }
 
         // Tiered authorization: authorized users get full access, others get limited chat
         // (Limited users can chat but owner-only tools are blocked in tools.js via OWNER_ONLY_TOOLS)
@@ -2028,6 +2089,13 @@ Rules for Python Mode:
 
         } catch (error) {
             console.error('[ERROR]', error);
+            auditLog({
+                type: 'error',
+                user_id: userId,
+                chat_id: chatId,
+                error: error.message || String(error),
+                status: error?.status,
+            }).catch(() => {});
             const isRateLimit = error?.status === 429 || (error.message && error.message.toLowerCase().includes('rate limit'));
             const isOverloaded = error?.status === 529 || (error.message && error.message.toLowerCase().includes('overloaded'));
             if (isRateLimit || isOverloaded) {
@@ -2084,12 +2152,25 @@ function setupControlAPI() {
         }
     }, 300000);
 
+    const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
     const server = http.createServer(async (req, res) => {
-        // CORS
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        // CORS — restrict to dashboard origin
+        res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:8080');
         res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+        // Body size limit
+        let bodySize = 0;
+        req.on('data', (chunk) => {
+            bodySize += chunk.length;
+            if (bodySize > MAX_BODY_SIZE) {
+                req.destroy();
+                res.writeHead(413, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request body too large. Max 1MB.' }));
+            }
+        });
 
         // Rate limiting
         const clientIp = req.socket.remoteAddress || 'unknown';
@@ -2395,9 +2476,27 @@ Call the send_email tool now with exactly these parameters.`;
                 }
             });
 
+        } else if (req.method === 'GET' && req.url === '/api/health') {
+            const memUsage = process.memoryUsage();
+            const health = {
+                status: 'ok',
+                uptime_seconds: Math.floor(process.uptime()),
+                memory: {
+                    rss_mb: Math.round(memUsage.rss / 1024 / 1024),
+                    heap_used_mb: Math.round(memUsage.heapUsed / 1024 / 1024),
+                    heap_total_mb: Math.round(memUsage.heapTotal / 1024 / 1024),
+                },
+                telegram: bot ? 'connected' : 'disconnected',
+                chromadb: (await import('./tools.js')).isRAGAvailable() ? 'available' : 'unavailable',
+                redis: redis ? 'connected' : 'disconnected',
+                timestamp: new Date().toISOString(),
+            };
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(health));
+
         } else {
             res.writeHead(404);
-            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger' }));
+            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger, GET /api/health' }));
         }
     });
 
@@ -2606,11 +2705,74 @@ async function init() {
         } catch {}
     }, 60000);
 
+    // Conversation starters after idle (owner only, 9am-6pm, max once per day)
+    let lastStarterDate = null;
+
+    // Track owner message times
+    const origSetup = bot._events?.message;
+    setInterval(async () => {
+        if (config.do_not_disturb) return;
+        if (!config.telegram_owner_id) return;
+
+        const now = new Date();
+        const hour = now.getHours();
+        if (hour < 9 || hour >= 18) return; // Working hours only
+
+        const today = now.toISOString().split('T')[0];
+        if (lastStarterDate === today) return; // Max once per day
+
+        const idleMs = Date.now() - lastOwnerMessageTime;
+        if (idleMs < 2 * 3600000) return; // Need 2h of idle
+
+        lastStarterDate = today;
+        try {
+            const starterResponse = await chatSystem.chat(
+                config.telegram_owner_id,
+                '[SYSTEM: Generate a brief, contextual conversation starter for Lee based on recent memory or research. Keep it to 1-2 sentences. Be natural — like a colleague casually sharing something interesting.]',
+                { first_name: 'System' },
+                {},
+                { source: 'idle-starter' }
+            );
+            if (starterResponse && bot) {
+                await sendMarkdown(config.telegram_owner_id, starterResponse.substring(0, 2000));
+            }
+        } catch (err) {
+            console.error('[IDLE] Starter failed:', err.message);
+        }
+    }, 7200000); // Check every 2 hours
+
     console.log('');
     console.log('ALEX is now online and ready!');
     console.log(`Workspace: ${WORKSPACE_PATH}`);
     console.log('');
 }
+
+// Graceful shutdown handler
+let shuttingDown = false;
+async function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n[SHUTDOWN] ${signal} received. Draining queue and shutting down...`);
+    postDashboard('set_status', { status: 'offline' });
+    postDashboard('add_activity', { entry: `ALEX shutting down (${signal})` });
+
+    try {
+        // Stop accepting new Telegram messages
+        if (bot) {
+            bot.stopPolling();
+            console.log('[SHUTDOWN] Telegram polling stopped');
+        }
+        // Wait briefly for dashboard push
+        await new Promise(r => setTimeout(r, 1000));
+    } catch (err) {
+        console.error('[SHUTDOWN] Error:', err.message);
+    }
+
+    process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 init().catch(error => {
     console.error('Fatal error:', error);

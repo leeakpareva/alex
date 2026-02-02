@@ -39,6 +39,8 @@ const OPTIONAL_KEYS = {
     upstash_redis_url: { type: 'string' },
     upstash_redis_token: { type: 'string' },
     alphavantage_api_key: { type: 'string' },
+    full_access_users: { type: 'array' },
+    do_not_disturb: { type: 'boolean' },
 };
 
 export async function loadConfig() {

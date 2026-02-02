@@ -24,9 +24,11 @@ export const BUILTIN_TASKS = new Map([
         task_description: `Good morning Lee! Provide a morning briefing covering:
 1. Any overnight developments in AI/robotics/African tech
 2. Key economic indicators or market movements
-3. Any tasks or deadlines coming up
-4. Proactive suggestions based on recent conversations
-5. Weather and any relevant news
+3. Weather in London today (use bash: curl -s 'wttr.in/London?format=3')
+4. Today's scheduled tasks (list any user-created tasks due today)
+5. Tracked stock movements — check any stocks mentioned in recent memory
+6. Inbox status — how many emails need attention
+7. Proactive suggestions based on recent conversations
 
 Keep it concise but comprehensive. This is a daily routine.`
     }],
@@ -68,6 +70,28 @@ End with a brief strategic reflection.`
 3. If any emails have can_handle_autonomously=true and are still not_started, propose handling them
 4. Send Lee a brief inbox status summary via Telegram`
     }],
+    ['stock-alerts', {
+        name: 'stock-alerts',
+        task_description: `Check stock alert thresholds defined in ~/.alex/alerts.json.
+
+1. Read the alerts config file
+2. For each stock alert, use stock_quote to get the current price
+3. If price exceeds the 'above' threshold or drops below the 'below' threshold, send Lee a Telegram alert
+4. Only alert once per threshold breach per 24 hours (check ~/.alex/alerts-state.json)
+
+If no alerts are configured, skip silently.`
+    }],
+    ['check-followups', {
+        name: 'check-followups',
+        task_description: `Review the tasks memory (memory_recall category: tasks) for any deadlines, reminders, or follow-ups that are due today or overdue.
+
+1. Read the tasks memory for items containing dates, deadlines, or "remind" keywords
+2. Check if any are due today or past due
+3. If found, send Lee a Telegram reminder summarising what's due
+4. If nothing is due, skip silently (no message needed)
+
+Be proactive but not noisy — only message if there's something actionable.`
+    }],
     ['weekly-self-review', {
         name: 'weekly-self-review',
         task_description: `Weekly self-improvement review. Analyse your own performance this week:
@@ -92,8 +116,8 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         const systemPrompt = await buildSystemPrompt();
 
         const response = await callAnthropicQueued({
-            model: 'claude-3-5-haiku-20241022',
-            max_tokens: 8192,
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 16384,
             system: systemPrompt,
             tools: TOOLS,
             messages: [{

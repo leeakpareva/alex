@@ -12,7 +12,7 @@ sudo systemctl restart alex      # Restart live service
 sudo systemctl status alex       # Check service status
 ```
 
-No test suite. Verify with `node --check` on modified files.
+Test suite: `npx vitest run` (unit + e2e). Also verify with `node --check` on modified files.
 
 ## Owner ID
 
@@ -48,6 +48,8 @@ Telegram message → gateway.js:271 setupTelegram() (dedup + auth)
 | **memory.js** | 215 | Conversations, categorised memory, knowledge base | `MemorySystem.init` :57, `saveConversation` :131, `cleanupOldConversations` :194 |
 | **skills.js** | 226 | Skill CRUD, 7 default skills | Skills stored as `~/.alex/skills/{name}/SKILL.md` |
 | **config.js** | 89 | Config loader, path validation | `WORKSPACE_PATH`, `ALLOWED_WRITE_PATHS`, `isPathAllowed()` |
+| **keyword-index.js** | 100 | Inverted keyword index with TF scoring for memory_recall fallback | `KeywordIndex`, `search`, `addDocument` |
+| **alerts.js** | 60 | Stock/service alert threshold monitoring | `AlertsSystem`, `getAlerts`, `wasRecentlyFired` |
 | **slack.js** | 326 | Slack Web API polling (3s), threaded replies | `setupSlack` + `startSlackPolling` |
 | **inbox.js** | 543 | Gmail inbox monitoring, AI replies | Email filing integration |
 | **email-filing.js** | 412 | Email filing/categorisation system | — |
@@ -80,11 +82,11 @@ generate_chart, generate_diagram, generate_mindmap
 
 Chart/diagram/mindmap tools are public — they produce PNG images sent via Telegram with no filesystem or shell risk. `generate_image` (DALL-E) and `generate_pdf` remain owner-only due to cost/risk.
 
-### Permission check — `tools.js:622`
+### Permission check — `tools.js`
 
 ```javascript
 if (OWNER_ONLY_TOOLS.has(name) && config.telegram_owner_id && callerUserId) {
-    if (callerUserId !== config.telegram_owner_id) {
+    if (callerUserId !== config.telegram_owner_id && !FULL_ACCESS_USERS.has(callerUserId)) {
         return { success: false, error: `Permission denied: '${name}' is restricted to the account owner.` };
     }
 }
@@ -137,14 +139,14 @@ Priority order:
 | Sonnet | 16384 | `chat.js:631`, `:724` |
 | DeepSeek | 8192 | `chat.js:479` |
 | GPT-4o | 8192 | `chat.js:328` |
-| Summary (Haiku) | 600 | `chat.js:382` |
+| Summary (Haiku) | 800 | `chat.js` |
 
 ---
 
 ## Conversation Summarisation — `chat.js:366`
 
 ### Constants
-- `RECENT_WINDOW = 12` (`:350`) — last 12 messages kept verbatim
+- `RECENT_WINDOW = 8` — last 8 messages kept verbatim
 
 ### Two-tier approach
 
@@ -293,15 +295,16 @@ Markmap via `npx markmap-cli` + Puppeteer screenshot. Accepts markdown outline, 
 | `9880c6d` | API auth, rate limiting, owner-only tool permissions |
 | `6850034` | Alpha Vantage financial tools, Slack integration, email filing |
 | Latest | Allow chart/diagram/mindmap tools for all users (removed from OWNER_ONLY_TOOLS) |
+| Latest | 25 improvements: rate limiting, CORS hardening, tool timeouts, health endpoint, prompt caching, bash blocklist, tool output truncation, RECENT_WINDOW=8, keyword index, conversation archiving, auto-fact extraction, user prefs, RAG fallback, enhanced briefing, deadline follow-ups, stock alerts, idle starters, auto-reminders, circuit breakers for DeepSeek/OpenAI, graceful shutdown, test suite |
 
 ---
 
 ## Known Constraints & Improvement Areas
 
-- **No test suite** — all verification is `node --check` syntax-only
+- **Test suite** — vitest unit + e2e tests available via `npx vitest run`
 - **Single-process** — no clustering; one stuck tool blocks the queue
 - **Conversation storage** — flat JSON files, no database; 100-message cap per chat
 - **RAG** — depends on ChromaDB being available; degrades gracefully if down (`tools.js:22 checkRAG`)
 - **Puppeteer for mindmaps** — heavy for a Pi 5; may OOM on complex maps
-- **DeepSeek/OpenAI fallback** — no circuit breaker on these; only Anthropic has one
+- **DeepSeek/OpenAI fallback** — now have circuit breakers (added in improvements)
 - **Cron file ownership** — must be `root:root` with trailing newline or cron silently ignores them
