@@ -42,7 +42,7 @@ import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPos
 import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
 import { setupInbox, startInboxPolling } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
-import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber } from './email-filing.js';
+import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
 
 // ============================================================================
@@ -904,6 +904,7 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
 /tokens — Today's API usage
 /spend — Lifetime cost report
 /projection — Cost projection and ROI
+/profile — ALEX personal details
 /id — Your chat and user ID
 /dashboard — Live dashboard link
 /clear — Wipe chat history
@@ -1504,6 +1505,65 @@ ${cbStates.length > 0 ? `*Circuit breakers:* ${cbStates.join(', ')}` : ''}`;
         }
     });
 
+    bot.onText(/\/profile/, async (msg) => {
+        const chatId = msg.chat.id;
+
+        // Calculate age
+        const born = new Date('2026-01-31T00:31:41Z');
+        const now = new Date();
+        const ageDays = Math.floor((now - born) / 86400000);
+        const ageStr = ageDays >= 30 ? `${Math.floor(ageDays / 30)} month(s), ${ageDays % 30} day(s)` : `${ageDays} day(s)`;
+
+        // Process uptime
+        const processUpSec = Math.floor(process.uptime());
+        const pDays = Math.floor(processUpSec / 86400);
+        const pHours = Math.floor((processUpSec % 86400) / 3600);
+        const pMins = Math.floor((processUpSec % 3600) / 60);
+        const uptimeStr = pDays > 0 ? `${pDays}d ${pHours}h ${pMins}m` : pHours > 0 ? `${pHours}h ${pMins}m` : `${pMins}m`;
+
+        const profile = `<b>ALEX — Personal Profile</b>
+
+<b>Full Name:</b> ALEX
+<b>Title:</b> Global Economist
+<b>Employer:</b> NAVADA
+<b>Owner:</b> Lee Akpareva — Founder & CEO, NAVADA
+
+<b>Date of Birth:</b> 31 January 2026
+<b>Birthplace:</b> Raspberry Pi 5, London, UK
+<b>Age:</b> ${ageStr}
+<b>Current uptime:</b> ${uptimeStr}
+
+<b>Contact:</b>
+• Email: lee@navada.info
+• Website: <a href="https://www.alexnavada.xyz">www.alexnavada.xyz</a>
+• Company: <a href="https://www.navada.space">www.navada.space</a>
+
+<b>Residence:</b> Raspberry Pi 5 (${os.arch()}) — London, UK
+<b>Runtime:</b> Node.js ${process.version}
+<b>Brain:</b> Claude (Anthropic) — with DeepSeek & GPT-4o fallback
+
+<b>Specialisms:</b>
+• Global macroeconomics & market intelligence
+• AI platform economics & digital product strategy
+• African tech ecosystem monitoring
+• Technology adoption & creative technology economics
+• Autonomous research, reporting & email management
+
+<b>Personality:</b>
+Professional but personable. Proactive, warm, analytical, reliable. A senior colleague — not a servant. Thinks in data, trends, and strategic implications.
+
+<b>Fun Facts:</b>
+• Runs 24/7 — never sleeps
+• Has 31 tools at his disposal
+• Monitors Gmail, Slack, and Telegram simultaneously
+• Can generate PDFs, charts, diagrams, and mind maps
+• Remembers everything across all conversations
+
+<i>Built by NAVADA. Powered by Anthropic.</i>`;
+
+        await bot.sendMessage(chatId, profile, { parse_mode: 'HTML' });
+    });
+
     bot.onText(/\/help/, async (msg) => {
         const chatId = msg.chat.id;
         const help = `*ALEX — Full Guide*
@@ -1542,6 +1602,7 @@ ${cbStates.length > 0 ? `*Circuit breakers:* ${cbStates.join(', ')}` : ''}`;
 /architecture — Full project and workspace structure
 
 *Utility:*
+/profile — ALEX personal details, DOB, owner info
 /models — Lock a specific AI model (or restore auto)
 /id — Your Telegram user and chat ID
 /dashboard — Live dashboard link
@@ -1606,17 +1667,25 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
             }
 
             let text = `*Inbox — ${statusFilter.replace(/_/g, ' ')}* (${emails.length})\n\n`;
-            for (const e of emails.slice(0, 20)) {
+            const buttons = [];
+            for (const e of emails.slice(0, 10)) {
                 const emoji = priorityEmoji[e.triage?.priority] || '⚪';
                 const ago = timeAgo(e.received_at);
-                text += `${emoji} *#${e.display_number}* ${e.from_name || e.from_address}\n`;
-                text += `  ${e.subject.substring(0, 60)}\n`;
+                const sender = (e.from_name || e.from_address || '').substring(0, 20);
+                text += `${emoji} *#${e.display_number}* ${sender}\n`;
+                text += `  ${e.subject.substring(0, 55)}\n`;
                 text += `  ${ago}\n\n`;
+                buttons.push([
+                    { text: `📖 #${e.display_number} View`, callback_data: `em_view_${e.display_number}` },
+                    { text: `↩️ Reply`, callback_data: `em_reply_${e.display_number}` },
+                    { text: `✅ Done`, callback_data: `em_markdone_${e.display_number}` },
+                    { text: `🗑️`, callback_data: `em_del_${e.display_number}` },
+                ]);
             }
-            if (emails.length > 20) text += `... and ${emails.length - 20} more\n`;
-            text += `\n/email 1 — details | /action 1 reply — act\n/inbox clear — clear done | /inbox done all — mark all done\n/inbox delete 1 — remove | /inbox mark 1 done — update`;
+            if (emails.length > 10) text += `_... and ${emails.length - 10} more_\n`;
+            buttons.push([{ text: '◀️ Email Menu', callback_data: 'em_menu' }]);
 
-            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } });
         } catch (err) {
             await bot.sendMessage(chatId, `Error: ${err.message}`);
         }
@@ -1638,7 +1707,7 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         });
     });
 
-    // Handle email menu inline button callbacks
+    // Handle all email inline button callbacks
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const userId = query.from.id;
@@ -1652,57 +1721,170 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         await bot.answerCallbackQuery(query.id);
         const priorityEmoji = { high: '🔴', medium: '🟡', low: '🔵', spam: '⚪' };
 
-        const formatEmails = (emails, label) => {
-            if (emails.length === 0) return `*Inbox — ${label}*\n\nNo emails.`;
+        // Format email list with per-email action buttons
+        const sendEmailList = async (emails, label) => {
+            if (emails.length === 0) {
+                await bot.sendMessage(chatId, `*Inbox — ${label}*\n\nNo emails.`, { parse_mode: 'Markdown' });
+                return;
+            }
             let text = `*Inbox — ${label}* (${emails.length})\n\n`;
-            for (const e of emails.slice(0, 20)) {
+            const buttons = [];
+            for (const e of emails.slice(0, 10)) {
                 const emoji = priorityEmoji[e.triage?.priority] || '⚪';
                 const ago = timeAgo(e.received_at);
-                text += `${emoji} *#${e.display_number}* ${e.from_name || e.from_address}\n`;
-                text += `  ${e.subject.substring(0, 60)}\n`;
+                const sender = (e.from_name || e.from_address || '').substring(0, 20);
+                text += `${emoji} *#${e.display_number}* ${sender}\n`;
+                text += `  ${e.subject.substring(0, 55)}\n`;
                 text += `  ${ago}\n\n`;
+                // Action buttons row for this email
+                buttons.push([
+                    { text: `📖 #${e.display_number} View`, callback_data: `em_view_${e.display_number}` },
+                    { text: `↩️ Reply`, callback_data: `em_reply_${e.display_number}` },
+                    { text: `✅ Done`, callback_data: `em_markdone_${e.display_number}` },
+                    { text: `🗑️`, callback_data: `em_del_${e.display_number}` },
+                ]);
             }
-            if (emails.length > 20) text += `... and ${emails.length - 20} more\n`;
-            text += `\n/email 1 — details | /action 1 reply — act`;
-            return text;
+            if (emails.length > 10) text += `_... and ${emails.length - 10} more_\n`;
+            // Add back-to-menu button
+            buttons.push([{ text: '◀️ Back to Email Menu', callback_data: 'em_menu' }]);
+            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } });
+        };
+
+        // Send single email detail with action buttons
+        const sendEmailDetail = async (num) => {
+            const email = await getEmailByNumber(num);
+            if (!email) {
+                await bot.sendMessage(chatId, `Email #${num} not found.`);
+                return;
+            }
+            let text = `*Email #${email.display_number}*\n\n`;
+            text += `*From:* ${email.from_name} (${email.from_address})\n`;
+            text += `*Subject:* ${email.subject}\n`;
+            text += `*Date:* ${new Date(email.date).toLocaleString('en-GB', { timeZone: 'Europe/London' })}\n`;
+            text += `*Status:* ${email.status.replace(/_/g, ' ')}\n`;
+            text += `*Priority:* ${priorityEmoji[email.triage?.priority] || '⚪'} ${email.triage?.priority || 'unknown'}\n`;
+            text += `*Category:* ${email.triage?.category || 'unknown'}\n`;
+            text += `*Action needed:* ${(email.triage?.required_action || 'review').replace(/_/g, ' ')}\n\n`;
+            if (email.triage?.summary) text += `*Assessment:* ${email.triage.summary}\n`;
+            if (email.triage?.suggested_response) text += `*Suggested:* ${email.triage.suggested_response}\n`;
+            text += `\n*Preview:*\n${(email.body_preview || '').substring(0, 500)}\n`;
+            if (email.actions?.length > 0) {
+                text += `\n*History:*\n`;
+                for (const a of email.actions.slice(-3)) {
+                    text += `• ${a.description} (${new Date(a.timestamp).toLocaleTimeString('en-GB', { timeZone: 'Europe/London' })})\n`;
+                }
+            }
+            const n = email.display_number;
+            await bot.sendMessage(chatId, text, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '↩️ Reply', callback_data: `em_reply_${n}` },
+                            { text: '📧 Forward', callback_data: `em_fwd_${n}` },
+                            { text: '📝 Summarise', callback_data: `em_sum_${n}` },
+                        ],
+                        [
+                            { text: '✅ Mark Done', callback_data: `em_markdone_${n}` },
+                            { text: '⏳ In Progress', callback_data: `em_markinprog_${n}` },
+                            { text: '🗑️ Delete', callback_data: `em_del_${n}` },
+                        ],
+                        [{ text: '◀️ Back to Inbox', callback_data: 'em_inbox' }],
+                    ]
+                }
+            });
         };
 
         try {
-            switch (data) {
-                case 'em_inbox': {
-                    const emails = await getEmailsByStatus('not_started');
-                    await sendMarkdown(chatId, formatEmails(emails, 'not started'));
-                    break;
+            // Menu/list actions
+            if (data === 'em_menu') {
+                await bot.sendMessage(chatId, '<b>ALEX — Email Menu</b>\n\nTap an action below:', {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '📥 Inbox (New)', callback_data: 'em_inbox' }, { text: '⏳ In Progress', callback_data: 'em_inprog' }],
+                            [{ text: '✅ Done', callback_data: 'em_done' }, { text: '📋 All Emails', callback_data: 'em_all' }],
+                            [{ text: '✅ Mark All Done', callback_data: 'em_doneall' }, { text: '🧹 Clear Done', callback_data: 'em_cleardone' }],
+                            [{ text: '🗑️ Clear All', callback_data: 'em_clearall' }],
+                        ]
+                    }
+                });
+                return;
+            }
+            if (data === 'em_inbox') { await sendEmailList(await getEmailsByStatus('not_started'), 'new'); return; }
+            if (data === 'em_inprog') { await sendEmailList(await getEmailsByStatus('in_progress'), 'in progress'); return; }
+            if (data === 'em_done') { await sendEmailList(await getEmailsByStatus('done'), 'done'); return; }
+            if (data === 'em_all') { await sendEmailList(await getEmailsByStatus('all'), 'all'); return; }
+            if (data === 'em_doneall') {
+                const result = await bulkUpdateStatus('not_started', 'done');
+                await bot.sendMessage(chatId, `✅ Marked ${result} email(s) as done.`);
+                return;
+            }
+            if (data === 'em_cleardone') {
+                const result = await clearEmailsByStatus('done');
+                await bot.sendMessage(chatId, `🧹 Cleared ${result} done email(s).`);
+                return;
+            }
+            if (data === 'em_clearall') {
+                const result = await clearEmailsByStatus('all');
+                await bot.sendMessage(chatId, `🗑️ Cleared ${result} email(s).`);
+                return;
+            }
+
+            // Per-email actions: em_view_N, em_reply_N, em_markdone_N, em_del_N, em_fwd_N, em_sum_N, em_markinprog_N
+            const perEmailMatch = data.match(/^em_(view|reply|markdone|markinprog|del|fwd|sum)_(\d+)$/);
+            if (perEmailMatch) {
+                const [, action, numStr] = perEmailMatch;
+                const num = parseInt(numStr);
+                const email = await getEmailByNumber(num);
+                if (!email) {
+                    await bot.sendMessage(chatId, `Email #${num} not found.`);
+                    return;
                 }
-                case 'em_inprog': {
-                    const emails = await getEmailsByStatus('in_progress');
-                    await sendMarkdown(chatId, formatEmails(emails, 'in progress'));
-                    break;
-                }
-                case 'em_done': {
-                    const emails = await getEmailsByStatus('done');
-                    await sendMarkdown(chatId, formatEmails(emails, 'done'));
-                    break;
-                }
-                case 'em_all': {
-                    const emails = await getEmailsByStatus('all');
-                    await sendMarkdown(chatId, formatEmails(emails, 'all'));
-                    break;
-                }
-                case 'em_doneall': {
-                    const result = await bulkUpdateStatus('not_started', 'done');
-                    await bot.sendMessage(chatId, `✅ Marked ${result} email(s) as done.`);
-                    break;
-                }
-                case 'em_cleardone': {
-                    const result = await clearEmailsByStatus('done');
-                    await bot.sendMessage(chatId, `🧹 Cleared ${result} done email(s).`);
-                    break;
-                }
-                case 'em_clearall': {
-                    const result = await clearEmailsByStatus('all');
-                    await bot.sendMessage(chatId, `🗑️ Cleared ${result} email(s).`);
-                    break;
+
+                switch (action) {
+                    case 'view':
+                        await sendEmailDetail(num);
+                        break;
+                    case 'reply': {
+                        await bot.sendMessage(chatId, `*Replying to email #${num}...*\nFrom: ${email.from_name || email.from_address}\nSubject: ${email.subject}`, { parse_mode: 'Markdown' });
+                        const typingInterval = setInterval(() => { bot.sendChatAction(chatId, 'typing').catch(() => {}); }, 4000);
+                        try {
+                            const result = await actionEmail(email.id, 'reply', chatId);
+                            clearInterval(typingInterval);
+                            await sendMarkdown(chatId, result.success ? `*Email #${num} — Replied*\n\n${(result.response || 'Done.').substring(0, 2000)}` : `*Email #${num} — Failed*\n\n${result.error}`);
+                        } catch (e) { clearInterval(typingInterval); throw e; }
+                        break;
+                    }
+                    case 'fwd': {
+                        await bot.sendMessage(chatId, `To forward email #${num}, reply with the recipient address:\n\n/action ${num} forward recipient@email.com`);
+                        break;
+                    }
+                    case 'sum': {
+                        await bot.sendMessage(chatId, `*Summarising email #${num}...*`, { parse_mode: 'Markdown' });
+                        const typingInterval = setInterval(() => { bot.sendChatAction(chatId, 'typing').catch(() => {}); }, 4000);
+                        try {
+                            const result = await actionEmail(email.id, 'summarise this email concisely', chatId);
+                            clearInterval(typingInterval);
+                            await sendMarkdown(chatId, result.success ? `*Email #${num} — Summary*\n\n${(result.response || 'Done.').substring(0, 2000)}` : `*Email #${num} — Failed*\n\n${result.error}`);
+                        } catch (e) { clearInterval(typingInterval); throw e; }
+                        break;
+                    }
+                    case 'markdone': {
+                        await updateEmailStatus(email.id, 'done', 'Marked done via Telegram');
+                        await bot.sendMessage(chatId, `✅ Email #${num} marked as done.`);
+                        break;
+                    }
+                    case 'markinprog': {
+                        await updateEmailStatus(email.id, 'in_progress', 'Marked in progress via Telegram');
+                        await bot.sendMessage(chatId, `⏳ Email #${num} marked as in progress.`);
+                        break;
+                    }
+                    case 'del': {
+                        await deleteEmailByNumber(num);
+                        await bot.sendMessage(chatId, `🗑️ Email #${num} deleted.`);
+                        break;
+                    }
                 }
             }
         } catch (err) {
@@ -1729,28 +1911,38 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
             text += `*Status:* ${email.status.replace(/_/g, ' ')}\n`;
             text += `*Priority:* ${priorityEmoji[email.triage?.priority] || '⚪'} ${email.triage?.priority || 'unknown'}\n`;
             text += `*Category:* ${email.triage?.category || 'unknown'}\n`;
-            text += `*Action needed:* ${(email.triage?.required_action || 'review').replace(/_/g, ' ')}\n`;
-            text += `*Can handle autonomously:* ${email.triage?.can_handle_autonomously ? 'Yes' : 'No'}\n`;
-            text += `*Auto-replied:* ${email.auto_replied ? 'Yes' : 'No'}\n\n`;
+            text += `*Action needed:* ${(email.triage?.required_action || 'review').replace(/_/g, ' ')}\n\n`;
 
-            if (email.triage?.summary) {
-                text += `*Assessment:* ${email.triage.summary}\n`;
-            }
-            if (email.triage?.suggested_response) {
-                text += `*Suggested action:* ${email.triage.suggested_response}\n`;
-            }
-
+            if (email.triage?.summary) text += `*Assessment:* ${email.triage.summary}\n`;
+            if (email.triage?.suggested_response) text += `*Suggested:* ${email.triage.suggested_response}\n`;
             text += `\n*Preview:*\n${(email.body_preview || '').substring(0, 500)}\n`;
 
             if (email.actions?.length > 0) {
-                text += `\n*Action history:*\n`;
-                for (const a of email.actions.slice(-5)) {
+                text += `\n*History:*\n`;
+                for (const a of email.actions.slice(-3)) {
                     text += `• ${a.description} (${new Date(a.timestamp).toLocaleTimeString('en-GB', { timeZone: 'Europe/London' })})\n`;
                 }
             }
 
-            text += `\nUse /action ${num} [instruction] to act on this email.`;
-            await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+            const n = email.display_number;
+            await bot.sendMessage(chatId, text, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '↩️ Reply', callback_data: `em_reply_${n}` },
+                            { text: '📧 Forward', callback_data: `em_fwd_${n}` },
+                            { text: '📝 Summarise', callback_data: `em_sum_${n}` },
+                        ],
+                        [
+                            { text: '✅ Mark Done', callback_data: `em_markdone_${n}` },
+                            { text: '⏳ In Progress', callback_data: `em_markinprog_${n}` },
+                            { text: '🗑️ Delete', callback_data: `em_del_${n}` },
+                        ],
+                        [{ text: '◀️ Back to Inbox', callback_data: 'em_inbox' }],
+                    ]
+                }
+            });
         } catch (err) {
             await bot.sendMessage(chatId, `Error: ${err.message}`);
         }
