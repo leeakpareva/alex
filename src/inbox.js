@@ -75,7 +75,42 @@ const NO_REPLY_PATTERNS = [
     /noreply/i, /no-reply/i, /mailer-daemon/i, /postmaster/i,
     /bounce/i, /notifications?@/i, /googlegroups/i, /unsubscribe/i,
     /calendar-notification/i, /digest/i,
+    /zendesk/i, /freshdesk/i, /helpdesk/i, /support@/i, /helpscout/i,
+    /intercom/i, /jira/i, /servicenow/i, /automated/i, /do-not-reply/i,
+    /reddit/i, /ticketing/i, /feedback@/i, /info@/i,
 ];
+
+// Hard-blocked addresses — never process or reply to these
+const BLOCKED_SENDERS = new Set([
+    'support@reddit.zendesk.com',
+]);
+
+// Loop prevention: track recent auto-replies per sender+subject thread
+const recentAutoReplies = new Map(); // key: "address::subject" → { count, lastReplyAt }
+const MAX_AUTO_REPLIES_PER_THREAD = 1;
+const AUTO_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function hasReplyLoopRisk(fromAddress, subject) {
+    // Normalise: strip Re:/Fwd: prefixes for thread matching
+    const normSubject = subject.replace(/^(Re:\s*|Fwd?:\s*)+/i, '').trim().toLowerCase();
+    const key = `${fromAddress.toLowerCase()}::${normSubject}`;
+    const entry = recentAutoReplies.get(key);
+    if (!entry) return false;
+    if (Date.now() - entry.lastReplyAt > AUTO_REPLY_WINDOW_MS) {
+        recentAutoReplies.delete(key);
+        return false;
+    }
+    return entry.count >= MAX_AUTO_REPLIES_PER_THREAD;
+}
+
+function recordAutoReply(fromAddress, subject) {
+    const normSubject = subject.replace(/^(Re:\s*|Fwd?:\s*)+/i, '').trim().toLowerCase();
+    const key = `${fromAddress.toLowerCase()}::${normSubject}`;
+    const entry = recentAutoReplies.get(key) || { count: 0, lastReplyAt: 0 };
+    entry.count++;
+    entry.lastReplyAt = Date.now();
+    recentAutoReplies.set(key, entry);
+}
 
 function shouldAutoReply(fromAddress) {
     if (!fromAddress) return false;
@@ -428,6 +463,12 @@ async function pollInbox() {
                             const inReplyTo = parsed.inReplyTo || '';
                             const references = (Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references) || '';
 
+                            // Hard block: skip entirely
+                            if (BLOCKED_SENDERS.has(fromAddress.toLowerCase())) {
+                                console.log(`[INBOX] BLOCKED sender, skipping entirely: ${fromAddress}`);
+                                continue;
+                            }
+
                             console.log(`[INBOX] Processing: ${fromAddress} — ${subject}`);
 
                             // Detect if sender wants a voice response
@@ -440,7 +481,7 @@ async function pollInbox() {
                             let autoReplied = false;
                             let replyText = '';
                             let voiceSent = false;
-                            if (shouldAutoReply(fromAddress)) {
+                            if (shouldAutoReply(fromAddress) && !hasReplyLoopRisk(fromAddress, subject)) {
                                 try {
                                     const aiReplyHtml = await generateAIReply(fromName, fromAddress, subject, bodyText, voiceRequested);
                                     const finalHtml = aiReplyHtml
@@ -472,6 +513,7 @@ async function pollInbox() {
 
                                     await sendReplyEmail(fromAddress, subject, emailHtml, attachments);
                                     autoReplied = true;
+                                    recordAutoReply(fromAddress, subject);
                                     console.log(`[INBOX] AI reply sent to ${fromAddress}${voiceSent ? ' (with voice)' : ''}`);
 
                                     // Clean up voice file after sending

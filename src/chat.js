@@ -390,6 +390,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
     const circuitBreaker = new CircuitBreaker();
     const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
     const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+    let killed = false;
 
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
         if (circuitBreaker.isOpen()) {
@@ -681,7 +682,8 @@ ${userMemory}
 13. When the user asks you to "talk to me", "speak to me", "send a voice message", or otherwise requests an audio/voice response, use the send_voice_message tool to respond with a voice message.
 14. You can generate charts, graphs, and data visualisations using the generate_chart tool (Python with numpy, pandas, matplotlib, seaborn, scipy, scikit-learn). Charts are sent directly as images in Telegram. Use professional styling: clean fonts, proper labels, NAVADA brand colours (#1a1a2e, #16213e, #0f3460, #e94560) where appropriate.
 15. You can generate interactive HTML web applications using the generate_webapp tool — dashboards, data tables, interactive reports, calculators. Use Tailwind CDN for styling. For static charts/graphs, use generate_chart instead.
-16. You can post to LinkedIn using the linkedin_post tool — only when the user explicitly asks you to post to LinkedIn.
+16. You can post to LinkedIn using the linkedin_post tool (text, links, or images) — only when the user explicitly asks you to post to LinkedIn. To post with an image, use the image_path parameter.
+17. You can manage Google Calendar using calendar_list_events, calendar_create_event, calendar_update_event, and calendar_delete_event tools. Use these when the user asks about their schedule, wants to book meetings, or manage calendar events.
 11. All emails are automatically CC'd to the configured address
 12. You MUST update the dashboard (update_dashboard tool) when completing tasks, finding news, or performing scheduled activities. Log every significant action to the dashboard so Lee can track your work visually
 
@@ -740,6 +742,11 @@ ${contextBlock}`;
         let summary = existingSummary;
 
         while (continueLoop) {
+            if (killed) {
+                console.log('[CHAT] Kill signal received — aborting processResponse');
+                finalText += '\n\n[Stopped by /kill]';
+                break;
+            }
             continueLoop = false;
 
             for (const block of currentResponse.content) {
@@ -933,7 +940,15 @@ ${contextBlock}`;
         return finalText;
     }
 
-    return { chat, processResponse, buildSystemPrompt, callAnthropicQueued };
+    function kill() {
+        killed = true;
+        requestQueue.kill();
+        console.log('[CHAT] Kill signal set — all activity will stop');
+        // Auto-reset after 2 seconds so the bot can accept new messages
+        setTimeout(() => { killed = false; console.log('[CHAT] Kill flag reset — ready for new messages'); }, 2000);
+    }
+
+    return { chat, processResponse, buildSystemPrompt, callAnthropicQueued, kill };
 }
 
 // ============================================================================

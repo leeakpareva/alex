@@ -836,6 +836,17 @@ _Use /duties for task schedules, /tokens for usage breakdown, /spend for full co
         }
     });
 
+    bot.onText(/\/kill/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "Kill is owner-only.");
+            return;
+        }
+        chatSystem.kill();
+        await bot.sendMessage(chatId, 'All current activities killed. Ready for new messages.');
+    });
+
     bot.onText(/\/clear/, async (msg) => {
         const chatId = msg.chat.id;
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
@@ -1571,9 +1582,9 @@ Professional but personable. Proactive, warm, analytical, reliable. A senior col
         try {
             const changelogPath = path.join(process.cwd(), 'Fixes', 'CHANGELOG.md');
             const raw = await readFile(changelogPath, 'utf-8');
-            // Parse ## sections and take last 5
+            // Parse ## sections and show only the 5 most recent
             const sections = raw.split(/\n## /).filter(s => s.trim() && !s.startsWith('# '));
-            const recent = sections.slice(0, 5);
+            const recent = sections.slice(-5);
             let html = '<b>ALEX — Recent Changes</b>\n';
             for (const section of recent) {
                 const lines = section.split('\n');
@@ -1731,6 +1742,52 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
                 { parse_mode: 'HTML' });
         } catch (err) {
             await bot.sendMessage(chatId, `LinkedIn auth failed: ${err.message}`);
+        }
+    });
+
+    // ========================================================================
+    // GOOGLE CALENDAR OAUTH COMMAND
+    // ========================================================================
+
+    bot.onText(/\/googlecalendar(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "Google Calendar connection is owner-only.");
+            return;
+        }
+
+        const { getAuthUrl, exchangeCodeForToken } = await import('./google-calendar.js');
+
+        if (!config.google_calendar_client_id || !config.google_calendar_client_secret) {
+            await bot.sendMessage(chatId, 'Google Calendar not configured. Add google_calendar_client_id and google_calendar_client_secret to config.json.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const url = getAuthUrl(config.google_calendar_client_id);
+            await bot.sendMessage(chatId,
+                `<b>Google Calendar — Connect</b>\n\n1. Open this link in your browser:\n<code>${url}</code>\n\n2. Authorize the app\n3. You'll be redirected to a localhost URL that won't load — that's fine\n4. Copy the full URL from your browser and send it here:\n<code>/googlecalendar https://localhost:9090/api/google-calendar/callback?code=...</code>`,
+                { parse_mode: 'HTML' });
+            return;
+        }
+
+        let code = arg;
+        try {
+            const parsed = new URL(arg);
+            code = parsed.searchParams.get('code') || arg;
+        } catch {
+            // arg is the raw code itself
+        }
+
+        try {
+            await exchangeCodeForToken(code, config);
+            await bot.sendMessage(chatId,
+                `<b>Google Calendar connected!</b>\n\nYou can now ask me about your schedule, create events, or manage your calendar.`,
+                { parse_mode: 'HTML' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `Google Calendar auth failed: ${err.message}`);
         }
     });
 
@@ -2882,7 +2939,9 @@ Rules for Python Mode:
         { command: 'health', description: 'Quick system health overview' },
         { command: 'help', description: 'Full guide with tips' },
         { command: 'id', description: 'Your Telegram user and chat ID' },
+        { command: 'googlecalendar', description: 'Connect Google Calendar' },
         { command: 'inbox', description: 'Email queue (not_started by default)' },
+        { command: 'kill', description: 'Stop all current activities instantly' },
         { command: 'learn', description: 'Educational mode (What/How/Why)' },
         { command: 'linkedin', description: 'Connect or post to LinkedIn' },
         { command: 'logs', description: 'Recent audit log entries' },

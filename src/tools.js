@@ -625,9 +625,65 @@ export const TOOLS = [
             type: "object",
             properties: {
                 text: { type: "string", description: "The post text content (max 3000 characters)" },
-                link_url: { type: "string", description: "Optional URL to attach as a link preview" }
+                link_url: { type: "string", description: "Optional URL to attach as a link preview" },
+                image_path: { type: "string", description: "Optional absolute path to an image file to attach to the post" }
             },
             required: ["text"]
+        }
+    },
+    {
+        name: "calendar_list_events",
+        description: "List upcoming Google Calendar events. Returns event summaries, times, locations, and attendees.",
+        input_schema: {
+            type: "object",
+            properties: {
+                max_results: { type: "number", description: "Maximum number of events to return (default: 10)" },
+                time_min: { type: "string", description: "Start of time range in ISO 8601 format (default: now)" },
+                time_max: { type: "string", description: "End of time range in ISO 8601 format" }
+            }
+        }
+    },
+    {
+        name: "calendar_create_event",
+        description: "Create a new Google Calendar event. Provide summary, start/end times (ISO 8601), and optional description, location, attendees.",
+        input_schema: {
+            type: "object",
+            properties: {
+                summary: { type: "string", description: "Event title" },
+                start_time: { type: "string", description: "Start time in ISO 8601 format (e.g. 2025-01-15T14:00:00)" },
+                end_time: { type: "string", description: "End time in ISO 8601 format (e.g. 2025-01-15T15:00:00)" },
+                description: { type: "string", description: "Event description" },
+                location: { type: "string", description: "Event location" },
+                attendees: { type: "array", items: { type: "string" }, description: "List of attendee email addresses" }
+            },
+            required: ["summary", "start_time", "end_time"]
+        }
+    },
+    {
+        name: "calendar_update_event",
+        description: "Update an existing Google Calendar event by ID. Only provided fields are changed.",
+        input_schema: {
+            type: "object",
+            properties: {
+                event_id: { type: "string", description: "Google Calendar event ID" },
+                summary: { type: "string", description: "New event title" },
+                start_time: { type: "string", description: "New start time in ISO 8601 format" },
+                end_time: { type: "string", description: "New end time in ISO 8601 format" },
+                description: { type: "string", description: "New event description" },
+                location: { type: "string", description: "New event location" }
+            },
+            required: ["event_id"]
+        }
+    },
+    {
+        name: "calendar_delete_event",
+        description: "Delete a Google Calendar event by ID.",
+        input_schema: {
+            type: "object",
+            properties: {
+                event_id: { type: "string", description: "Google Calendar event ID to delete" }
+            },
+            required: ["event_id"]
         }
     },
     {
@@ -665,6 +721,8 @@ export function maskSensitive(text) {
             '"$1": "$2xxxxxxxxxxxx"')
         .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx')
         .replace(/"(linkedin_access_token|linkedin_refresh_token|linkedin_client_secret)"\s*:\s*"([^"]{4})[^"]+"/gi,
+            '"$1": "$2xxxxxxxxxxxx"')
+        .replace(/"(google_calendar_access_token|google_calendar_refresh_token|google_calendar_client_secret)"\s*:\s*"([^"]{4})[^"]+"/gi,
             '"$1": "$2xxxxxxxxxxxx"');
 }
 
@@ -679,6 +737,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
     'manage_user', 'generate_webapp', 'linkedin_post',
+    'calendar_list_events', 'calendar_create_event', 'calendar_update_event', 'calendar_delete_event',
 ]);
 
 // Per-tool timeout limits (milliseconds)
@@ -1222,12 +1281,58 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 return { success: true, stdout, stderr, note: 'Delete command executed after password verification.' };
             }
 
+            case 'calendar_list_events': {
+                const { listEvents } = await import('./google-calendar.js');
+                const events = await listEvents(config, {
+                    maxResults: input.max_results,
+                    timeMin: input.time_min,
+                    timeMax: input.time_max,
+                });
+                if (events.length === 0) return { success: true, message: 'No upcoming events found.' };
+                const lines = events.map(e =>
+                    `• ${e.summary || '(No title)'}\n  ${e.start} → ${e.end}${e.location ? `\n  📍 ${e.location}` : ''}${e.attendees.length ? `\n  👥 ${e.attendees.join(', ')}` : ''}\n  ID: ${e.id}`
+                ).join('\n\n');
+                return { success: true, message: `Upcoming events (${events.length}):\n\n${lines}` };
+            }
+
+            case 'calendar_create_event': {
+                const { createEvent } = await import('./google-calendar.js');
+                const event = await createEvent(config, {
+                    summary: input.summary,
+                    description: input.description,
+                    startTime: input.start_time,
+                    endTime: input.end_time,
+                    location: input.location,
+                    attendees: input.attendees,
+                });
+                return { success: true, message: `Event created: ${event.summary}\n${event.start} → ${event.end}\nID: ${event.id}${event.htmlLink ? `\nLink: ${event.htmlLink}` : ''}` };
+            }
+
+            case 'calendar_update_event': {
+                const { updateEvent } = await import('./google-calendar.js');
+                const event = await updateEvent(config, {
+                    eventId: input.event_id,
+                    summary: input.summary,
+                    description: input.description,
+                    startTime: input.start_time,
+                    endTime: input.end_time,
+                    location: input.location,
+                });
+                return { success: true, message: `Event updated: ${event.summary}\n${event.start} → ${event.end}\nID: ${event.id}` };
+            }
+
+            case 'calendar_delete_event': {
+                const { deleteEvent } = await import('./google-calendar.js');
+                await deleteEvent(config, { eventId: input.event_id });
+                return { success: true, message: `Event ${input.event_id} deleted.` };
+            }
+
             case 'linkedin_post': {
                 const { createPost } = await import('./linkedin.js');
                 if (input.text && input.text.length > 3000) {
                     return { success: false, error: 'Post text exceeds 3000 character limit.' };
                 }
-                return await createPost({ text: input.text, linkUrl: input.link_url }, config);
+                return await createPost({ text: input.text, linkUrl: input.link_url, imagePath: input.image_path }, config);
             }
 
             case 'fetch_url': {

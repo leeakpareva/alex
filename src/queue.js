@@ -82,6 +82,18 @@ export class RequestQueue {
         console.log(`[QUEUE] Drained. Rejected ${remaining.length} pending items.`);
     }
 
+    /**
+     * Kill: immediately reject all queued items and stop processing
+     */
+    kill() {
+        console.log(`[QUEUE] Kill — rejecting ${this.queue.length} queued items`);
+        const remaining = this.queue.splice(0);
+        for (const item of remaining) {
+            item.reject(new Error('Killed by /kill command'));
+        }
+        this.processing = false;
+    }
+
     get size() {
         return this.queue.length;
     }

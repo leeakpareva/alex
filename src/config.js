@@ -47,6 +47,11 @@ const OPTIONAL_KEYS = {
     linkedin_refresh_token: { type: 'string' },
     linkedin_token_expires_at: { type: 'number' },
     linkedin_person_urn: { type: 'string' },
+    google_calendar_client_id: { type: 'string' },
+    google_calendar_client_secret: { type: 'string' },
+    google_calendar_access_token: { type: 'string' },
+    google_calendar_refresh_token: { type: 'string' },
+    google_calendar_token_expires_at: { type: 'number' },
 };
 
 export async function loadConfig() {
