@@ -1,8 +1,15 @@
 # NAVADA AI Agent Framework
 
-A production-grade autonomous AI agent that runs 24/7 on a Raspberry Pi 5. Built as **ALEX**, the Global Economist at NAVADA — a real employee that researches markets, sends emails, generates reports, monitors inboxes, and manages its own schedule. Designed to be cloned and re-personalised into any AI agent role.
+**A production-grade autonomous AI agent that runs 24/7 on a Raspberry Pi 5.**
 
-**Live:** [www.alexnavada.xyz](https://www.alexnavada.xyz)
+Built as **ALEX**, the Global Economist at NAVADA — a real employee that researches markets, sends emails, generates reports, monitors inboxes, posts to LinkedIn, manages calendars, and runs its own schedule. Designed to be cloned and re-personalised into any AI agent role.
+
+**Live Dashboard:** [www.alexnavada.xyz](https://www.alexnavada.xyz)
+
+[![Tests](https://img.shields.io/badge/tests-138%20passing-brightgreen)](#test-suite)
+[![Models](https://img.shields.io/badge/AI%20models-18-blue)](#model-routing)
+[![Tools](https://img.shields.io/badge/tools-31+-orange)](#tools-31)
+[![Uptime](https://img.shields.io/badge/uptime-24%2F7-success)](#cron-resilience)
 
 ---
 
@@ -10,35 +17,137 @@ A production-grade autonomous AI agent that runs 24/7 on a Raspberry Pi 5. Built
 
 Most AI agents are demos. ALEX is a deployed, measurable team member running in production since January 2026. Every action is logged, every token is costed, every task is tracked on a live dashboard. You can see exactly what the agent did, when, and how much it cost — in real time.
 
-The framework solves the hard problems of running an AI agent 24/7: conversation memory that doesn't blow up context windows, graceful API failures, cron job resilience across reboots, multi-model routing to control costs, and a security model that lets external users interact without exposing the host.
+The framework solves the hard problems of running an AI agent 24/7:
+
+- **Conversation memory** that doesn't blow up context windows (rolling summaries + RAG)
+- **Graceful API failures** with circuit breakers, retry logic, and multi-provider fallback
+- **Cron resilience** across reboots with 3-layer task recovery
+- **Multi-model routing** across 5 AI providers to control costs and maximise capability
+- **A security model** that lets external users interact without exposing the host
+- **Self-extending skills** — the agent can create its own tools at runtime
+
+For comparison, a human doing the same job costs ~£50,000/year. ALEX delivers **94% cost savings** and works 24/7/365.
 
 ---
 
-## Capabilities
+## What ALEX Can Do
 
 | Capability | Description |
 |------------|-------------|
+| **Multi-Model AI** | 18 models across 5 providers — Claude, OpenAI, DeepSeek, Kimi K2. Smart routing picks the best model for each task |
 | **Research** | Web search, market analysis, real-time financial data (stocks, crypto, economic indicators) |
 | **Email** | Draft and send HTML emails with attachments, branded templates, auto-CC |
-| **Gmail Inbox** | IMAP polling every 2 min — AI triage, auto-replies, Telegram notifications with action summaries |
-| **Email Filing** | AI-powered email categorisation, priority scoring, and status tracking |
-| **PDF Reports** | Styled PDF reports with tables, charts, and NAVADA branding |
-| **Data Analysis** | Python execution with numpy, pandas, matplotlib, seaborn, scipy, scikit-learn |
-| **Charts** | Generate and send data visualisations directly in Telegram |
-| **Diagrams** | Mermaid diagram rendering (flowcharts, sequence, ER, Gantt, pie, etc.) to PNG |
+| **Gmail Inbox** | IMAP polling every 2 min — AI triage, auto-replies, priority scoring, Telegram notifications |
+| **Email Filing** | AI-powered email categorisation, priority scoring, status tracking, and bulk management |
+| **LinkedIn** | OAuth 2.0 posting — text, links, and images. Publish directly from Telegram |
+| **Google Calendar** | List, create, update, and delete calendar events. Schedule meetings from chat |
+| **PDF Reports** | Styled PDF reports with tables, charts, and branding |
+| **Data Analysis** | Full Python execution — numpy, pandas, matplotlib, seaborn, scipy, scikit-learn |
+| **Charts & Graphs** | Generate and send data visualisations directly as images in Telegram |
+| **Diagrams** | Mermaid rendering (flowcharts, sequence, ER, Gantt, pie, class, state) to PNG |
 | **Mind Maps** | Markmap mind map generation from markdown outlines to PNG |
-| **Web Apps** | Generate self-contained interactive HTML apps (dashboards, calculators, data tables) via `generate_webapp` |
+| **Web Apps** | Generate self-contained interactive HTML apps (dashboards, calculators, data tables) |
 | **Voice** | Receive voice notes (Whisper transcription) and send voice responses (TTS) |
-| **URL Fetching** | Hit any API, scrape any page, download data via `fetch_url` |
+| **Image Generation** | DALL-E 3 image generation from natural language prompts |
+| **URL Fetching** | Hit any API, scrape any page, download data — full HTTP verb support |
 | **Scheduling** | Cron-based tasks, reminders, recurring jobs — 8+ daily heartbeats by default |
-| **Memory** | Persistent memory across all conversations with rolling summaries and auto-fact extraction |
-| **Skills** | Self-extending plugin system — the agent can create its own tools |
-| **RAG** | ChromaDB vector search over knowledge base with keyword fallback |
-| **Dashboard** | Live Vercel dashboard with real-time task tracking, token costs, activity log |
-| **Multi-Platform** | Telegram + Slack + CLI + Control API |
-| **Smart Routing** | Haiku for greetings, Sonnet for work, Opus on demand, DeepSeek for deep research, GPT-4o fallback |
-| **Modes** | `/learn` (educational), `/mathematician` (quantitative), `/strategist` (frameworks), `/python` (data), `/voice` (audio) |
-| **User Management** | Add/remove Telegram users and grant/revoke full access via `manage_user` tool |
+| **Memory** | Persistent memory across conversations with rolling summaries, auto-fact extraction, and RAG |
+| **Skills** | Self-extending plugin system — the agent can create its own tools at runtime |
+| **Dashboard** | Live Vercel dashboard with real-time task tracking, token costs, and activity log |
+| **Multi-Platform** | Telegram + Slack + Gmail + LinkedIn + Google Calendar + CLI + Control API |
+| **Modes** | `/learn`, `/mathematician`, `/strategist`, `/python`, `/voice` — stackable specialist modes |
+| **User Management** | Add/remove Telegram users, grant/revoke full access with tiered permissions |
+
+---
+
+## Model Routing — 18 Models, 5 Providers
+
+ALEX automatically selects the optimal model for each message, or you can override manually via `/models` or inline commands like "use kimi".
+
+### Providers
+
+| Provider | Models | Tool Support | Notes |
+|----------|--------|-------------|-------|
+| **Anthropic** | Haiku 3.5, Sonnet 4, Opus 4.5 | Full (31+ tools) | Primary provider. Prompt caching, web search |
+| **Kimi (Moonshot AI)** | Kimi K2, Kimi K2 Thinking | Full (31+ tools) | 1T parameter MoE. 128K-256K context. ~6x cheaper than Sonnet |
+| **OpenAI** | GPT-4o, GPT-4.1 family, GPT-5 family, o3, o4-mini | Text only | 12 models. Reasoning modes for o3/o4-mini/GPT-5 |
+| **DeepSeek** | DeepSeek Chat | Text only | Deep research and analysis at ultra-low cost |
+
+### Smart Routing Logic
+
+| Trigger | Model | Why |
+|---------|-------|-----|
+| Greetings, status, short messages (<80 chars) | Haiku 3.5 | Fast, cheap (~$0.002/call) |
+| Complex tasks, reports, building, emails | Sonnet 4 | Best all-rounder (~$0.10/call) |
+| "use kimi" | Kimi K2 | Full tools, 6x cheaper than Sonnet |
+| "use kimi thinking" | Kimi K2 Thinking | 256K reasoning mode |
+| "use deepseek", "deep research" | DeepSeek | Ultra-cheap analysis (~$0.001/call) |
+| "use gpt", "use o3", "use gpt-5" etc. | OpenAI variants | Specific model selection |
+| "use opus" | Opus 4.5 | Maximum capability (~$0.30/call) |
+
+All models have independent circuit breakers — 5 consecutive failures trips the breaker for 5 minutes, then auto-recovers. Anthropic failures cascade to OpenAI GPT-4o as a fallback.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                          Agent Gateway                                │
+│                        (src/gateway.js)                               │
+├───────────┬──────────┬──────────┬───────────┬───────────────────────┤
+│ Telegram  │  Slack   │  Gmail   │ LinkedIn  │  Google Calendar      │
+│   Bot     │   Bot    │  Inbox   │  OAuth    │  Integration          │
+├───────────┴──────────┴──────────┴───────────┴───────────────────────┤
+│                      Chat System (src/chat.js)                        │
+│  Smart Model Routing → Priority Queue → Circuit Breakers → Retry     │
+├──────────────────────────────────────────────────────────────────────┤
+│  Anthropic (Haiku/Sonnet/Opus)  │  Kimi K2 (OpenAI-compatible)      │
+│  OpenAI (GPT-4o/4.1/5/o3/o4)   │  DeepSeek (deep research)         │
+├──────────────────────────────────────────────────────────────────────┤
+│  31+ Tools │ Skills System │ Memory + RAG │ Python Execution         │
+├──────────────────────────────────────────────────────────────────────┤
+│                     Raspberry Pi 5 (8GB RAM)                          │
+│        24/7 systemd + cron scheduling + 3-layer auto-recovery        │
+├──────────────────────────────────────────────────────────────────────┤
+│            Dashboard: Upstash Redis → Vercel (live)                   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Message Flow
+
+```
+Telegram/Slack/Gmail message
+  → gateway.js (dedup + auth + permission tier)
+  → downloads photos/docs/voice as content blocks
+  → voice notes: Whisper transcription → text
+  → chat.js chat() → selectModel() routes to optimal model/provider
+  → buildSystemPrompt() with identity, memory, RAG context
+  → prepareMessages() summarises old messages, keeps last 8 verbatim
+  → callAnthropicQueued() / callKimiWithTools() / callDeepSeek() / callOpenAI()
+  → processResponse() loops on tool_use / function_call blocks
+  → smartSplit() response at paragraph boundaries → send via Telegram/Slack
+```
+
+### Source Modules (9,271 lines)
+
+| Module | Lines | Purpose |
+|--------|------:|---------|
+| `src/gateway.js` | 3,645 | Entry point. Telegram/Slack bots, control API, tool execution with DI, 40+ commands, startup catch-up |
+| `src/tools.js` | 1,513 | 31+ tool definitions + `executeTool()`. Permissions, masking, delete guardrail, timeouts |
+| `src/chat.js` | 1,143 | Chat system factory. 18-model routing, token logging, summarisation, circuit breakers, auto-fact extraction |
+| `src/inbox.js` | 585 | Gmail inbox monitor. IMAP polling, AI reply generation, Telegram notifications |
+| `src/email-filing.js` | 462 | Email filing and categorisation. AI triage, priority scoring, status management |
+| `src/slack.js` | 326 | Slack interface. Channel polling + DMs, threaded replies, mention-only filtering |
+| `src/memory.js` | 308 | Persistent memory. Per-chat conversations with rolling summaries, categorised memory, RAG |
+| `src/heartbeat.js` | 275 | Scheduled tasks, dashboard sync, cleanup. HTML notifications with plain-text fallback |
+| `src/skills.js` | 226 | Self-extending skill system. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
+| `src/linkedin.js` | 221 | LinkedIn OAuth 2.0. Text posts, link sharing, image uploads |
+| `src/google-calendar.js` | 213 | Google Calendar. List, create, update, delete events with OAuth token refresh |
+| `src/config.js` | 106 | Config loader with schema validation, path security |
+| `src/queue.js` | 100 | Priority request queue with 429 cooldown and rate limit handling |
+| `src/keyword-index.js` | 93 | Inverted keyword index with TF scoring for memory recall fallback |
+| `src/alerts.js` | 55 | Stock and service alert threshold monitoring |
 
 ---
 
@@ -48,132 +157,41 @@ The agent enforces a two-tier permission system at both the **command** and **to
 
 ### Owner (full access)
 
-All 31+ tools available including bash, file operations, email, code execution, scheduling, diagrams, mind maps, web apps, and system management. All 40 Telegram commands available.
+All 31+ tools, all 40 Telegram commands, all integrations.
 
-### Limited Users (chat + basic commands)
+### Limited Users (chat + safe tools)
 
-Limited users can chat with the agent and use a subset of commands. Owner-only tools are blocked at the API level.
+Limited users can chat with the agent and use safe, read-only tools. Everything that touches the filesystem, shell, email, scheduling, or costs money is blocked at the API level.
 
-| Allowed Commands | Allowed Tools | Blocked |
-|-----------------|---------------|---------|
-| `/start`, `/help` | `web_lookup` — search the web | `bash` — shell commands |
-| `/stocks`, `/news` | `web_search` — Claude web search | `read_file` / `write_file` / `edit_file` — filesystem |
-| `/research`, `/brief` | `memory_recall` — read knowledge | `send_email`, `fetch_url`, `generate_pdf`, `generate_webapp` |
-| `/tracked` | `stock_quote`, `stock_search` — financial data | `generate_image`, `schedule_task`, `delete_task` |
-| | `generate_chart`, `generate_diagram`, `generate_mindmap` | `send_file`, `send_voice_message`, `manage_user` |
-| | | All other system commands |
+| Allowed Tools (All Users) | Blocked Tools (Owner Only) |
+|--------------------------|---------------------------|
+| `web_lookup`, `web_search` | `bash`, `read_file`, `write_file`, `edit_file` |
+| `memory_recall` | `list_directory`, `grep`, `glob` |
+| `stock_quote`, `stock_search`, `company_overview` | `send_email`, `fetch_url`, `generate_pdf` |
+| `market_news`, `crypto_rate`, `economic_indicator` | `generate_image`, `generate_webapp` |
+| `generate_chart`, `generate_diagram`, `generate_mindmap` | `schedule_task`, `delete_task`, `confirm_delete` |
+| `get_recent_uploads` | `send_file`, `send_voice_message`, `manage_user` |
+| | `create_skill`, `update_dashboard`, `memory_save` |
+| | `linkedin_post`, `calendar_*` tools |
 
 ### Additional Protections
 
-- **Sensitive data masking**: API keys, tokens, passwords, and secrets are automatically redacted in all tool outputs before reaching the model
-- **Control API authentication**: Bearer token required for all non-cron API requests
-- **Rate limiting**: 30 requests/minute per IP on the Control API
-- **CORS hardening**: Restricted origins and body size limits
-- **Delete guardrail**: File deletions require 3 confirmations + password
-- **Bash blocklist**: Dangerous commands (`mkfs`, `dd`, `reboot`, `shutdown`, `systemctl stop alex`, `chmod 777 /`, pipe-to-shell) blocked at execution
-- **Tool timeouts**: Per-tool timeout limits (bash 300s, chart 180s, diagram/mindmap 60s, default 30s)
-- **Circuit breakers**: Automatic API call suspension after 5 consecutive failures for Anthropic, DeepSeek, and OpenAI — auto-recovers after 5 minutes
-- **Tool output truncation**: Large tool outputs capped to prevent token blowout
+- **Sensitive data masking** — API keys, tokens, passwords automatically redacted in all tool outputs
+- **Control API authentication** — Bearer token required for all non-cron requests
+- **Rate limiting** — Per-user Telegram rate limits (40/min owner, 20/min users) + 30 req/min API
+- **CORS hardening** — Restricted origins and body size limits
+- **Delete guardrail** — File deletions require 3 confirmations + password
+- **Bash blocklist** — `mkfs`, `dd`, `reboot`, `shutdown`, `systemctl stop alex`, `chmod 777 /`, pipe-to-shell all blocked
+- **Tool timeouts** — bash 300s, chart 180s, diagram/mindmap 60s, default 30s
+- **Circuit breakers** — Per-provider (Anthropic, DeepSeek, OpenAI, Kimi) — auto-recovery after 5 minutes
+- **Tool output truncation** — Large outputs capped to prevent token blowout
+- **Message length limit** — 50,000 character cap on incoming messages
 
 ---
 
-## Architecture
+## Telegram Commands (40+)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Agent Gateway                         │
-│                      (src/gateway.js)                        │
-├──────────┬──────────┬──────────┬──────────┬────────────────┤
-│ Telegram │  Slack   │  Gmail   │  Skills  │    Request     │
-│   Bot    │   Bot    │  Inbox   │  System  │     Queue      │
-├──────────┴──────────┴──────────┴──────────┴────────────────┤
-│  Claude (Sonnet 4 / Haiku 3.5 / Opus 4.5 / DeepSeek)      │
-│  OpenAI (Whisper STT / TTS / DALL-E) + Web Search + Tools  │
-├────────────────────┬───────────────────────────────────────┤
-│  ChromaDB (RAG)    │  Python (analysis) + reportlab (PDF)  │
-├────────────────────┴───────────────────────────────────────┤
-│                    Raspberry Pi 5 (8GB)                      │
-│     24/7 systemd + cron scheduling + auto-recovery          │
-├─────────────────────────────────────────────────────────────┤
-│         Dashboard: Upstash Redis → Vercel (live)            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Message Flow
-
-```
-Telegram/Slack message → gateway.js (dedup + auth + permission tier)
-  → downloads photos/docs/voice as content blocks
-  → voice notes: Whisper transcription → text
-  → natural acknowledgment from 14 varied responses (no robotic "Let me check")
-  → chat.js chat() → selectModel() routes to optimal model
-  → buildSystemPrompt() with identity, memory, RAG context
-  → prepareMessages() summarizes old messages, keeps last 8 verbatim
-  → callAnthropicQueued() via priority queue + circuit breaker
-  → processResponse() loops on tool_use blocks (12-msg window for scheduled tasks)
-  → smartSplit() response at paragraph boundaries → send via Telegram/Slack
-```
-
-### Model Routing
-
-| Trigger | Model | Cost/Call |
-|---------|-------|-----------|
-| Greetings, status checks, short messages (<80 chars) | Haiku 3.5 (8192 max tokens) | ~$0.002 |
-| Research, analysis, reports, emails, tools, building | Sonnet 4 (16384 max tokens) | ~$0.10 |
-| Scheduled tasks (morning briefing, inbox review, etc.) | Sonnet 4 | ~$0.10 |
-| "use deepseek", deep research, thorough analysis | DeepSeek | ~$0.001 |
-| "use gpt", explicit GPT request | GPT-4o | ~$0.05 |
-| "use opus", maximum capability | Opus 4.5 | ~$0.30 |
-
-### Source Modules
-
-| Module | Purpose |
-|--------|---------|
-| `src/gateway.js` | Entry point. Telegram/Slack bots, authenticated control API, tool execution with dependency injection, permission enforcement, startup catch-up for missed tasks, 40 Telegram commands |
-| `src/chat.js` | Chat system factory. Model selection, token logging, conversation summarisation, API calls with retry and fallback, auto-fact extraction, auto-reminder detection |
-| `src/tools.js` | 31+ tool definitions + `executeTool()` switch. Owner-only permission enforcement, sensitive data masking, delete guardrail, tool timeouts |
-| `src/heartbeat.js` | Built-in task definitions, scheduled task execution through AI (Sonnet), dashboard sync, cleanup. HTML notifications with plain-text fallback |
-| `src/memory.js` | Persistent memory system. Per-chat conversations with rolling summaries, categorised memory, RAG integration, conversation archiving |
-| `src/skills.js` | Self-extending skill system. Skills stored as `~/.alex/skills/{name}/SKILL.md` |
-| `src/slack.js` | Slack interface. Channel polling + DMs, threaded replies, mention-only filtering |
-| `src/inbox.js` | Gmail inbox monitor. IMAP polling, AI reply generation, Telegram notifications |
-| `src/email-filing.js` | Email filing and categorisation with AI triage, priority scoring, status management |
-| `src/config.js` | Config loader with validation, path security |
-| `src/queue.js` | Priority request queue with circuit breaker and rate limit handling |
-| `src/keyword-index.js` | Inverted keyword index with TF scoring for memory recall fallback |
-| `src/alerts.js` | Stock and service alert threshold monitoring |
-
----
-
-## Performance Tracking
-
-Everything the agent does is measured in real time:
-
-- **Token usage** — per-call logging by model with source attribution (telegram, scheduled, api)
-- **Task completion** — every task logged to the dashboard with status, category, token count, and cost
-- **Activity log** — timestamped record of every action, visible on the live dashboard
-- **Cost breakdown** — `/tokens` for today, `/spend` for lifetime, `/costs` for per-task attribution, `/projection` for forecasts
-- **Heartbeat monitoring** — 8+ daily scheduled tasks with success/failure tracking
-- **Session metrics** — uptime, API calls, conversations tracked, all visible via `/status`
-- **Auto-fact extraction** — key facts automatically saved to knowledge base every 20 messages
-
-### Cost to Run
-
-Based on real production data (Jan-Feb 2026):
-
-| Component | Daily | Monthly | Annual |
-|-----------|-------|---------|--------|
-| API tokens (Claude + OpenAI) | ~£8 | ~£244 | ~£2,964 |
-| Raspberry Pi electricity (12W) | £0.07 | £2.15 | £25.75 |
-| **Total** | **~£8** | **~£246** | **~£2,990** |
-
-For comparison, a human doing the same job costs ~£50,000/year (UK mid-level + employer NI/pension/overhead). The agent delivers **94% cost savings** and works 24/7.
-
----
-
-## Telegram Commands (40)
-
-All commands are registered in Telegram's `/` autocomplete menu in alphabetical order.
+All commands are registered in Telegram's `/` autocomplete menu.
 
 | Command | Description |
 |---------|-------------|
@@ -190,19 +208,20 @@ All commands are registered in Telegram's `/` autocomplete menu in alphabetical 
 | `/email <n>` | Full email details for email #n |
 | `/errors` | Today's errors from audit log |
 | `/exit` | Turn off all active modes |
-| `/fixes` | Recent changelog entries (last 5 from Fixes/CHANGELOG.md) |
+| `/fixes` | Recent changelog entries |
 | `/health` | Quick system health overview |
 | `/help` | Full guide with tips and mode descriptions |
 | `/id` | Your Telegram user and chat ID |
-| `/inbox` | Email queue (not_started by default). Supports: `clear`, `done all`, `delete`, `mark` |
+| `/inbox` | Email queue. Supports: `clear`, `done all`, `delete`, `mark` |
+| `/kill` | Emergency stop — halts all in-flight AI processing immediately |
 | `/learn` | Toggle educational mode (What / How / Why structure) |
 | `/logs` | Recent audit log entries |
 | `/mathematician` | Toggle quantitative mode (calculations, financial models, statistics) |
 | `/memory` | Browse memory banks |
 | `/mode` | Show active modes |
-| `/models` | Switch AI model or restore auto-routing |
+| `/models` | Switch AI model (18 models) or restore auto-routing |
 | `/news` | Latest gathered news and insights |
-| `/profile` | ALEX personal details, DOB, owner info |
+| `/profile` | ALEX personal details and owner info |
 | `/projection` | Cost projection and ROI analysis |
 | `/python` | Toggle Python mode (forces Python execution for all analysis) |
 | `/research <topic>` | Deep research on any topic (runs in background) |
@@ -215,7 +234,7 @@ All commands are registered in Telegram's `/` autocomplete menu in alphabetical 
 | `/tasks` | List scheduled and recurring tasks |
 | `/testreport` | Full system test report (health, tools, connectivity) |
 | `/tokens` | Today's API usage by model |
-| `/tracked` | View tracked tasks (use CAPITAL keywords to track: TASK, MEETING, DEADLINE, etc.) |
+| `/tracked` | View tracked tasks (TASK, MEETING, DEADLINE keywords) |
 | `/voice` | Toggle voice reply mode (TTS responses) |
 
 Modes can be stacked: `/mathematician` + `/strategist` gives quantitative strategic analysis.
@@ -228,68 +247,122 @@ Modes can be stacked: `/mathematician` + `/strategist` gives quantitative strate
 |------|--------|-------------|
 | `bash` | Owner | Execute shell commands (with blocklist for dangerous ops) |
 | `read_file` | Owner | Read any file on the Pi |
-| `write_file` | Owner | Write files anywhere under /home/head |
+| `write_file` | Owner | Write files (path-restricted) |
 | `edit_file` | Owner | Precise text replacement in files |
 | `list_directory` | Owner | Browse filesystem |
 | `grep` | Owner | Regex search across files |
 | `glob` | Owner | Find files by name pattern |
 | `web_lookup` | All | DuckDuckGo web search |
 | `web_search` | All | Claude built-in web search |
-| `memory_save` | Owner | Save to persistent memory |
-| `memory_recall` | All | Read from persistent memory |
-| `send_email` | Owner | HTML emails with templates and attachments |
-| `generate_pdf` | Owner | Professional PDF reports |
-| `generate_chart` | All | Python data analysis and visualisation |
-| `generate_diagram` | All | Mermaid diagrams to PNG |
+| `memory_save` | Owner | Save to persistent categorised memory |
+| `memory_recall` | All | Read from persistent memory + RAG |
+| `send_email` | Owner | HTML emails with templates, attachments, and auto-CC |
+| `generate_pdf` | Owner | Professional PDF reports with branding |
+| `generate_chart` | All | Python data analysis and visualisation to PNG |
+| `generate_diagram` | All | Mermaid diagrams to PNG (flowchart, sequence, ER, Gantt, pie, class, state) |
 | `generate_mindmap` | All | Markmap mind maps to PNG |
 | `generate_webapp` | Owner | Self-contained interactive HTML web apps |
 | `generate_image` | Owner | DALL-E 3 image generation |
 | `schedule_task` | Owner | Create cron-based scheduled tasks |
 | `delete_task` | Owner | Remove scheduled tasks |
-| `create_skill` | Owner | Create new agent skills |
+| `confirm_delete` | Owner | Execute file deletion (3 confirmations + password) |
+| `create_skill` | Owner | Create new agent skills at runtime |
 | `update_dashboard` | Owner | Push data to live dashboard |
 | `send_file` | Owner | Send any file via Telegram |
 | `send_voice_message` | Owner | Text-to-speech voice messages |
 | `fetch_url` | Owner | HTTP requests (GET/POST/PUT/PATCH/DELETE) |
-| `stock_quote` | All | Real-time stock prices (Alpha Vantage) |
+| `stock_quote` | All | Real-time stock prices |
 | `stock_search` | All | Search stock ticker symbols |
 | `company_overview` | All | Company fundamentals and financials |
 | `market_news` | All | Market news with sentiment analysis |
 | `crypto_rate` | All | Cryptocurrency exchange rates |
 | `economic_indicator` | All | US economic data (GDP, CPI, unemployment, etc.) |
-| `confirm_delete` | Owner | Execute file deletion after 3 confirmations + password |
 | `manage_user` | Owner | Add/remove Telegram users, grant/revoke full access |
-| `get_recent_uploads` | All | List recently uploaded files in chat |
+| `get_recent_uploads` | All | List recently uploaded files |
+| `linkedin_post` | Owner | Post to LinkedIn (text, links, images) |
+| `calendar_list_events` | Owner | List upcoming Google Calendar events |
+| `calendar_create_event` | Owner | Create calendar events |
+| `calendar_update_event` | Owner | Update existing calendar events |
+| `calendar_delete_event` | Owner | Delete calendar events |
 
 ---
 
-## Workspace Layout
+## Integrations
 
+### Telegram (Primary Interface)
+Full-featured bot with 40+ slash commands, inline model selection, voice notes, photo/document handling, and tiered user permissions.
+
+### Slack
+Channel polling with threaded replies, mention-only filtering, and DM support. Shares the same chat system and tools as Telegram.
+
+### Gmail
+IMAP polling every 2 minutes. AI-powered triage scores incoming emails by priority, generates suggested replies, and sends Telegram notifications. Full email filing system with status tracking (`not_started` → `in_progress` → `done`).
+
+### LinkedIn
+OAuth 2.0 integration for publishing posts directly from Telegram. Supports text posts, link sharing, and image uploads. Token auto-refresh.
+
+### Google Calendar
+Full CRUD for calendar events. List upcoming meetings, create new events, update or cancel existing ones — all from Telegram.
+
+### Control API (Port 9090)
+Authenticated REST API for programmatic access:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/command` | POST | Run a message through the chat system |
+| `/api/send` | POST | Direct message to a Telegram user |
+| `/api/trigger` | POST | Trigger a scheduled task by name |
+| `/api/users` | GET | List known Telegram users |
+| `/api/broadcast` | POST | Message all known users |
+| `/api/health` | GET | Health check endpoint |
+
+---
+
+## Performance Tracking
+
+Everything the agent does is measured in real time:
+
+- **Token usage** — per-call logging by model with source attribution (telegram, scheduled, api)
+- **Cost breakdown** — `/tokens` for today, `/spend` for lifetime, `/costs` for per-task attribution, `/projection` for forecasts
+- **Activity log** — timestamped record of every action, visible on the live dashboard
+- **Heartbeat monitoring** — 8+ daily scheduled tasks with success/failure tracking
+- **Session metrics** — uptime, API calls, conversations tracked, all visible via `/status`
+- **Auto-fact extraction** — key facts automatically saved to knowledge base every 20 messages
+- **Auto-reminder detection** — deadlines and reminders detected and saved to task memory
+
+### Cost to Run
+
+Based on real production data (Jan-Feb 2026):
+
+| Component | Daily | Monthly | Annual |
+|-----------|-------|---------|--------|
+| API tokens (Claude + OpenAI + Kimi) | ~£8 | ~£244 | ~£2,964 |
+| Raspberry Pi electricity (12W) | £0.07 | £2.15 | £25.75 |
+| **Total** | **~£8** | **~£246** | **~£2,990** |
+
+Human equivalent cost: ~£50,000/year (UK mid-level + employer NI/pension/overhead).
+
+---
+
+## Test Suite
+
+138 tests across 9 test files — unit tests and end-to-end tests.
+
+```bash
+npx vitest run
 ```
-~/.alex/
-├── config.json              # API keys (mode 0600)
-├── IDENTITY.md              # Agent personality/role definition
-├── USER.md                  # User information
-├── KNOWLEDGE.md             # Accumulated knowledge base
-├── conversations/           # Per-chat JSON with messages + rolling summary
-├── memory/                  # Categorised memory (user, projects, research, tasks, knowledge)
-├── skills/                  # Skill definitions (SKILL.md per skill)
-├── tasks/                   # Scheduled task JSON definitions
-├── templates/               # Email templates (signature.html, daily-summary.html, etc.)
-├── files/
-│   └── uploads/             # Files received via Telegram or Taildrop
-├── outputs/
-│   ├── reports/             # Generated PDFs
-│   ├── charts/              # Generated charts/visualisations
-│   ├── diagrams/            # Mermaid diagrams
-│   ├── mindmaps/            # Markmap mind maps
-│   ├── images/              # DALL-E generated images
-│   └── webapps/             # Generated HTML web applications
-├── logs/
-│   ├── audit/               # Tool execution and error audit logs
-│   └── tokens/              # Per-day token usage JSONL files
-└── voice/                   # Voice notes and transcriptions
-```
+
+| Suite | Tests | Coverage |
+|-------|------:|----------|
+| syntax-check (e2e) | 2 | All source files pass `node --check` |
+| file-integrity (e2e) | 31 | Critical files exist and have expected content |
+| control-api (e2e) | 9 | API endpoints respond correctly |
+| core-improvements (unit) | 25 | Model selection, circuit breakers, queue, smart split |
+| tools (unit) | 26 | Tool execution, permissions, guardrails |
+| email-filing (unit) | 17 | Email triage, filing, status management |
+| inbox (unit) | 13 | Gmail parsing, thread detection |
+| config (unit) | 10 | Config loading, validation, path security |
+| heartbeat (unit) | 5 | Scheduled task definitions and execution |
 
 ---
 
@@ -303,6 +376,8 @@ cd ~/my-agent
 npm install
 pip3 install --break-system-packages reportlab chromadb plotly kaleido
 ```
+
+**Requirements:** Node.js 22+, Python 3.11+, Raspberry Pi 5 (or any Linux box)
 
 ### 2. Create Workspace
 
@@ -320,31 +395,36 @@ chmod 700 ~/.alex
 {
   "anthropic_api_key": "sk-ant-...",
   "telegram_bot_token": "BOT_TOKEN_FROM_BOTFATHER",
-  "telegram_owner_id": YOUR_TELEGRAM_USER_ID,
+  "telegram_owner_id": 123456789,
   "telegram_authorized_users": [],
-  "telegram_notify_tasks": true,
-  "gmail_address": "your.email@gmail.com",
-  "gmail_app_password": "xxxx xxxx xxxx xxxx",
-  "recipient_email": "default@recipient.com",
-  "openai_api_key": "sk-...",
-  "alphavantage_api_key": "YOUR_KEY",
-  "control_api_token": "GENERATE_A_RANDOM_TOKEN",
-  "slack_token": "xoxb-...",
-  "slack_channel_id": "C0XXXXXXXX"
+  "telegram_notify_tasks": true
 }
 ```
 
 `chmod 600 ~/.alex/config.json`
 
+**Required keys:**
+
 | Key | Where to Get It |
 |-----|----------------|
-| `anthropic_api_key` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
-| `telegram_bot_token` | Telegram → @BotFather → /newbot |
-| `telegram_owner_id` | Telegram → @userinfobot → send any message |
-| `gmail_app_password` | Google Account → Security → 2FA → App Passwords |
-| `openai_api_key` | [platform.openai.com](https://platform.openai.com) → API Keys |
-| `alphavantage_api_key` | [alphavantage.co](https://www.alphavantage.co/support/#api-key) → free tier |
-| `control_api_token` | Generate: `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `anthropic_api_key` | [console.anthropic.com](https://console.anthropic.com) |
+| `telegram_bot_token` | Telegram @BotFather → /newbot |
+| `telegram_owner_id` | Telegram @userinfobot |
+
+**Optional keys (enable more features):**
+
+| Key | Enables | Source |
+|-----|---------|--------|
+| `openai_api_key` | GPT models, DALL-E, Whisper, TTS, fallback | [platform.openai.com](https://platform.openai.com) |
+| `kimi_api_key` | Kimi K2 models (cheap tool-enabled AI) | [kimi-k2.ai](https://kimi-k2.ai) |
+| `deepseek_api_key` | DeepSeek deep research | [platform.deepseek.com](https://platform.deepseek.com) |
+| `gmail_address` + `gmail_app_password` | Email sending and inbox monitoring | Google Account → App Passwords |
+| `alphavantage_api_key` | Financial data (stocks, crypto, economics) | [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
+| `slack_token` + `slack_channel_id` | Slack integration | Slack App dashboard |
+| `control_api_token` | Authenticated Control API | `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `linkedin_*` keys | LinkedIn posting | LinkedIn Developer Portal |
+| `google_calendar_*` keys | Google Calendar | Google Cloud Console |
+| `upstash_redis_url` + `upstash_redis_token` | Live Vercel dashboard | [upstash.com](https://upstash.com) |
 
 ### 4. Define the Agent Identity (`~/.alex/IDENTITY.md`)
 
@@ -355,14 +435,16 @@ You are ALEX, the Global Economist at NAVADA.
 You provide economic research, market analysis, and strategic intelligence.
 ```
 
-Change this file to create a completely different agent — a CTO, a sales lead, a research assistant, anything.
+Change this file to create a completely different agent — a CTO, a sales lead, a research assistant, a customer support agent, anything.
 
 ### 5. Deploy
 
 ```bash
+# Service
 sudo cp deploy/navada-1.service /etc/systemd/system/alex.service
 sudo systemctl daemon-reload && sudo systemctl enable alex && sudo systemctl start alex
 
+# Cron (scheduled tasks)
 sudo cp deploy/cron/alex /etc/cron.d/alex
 sudo cp deploy/cron/alex-tasks /etc/cron.d/alex-tasks
 sudo chown root:root /etc/cron.d/alex*
@@ -373,7 +455,7 @@ sudo chown root:root /etc/cron.d/alex*
 ```bash
 sudo systemctl status alex          # Should show active (running)
 journalctl -u alex -f               # Watch live logs
-npx vitest run                       # Run test suite (96 tests)
+npx vitest run                       # Run test suite (138 tests)
 ```
 
 Send a message to your bot on Telegram — it should respond.
@@ -402,32 +484,68 @@ Three layers ensure scheduled tasks never get lost:
 | `cleanup` | 03:00 daily | Archive old conversations, prune stale files |
 | `weekly-self-review` | Sun 22:00 | Self-improvement analysis and suggestions |
 
+---
+
+## Workspace Layout
+
+```
+~/.alex/
+├── config.json              # API keys (mode 0600)
+├── IDENTITY.md              # Agent personality and role definition
+├── USER.md                  # User information
+├── KNOWLEDGE.md             # Accumulated knowledge base
+├── conversations/           # Per-chat JSON with messages + rolling summary
+├── memory/                  # Categorised memory (user, projects, research, tasks)
+├── skills/                  # Skill definitions (SKILL.md per skill)
+├── tasks/                   # Scheduled task JSON definitions
+├── templates/               # Email templates (signature, daily-summary, etc.)
+├── files/
+│   └── uploads/             # Files received via Telegram or Taildrop
+├── outputs/
+│   ├── reports/             # Generated PDFs
+│   ├── charts/              # Generated charts and visualisations
+│   ├── diagrams/            # Mermaid diagrams
+│   ├── mindmaps/            # Markmap mind maps
+│   ├── images/              # DALL-E generated images
+│   └── webapps/             # Generated HTML web applications
+├── logs/
+│   ├── audit/               # Tool execution and error audit logs
+│   └── tokens/              # Per-day token usage JSONL files
+└── voice/                   # Voice notes and transcriptions
+```
+
+---
+
 ## Key Design Patterns
 
-- **Dependency injection**: `executeTool()` receives all deps as a single object — never imports globals
-- **Tiered permissions**: `OWNER_ONLY_TOOLS` set checked on every tool call with `callerUserId` context
-- **Sensitive masking**: `maskSensitive()` redacts API keys, tokens, and passwords in all tool outputs
-- **Token conservation**: Skill names only in system prompt, RAG top-3 chunks, rolling summaries, last 8 messages verbatim
-- **Queue priority**: User messages = priority 10, scheduled tasks = priority 1
-- **Fire-and-forget dashboard**: Dashboard POSTs never block the main response flow
-- **Circuit breakers**: Per-provider (Anthropic, DeepSeek, OpenAI) — 5 failures opens circuit for 5 minutes
-- **Natural acknowledgments**: 14 varied human-sounding responses instead of robotic "Let me check"
-- **Scheduled task safety**: Tighter message window (12 vs 20) to prevent token overflow during tool loops
-- **HTML notifications**: Heartbeat task results sent as HTML with plain-text fallback to avoid Telegram parse errors
+- **Dependency injection** — `executeTool()` receives all deps as a single object. Never imports globals
+- **Tiered permissions** — `OWNER_ONLY_TOOLS` checked on every tool call with `callerUserId` context
+- **Sensitive masking** — `maskSensitive()` redacts API keys, tokens, and passwords in all tool outputs
+- **Token conservation** — skill names only in system prompt, RAG top-3 chunks, rolling summaries, last 8 messages verbatim
+- **Queue priority** — user messages = priority 10, scheduled tasks = priority 1
+- **Fire-and-forget dashboard** — dashboard POSTs never block the main response flow
+- **Circuit breakers** — per-provider (Anthropic, DeepSeek, OpenAI, Kimi) with independent failure tracking
+- **Natural acknowledgments** — 14 varied human-sounding responses instead of robotic filler
+- **Scheduled task safety** — tighter message window (12 vs 20) to prevent token overflow during tool loops
+- **OpenAI-compatible providers** — Kimi K2 uses the same OpenAI SDK with custom baseURL, making it trivial to add more providers
+
+---
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
 | Bot not responding | `sudo systemctl status alex` then `journalctl -u alex -f` |
-| Telegram 409 conflicts | Kill duplicate processes: `pgrep -af gateway.js` then kill the stale one |
-| API errors | Check API key has credits, check config, use `/tokens` |
+| Telegram 409 conflicts | Kill duplicate processes: `pgrep -af gateway.js` |
+| API errors | Check API key credits, check config, use `/tokens` |
 | Email not sending | Verify Gmail App Password (not regular password), ensure 2FA is on |
 | Cron not firing | Check `/etc/cron.d/alex` has trailing newline, owned by root |
-| Scheduled task prompt overflow | Tighter tool-loop window (12 msgs) — check logs for 200K token errors |
-| High token usage | Use `/tokens` and `/costs` in Telegram, check model routing in logs |
+| High token usage | Use `/tokens` and `/costs`, check model routing in logs |
 | Control API 401 | Include `Authorization: Bearer <token>` header |
 | Commands not in Telegram menu | Restart service — `setMyCommands` runs on startup |
+| Kimi/DeepSeek not available | Check API key in config, restart Alex, check `/status` |
+
+---
 
 ## Quick Reference
 
@@ -437,7 +555,7 @@ npm run dev                            # Start with --watch
 sudo systemctl restart alex            # Restart service
 journalctl -u alex -f                  # Live logs
 node --check src/*.js                  # Syntax check all source
-npx vitest run                         # Run test suite
+npx vitest run                         # Run test suite (138 tests)
 curl -X POST http://127.0.0.1:9090/api/trigger \
   -H 'Content-Type: application/json' \
   -d '{"task":"morning-briefing"}'     # Trigger a task manually
