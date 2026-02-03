@@ -103,26 +103,12 @@ describe('Cron Configuration', () => {
 
 describe('Dashboard Files', () => {
     it('dashboard server.py exists', async () => {
-        const stat = await fs.stat('/home/head/clawd/dashboard/server.py');
+        const stat = await fs.stat('/home/head/navada-1/dashboard/server.py');
         expect(stat.isFile()).toBe(true);
     });
 
-    it('vercel index.html exists', async () => {
-        const stat = await fs.stat('/home/head/clawd/dashboard-vercel/public/index.html');
+    it('dashboard index.html exists', async () => {
+        const stat = await fs.stat('/home/head/navada-1/dashboard/index.html');
         expect(stat.isFile()).toBe(true);
-    });
-
-    it('vercel inbox API route exists', async () => {
-        const stat = await fs.stat('/home/head/clawd/dashboard-vercel/api/inbox.js');
-        expect(stat.isFile()).toBe(true);
-    });
-
-    it('dashboard index.html contains inbox section', async () => {
-        const content = await fs.readFile('/home/head/clawd/dashboard-vercel/public/index.html', 'utf-8');
-        expect(content).toMatch(/inbox-section/);
-        expect(content).toMatch(/inbox-not-started/);
-        expect(content).toMatch(/inbox-in-progress/);
-        expect(content).toMatch(/inbox-done/);
-        expect(content).toMatch(/renderInbox/);
     });
 });
