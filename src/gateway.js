@@ -71,6 +71,7 @@ let bot = null;
 let anthropic = null;
 let openaiClient = null;
 let deepseekClient = null;
+let kimiClient = null;
 let memory = null;
 let skills = null;
 let scheduledTasks = new Map();
@@ -445,6 +446,7 @@ Just message me naturally — I'm here to help.
 • Slack: ${config.slack_token ? 'polling' : 'disabled'}
 • Dashboard: ${redis ? 'connected' : 'local only'}
 • DeepSeek: ${deepseekClient ? 'available' : 'disabled'}
+• Kimi: ${kimiClient ? 'available' : 'disabled'}
 • OpenAI: ${openaiClient ? 'available' : 'disabled'}
 
 *ALEX Process:*
@@ -1507,6 +1509,7 @@ Telegram → gateway.js (dedup + auth) → chat.js (model select → build promp
 • Slack: ${config.slack_token ? 'polling' : 'disabled'}
 • Redis: ${redis ? 'connected' : 'local only'}
 • DeepSeek: ${deepseekClient ? 'available' : 'disabled'}
+• Kimi: ${kimiClient ? 'available' : 'disabled'}
 • OpenAI: ${openaiClient ? 'available' : 'disabled'}
 
 *Queue/Activity:* ${queueSize} entries
@@ -3477,6 +3480,13 @@ async function init() {
         console.log('[DEEPSEEK] No API key configured, deep research disabled');
     }
 
+    if (config.kimi_api_key) {
+        kimiClient = new OpenAI({ apiKey: config.kimi_api_key, baseURL: 'https://kimi-k2.ai/api/v1' });
+        console.log('[KIMI] Client initialized');
+    } else {
+        console.log('[KIMI] No API key configured, Kimi K2 disabled');
+    }
+
     // Initialize Upstash Redis for dashboard
     if (config.upstash_redis_url && config.upstash_redis_token) {
         redis = new Redis({ url: config.upstash_redis_url, token: config.upstash_redis_token });
@@ -3511,6 +3521,7 @@ async function init() {
         anthropic,
         openaiClient,
         deepseekClient,
+        kimiClient,
         memory,
         skills,
         executeTool: execToolWithDeps,

@@ -52,6 +52,7 @@ const OPTIONAL_KEYS = {
     google_calendar_access_token: { type: 'string' },
     google_calendar_refresh_token: { type: 'string' },
     google_calendar_token_expires_at: { type: 'number' },
+    kimi_api_key: { type: 'string' },
 };
 
 export async function loadConfig() {

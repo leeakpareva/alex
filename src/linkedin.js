@@ -97,9 +97,60 @@ export async function getProfile(accessToken) {
 }
 
 /**
- * Create a LinkedIn post (text, optional link URL)
+ * Upload an image to LinkedIn and return the asset URN
  */
-export async function createPost({ text, linkUrl }, config) {
+async function uploadImage(imagePath, config) {
+    const buffer = await fs.readFile(imagePath);
+
+    // Step 1: Register upload
+    const registerBody = {
+        registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            owner: config.linkedin_person_urn,
+            serviceRelationships: [{
+                relationshipType: 'OWNER',
+                identifier: 'urn:li:userGeneratedContent',
+            }],
+        },
+    };
+
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${config.linkedin_access_token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registerBody),
+    });
+    if (!registerRes.ok) {
+        const errText = await registerRes.text();
+        throw new Error(`LinkedIn image register failed (${registerRes.status}): ${errText}`);
+    }
+    const registerData = await registerRes.json();
+    const uploadUrl = registerData.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+    const asset = registerData.value.asset;
+
+    // Step 2: Upload binary
+    const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+            Authorization: `Bearer ${config.linkedin_access_token}`,
+            'Content-Type': 'application/octet-stream',
+        },
+        body: buffer,
+    });
+    if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        throw new Error(`LinkedIn image upload failed (${uploadRes.status}): ${errText}`);
+    }
+
+    return asset;
+}
+
+/**
+ * Create a LinkedIn post (text, optional link URL or image)
+ */
+export async function createPost({ text, linkUrl, imagePath }, config) {
     if (!config.linkedin_access_token) {
         throw new Error('LinkedIn not connected. Use /linkedin to authorize.');
     }
@@ -111,14 +162,19 @@ export async function createPost({ text, linkUrl }, config) {
         await saveTokensToConfig(config);
     }
 
+    let assetUrn;
+    if (imagePath) {
+        assetUrn = await uploadImage(imagePath, config);
+    }
+
     const body = {
         author: config.linkedin_person_urn,
         lifecycleState: 'PUBLISHED',
         specificContent: {
             'com.linkedin.ugc.ShareContent': {
                 shareCommentary: { text },
-                shareMediaCategory: linkUrl ? 'ARTICLE' : 'NONE',
-                ...(linkUrl ? { media: [{ status: 'READY', originalUrl: linkUrl }] } : {}),
+                shareMediaCategory: imagePath ? 'IMAGE' : (linkUrl ? 'ARTICLE' : 'NONE'),
+                ...(imagePath ? { media: [{ status: 'READY', media: assetUrn }] } : (linkUrl ? { media: [{ status: 'READY', originalUrl: linkUrl }] } : {})),
             },
         },
         visibility: {

@@ -54,6 +54,8 @@ const MODEL_PRICING = {
     'gpt-5-nano': { input: 0.05, output: 0.40 },
     'gpt-5.1': { input: 1.25, output: 10.00 },
     'gpt-5.2': { input: 1.75, output: 14.00 },
+    'kimi-k2': { input: 0.50, output: 2.00 },
+    'kimi-k2-thinking': { input: 1.00, output: 4.00 },
 };
 const USD_TO_GBP = 0.79;
 
@@ -62,6 +64,7 @@ function getModelPricing(model) {
     if (model.includes('haiku')) return MODEL_PRICING['claude-3-5-haiku-20241022'];
     if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
     if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
+    if (model.startsWith('kimi')) return MODEL_PRICING['kimi-k2'];
     if (MODEL_PRICING[model]) return MODEL_PRICING[model];
     if (model.includes('gpt-4.1-nano')) return MODEL_PRICING['gpt-4.1-nano'];
     if (model.includes('gpt-4.1-mini')) return MODEL_PRICING['gpt-4.1-mini'];
@@ -83,6 +86,7 @@ function getModelLabel(model) {
     if (model.includes('haiku')) return 'Haiku';
     if (model.includes('sonnet')) return 'Sonnet';
     if (model.includes('deepseek')) return 'DeepSeek';
+    if (model.startsWith('kimi')) return 'Kimi K2';
     if (model === 'o3') return 'o3';
     if (model === 'o4-mini') return 'o4-mini';
     if (model === 'gpt-5.2') return 'GPT-5.2';
@@ -292,6 +296,9 @@ const EXPLICIT_OVERRIDES = [
     { pattern: /\buse gpt[- ]?4\.1\b/i, model: 'gpt-4.1', label: 'gpt-4.1 (explicit)' },
     { pattern: /\buse gpt[- ]?4o\b/i, model: 'gpt-4o', label: 'gpt-4o (explicit)' },
     { pattern: /\buse (openai|gpt)\b/i, model: 'gpt-5.2', label: 'gpt-5.2 (explicit)' },
+    // Kimi
+    { pattern: /\buse kimi.?thinking\b/i, model: 'kimi-k2-thinking', label: 'kimi-k2-thinking (explicit)' },
+    { pattern: /\buse kimi\b/i, model: 'kimi-k2', label: 'kimi-k2 (explicit)' },
     // DeepSeek
     { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
     // Claude models
@@ -385,11 +392,12 @@ export class CircuitBreaker {
 // CHAT SYSTEM FACTORY
 // ============================================================================
 
-export function createChatSystem({ anthropic, openaiClient, deepseekClient, memory, skills, executeTool, TOOLS }) {
+export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, memory, skills, executeTool, TOOLS }) {
     const requestQueue = new RequestQueue();
     const circuitBreaker = new CircuitBreaker();
     const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
     const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+    const kimiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
     let killed = false;
 
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
@@ -613,6 +621,141 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, memo
             stop_reason: 'end_turn',
             usage,
         };
+    }
+
+    /**
+     * Convert Anthropic tool definitions to OpenAI function-calling format
+     */
+    function anthropicToolsToOpenAI(tools) {
+        return tools
+            .filter(t => t.name && t.input_schema) // skip non-standard entries like web_search
+            .map(t => ({
+                type: 'function',
+                function: {
+                    name: t.name,
+                    description: t.description || '',
+                    parameters: t.input_schema,
+                },
+            }));
+    }
+
+    /**
+     * Convert Anthropic messages to OpenAI format (text-only, strips tool blocks)
+     */
+    function toOpenAIMessages(messages, systemPrompt) {
+        const out = [];
+        if (systemPrompt) {
+            out.push({ role: 'system', content: typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt) });
+        }
+        for (const m of messages) {
+            if (typeof m.content === 'string') {
+                out.push({ role: m.role, content: m.content });
+            } else if (Array.isArray(m.content)) {
+                const textParts = m.content.filter(b => b.type === 'text').map(b => b.text);
+                if (textParts.length > 0) {
+                    out.push({ role: m.role, content: textParts.join('\n') });
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Call Kimi with OpenAI function-calling tool support
+     */
+    async function callKimiWithTools(apiMessages, systemPrompt, model, tools, context = {}) {
+        if (kimiBreaker.isOpen()) {
+            throw new Error('Kimi circuit breaker open — temporarily unavailable');
+        }
+
+        const openaiTools = anthropicToolsToOpenAI(tools);
+        let openaiMessages = toOpenAIMessages(apiMessages, systemPrompt);
+        let finalText = '';
+        let continueLoop = true;
+
+        while (continueLoop) {
+            if (killed) {
+                finalText += '\n\n[Stopped by /kill]';
+                break;
+            }
+            continueLoop = false;
+
+            console.log(`[KIMI] Calling ${model} (with tools)...`);
+            let kimiResponse;
+            try {
+                const requestParams = {
+                    model,
+                    messages: openaiMessages,
+                    max_tokens: 8192,
+                };
+                if (openaiTools.length > 0) {
+                    requestParams.tools = openaiTools;
+                }
+                kimiResponse = await kimiClient.chat.completions.create(requestParams);
+                kimiBreaker.recordSuccess();
+            } catch (err) {
+                kimiBreaker.recordFailure();
+                throw err;
+            }
+
+            const usage = {
+                input_tokens: kimiResponse.usage?.prompt_tokens || 0,
+                output_tokens: kimiResponse.usage?.completion_tokens || 0,
+            };
+            logTokenUsage(model, usage, context);
+
+            const choice = kimiResponse.choices?.[0];
+            if (!choice) break;
+
+            const message = choice.message;
+            if (message.content) {
+                finalText += message.content;
+            }
+
+            // Handle tool calls
+            if (choice.finish_reason === 'tool_calls' && message.tool_calls?.length > 0) {
+                // Add assistant message with tool calls to conversation
+                openaiMessages.push(message);
+
+                for (const toolCall of message.tool_calls) {
+                    const toolName = toolCall.function.name;
+                    let toolArgs;
+                    try {
+                        toolArgs = JSON.parse(toolCall.function.arguments);
+                    } catch {
+                        toolArgs = {};
+                    }
+
+                    console.log(`[KIMI] Tool call: ${toolName}`);
+                    let toolResult = await executeTool(toolName, toolArgs);
+
+                    // Truncate large outputs
+                    const TOOL_OUTPUT_LIMITS = { bash: 15000, read_file: 20000, fetch_url: 15000, grep: 10000 };
+                    const outputLimit = TOOL_OUTPUT_LIMITS[toolName] || 8000;
+                    const resultStr = JSON.stringify(toolResult);
+                    if (resultStr.length > outputLimit) {
+                        toolResult = { ...toolResult, _truncated: true, _note: `[truncated from ${resultStr.length} to ${outputLimit} chars]` };
+                        for (const key of Object.keys(toolResult)) {
+                            if (typeof toolResult[key] === 'string' && toolResult[key].length > outputLimit) {
+                                toolResult[key] = toolResult[key].substring(0, outputLimit) + `\n[truncated]`;
+                            }
+                        }
+                    }
+
+                    openaiMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: JSON.stringify(toolResult),
+                    });
+                }
+
+                continueLoop = true;
+            }
+
+            console.log(`[KIMI] ${model} response received`);
+        }
+
+        return finalText;
     }
 
     async function buildSystemPrompt(userQuery = null, context = {}) {
@@ -860,6 +1003,14 @@ ${contextBlock}`;
             text = text.replace(/```json\s*\{[\s\S]*?"tool_use"[\s\S]*?```/g, '').trim();
             if (!text) text = 'I completed my research but the response was malformed. Please try rephrasing your request.';
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
+            await memory.saveConversation(chatId, allMessages, summary);
+            return text;
+        }
+
+        // Kimi routing — with OpenAI function-calling tool support
+        if (model.startsWith('kimi') && kimiClient) {
+            const text = await callKimiWithTools(apiMessages, systemPrompt, model, TOOLS, callContext);
+            allMessages.push({ role: 'assistant', content: [{ type: 'text', text: text || '(empty response)' }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;
         }
