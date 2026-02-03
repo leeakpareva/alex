@@ -1,221 +1,199 @@
 #!/usr/bin/env node
-/**
- * Generates an HTML test report from vitest JSON output
- * Usage: vitest run --reporter=json --outputFile=test-report.json && node tests/generate-report.js
- */
 
-import { readFile, writeFile } from 'fs/promises';
-import path from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const JSON_FILE = path.resolve(import.meta.dirname, '../test-report.json');
-const HTML_FILE = path.resolve(import.meta.dirname, '../test-report.html');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = join(__dirname, '..');
 
-async function generate() {
-    let data;
-    try {
-        data = JSON.parse(await readFile(JSON_FILE, 'utf-8'));
-    } catch (err) {
-        console.error('Could not read test-report.json:', err.message);
-        process.exit(1);
-    }
+const inputPath = join(projectRoot, 'test-report.json');
+const outputPath = join(projectRoot, 'test-report.html');
 
-    const suites = data.testResults || [];
-    const totalTests = data.numTotalTests || 0;
-    const passed = data.numPassedTests || 0;
-    const failed = data.numFailedTests || 0;
-    const skipped = data.numPendingTests || 0;
-    const duration = ((data.testResults || []).reduce((s, r) => s + (r.endTime - r.startTime), 0) / 1000).toFixed(2);
-    const passRate = totalTests > 0 ? ((passed / totalTests) * 100).toFixed(1) : '0';
-    const timestamp = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', dateStyle: 'full', timeStyle: 'medium' });
+try {
+    const reportData = JSON.parse(readFileSync(inputPath, 'utf-8'));
+
+    const {
+        numTotalTests,
+        numPassedTests,
+        numFailedTests,
+        numPendingTests,
+        numTotalTestSuites,
+        numPassedTestSuites,
+        numFailedTestSuites,
+        testResults,
+        startTime,
+        success
+    } = reportData;
+
+    const passRate = numTotalTests > 0
+        ? ((numPassedTests / numTotalTests) * 100).toFixed(1)
+        : 0;
+
+    const duration = Date.now() - startTime;
+    const durationStr = duration > 1000
+        ? `${(duration / 1000).toFixed(2)}s`
+        : `${duration}ms`;
+
+    const timestamp = new Date().toISOString();
+
+    const statusColor = success ? '#22c55e' : '#ef4444';
+    const statusText = success ? 'PASSED' : 'FAILED';
 
     let suitesHtml = '';
-    for (const suite of suites) {
-        const suiteName = path.relative(path.resolve(import.meta.dirname, '..'), suite.name);
-        const suiteStatus = suite.status === 'passed' ? 'pass' : 'fail';
+    for (const suite of testResults) {
+        const suiteName = suite.name.replace(projectRoot + '/', '');
+        const suiteStatus = suite.status === 'passed' ? '✓' : '✗';
+        const suiteColor = suite.status === 'passed' ? '#22c55e' : '#ef4444';
 
         let testsHtml = '';
-        for (const test of suite.assertionResults || []) {
-            const status = test.status === 'passed' ? 'pass' : test.status === 'failed' ? 'fail' : 'skip';
-            const icon = status === 'pass' ? '&#10003;' : status === 'fail' ? '&#10007;' : '&#9644;';
-            const errorHtml = test.failureMessages?.length
-                ? `<pre class="error">${escHtml(test.failureMessages.join('\n')).substring(0, 1000)}</pre>`
-                : '';
-            const dur = test.duration ? `${test.duration}ms` : '';
+        for (const test of suite.assertionResults) {
+            const testStatus = test.status === 'passed' ? '✓'
+                : test.status === 'skipped' ? '○'
+                : '✗';
+            const testColor = test.status === 'passed' ? '#22c55e'
+                : test.status === 'skipped' ? '#f59e0b'
+                : '#ef4444';
 
             testsHtml += `
-                <tr class="${status}">
-                    <td class="icon">${icon}</td>
-                    <td class="test-name">${escHtml(test.ancestorTitles?.join(' > ') || '')} > ${escHtml(test.title)}</td>
-                    <td class="status">${status.toUpperCase()}</td>
-                    <td class="dur">${dur}</td>
-                </tr>
-                ${errorHtml ? `<tr class="error-row"><td colspan="4">${errorHtml}</td></tr>` : ''}`;
+                <div style="padding: 4px 0 4px 20px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: ${testColor}; font-weight: bold;">${testStatus}</span>
+                    <span style="margin-left: 8px;">${test.title}</span>
+                    ${test.duration ? `<span style="color: #9ca3af; margin-left: 8px;">(${test.duration.toFixed(1)}ms)</span>` : ''}
+                    ${test.failureMessages && test.failureMessages.length > 0
+                        ? `<pre style="color: #ef4444; font-size: 12px; margin: 4px 0 0 28px; white-space: pre-wrap;">${test.failureMessages.join('\n').substring(0, 500)}</pre>`
+                        : ''}
+                </div>`;
         }
 
         suitesHtml += `
-            <div class="suite ${suiteStatus}">
-                <div class="suite-header">
-                    <span class="suite-name">${escHtml(suiteName)}</span>
-                    <span class="suite-status ${suiteStatus}">${suiteStatus.toUpperCase()}</span>
+            <div style="margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                <div style="padding: 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: ${suiteColor}; font-weight: bold; font-size: 18px;">${suiteStatus}</span>
+                    <span style="margin-left: 8px; font-weight: 600;">${suiteName}</span>
                 </div>
-                <table class="tests">${testsHtml}</table>
+                <div style="padding: 8px 12px;">
+                    ${testsHtml}
+                </div>
             </div>`;
     }
 
-    // Categorize failures for improvement plan
-    const failures = [];
-    for (const suite of suites) {
-        for (const test of suite.assertionResults || []) {
-            if (test.status === 'failed') {
-                failures.push({
-                    suite: path.relative(path.resolve(import.meta.dirname, '..'), suite.name),
-                    test: test.title,
-                    ancestors: test.ancestorTitles?.join(' > ') || '',
-                    error: test.failureMessages?.[0]?.substring(0, 500) || 'Unknown error',
-                });
-            }
-        }
-    }
-
-    let improvementHtml = '';
-    if (failures.length > 0) {
-        improvementHtml = `
-            <div class="section">
-                <h2>Improvement Plan — ${failures.length} Failure(s) to Fix</h2>
-                <table class="improvements">
-                    <thead><tr><th>#</th><th>Test</th><th>File</th><th>Error Summary</th><th>Suggested Action</th></tr></thead>
-                    <tbody>
-                    ${failures.map((f, i) => `
-                        <tr>
-                            <td>${i + 1}</td>
-                            <td>${escHtml(f.ancestors)} > ${escHtml(f.test)}</td>
-                            <td class="mono">${escHtml(f.suite)}</td>
-                            <td><pre class="error-inline">${escHtml(f.error.split('\n')[0])}</pre></td>
-                            <td>Investigate and fix the failing assertion</td>
-                        </tr>
-                    `).join('')}
-                    </tbody>
-                </table>
-            </div>`;
-    } else {
-        improvementHtml = `
-            <div class="section all-pass">
-                <h2>All Tests Passing</h2>
-                <p>No failures detected. Consider adding more test coverage for edge cases.</p>
+    let improvementPlan = '';
+    if (!success) {
+        const failedSuites = testResults.filter(s => s.status === 'failed');
+        improvementPlan = `
+            <div style="margin-top: 24px; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+                <h3 style="margin: 0 0 12px 0; color: #991b1b;">Improvement Plan</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
+                    ${failedSuites.map(s => {
+                        const failedTests = s.assertionResults.filter(t => t.status === 'failed');
+                        return failedTests.map(t =>
+                            `<li><strong>${t.title}</strong>: Review and fix the failing assertion</li>`
+                        ).join('');
+                    }).join('')}
+                </ul>
             </div>`;
     }
 
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ALEX Test Report</title>
-<style>
-    :root { --bg: #0a0a0f; --card: #12121a; --border: #1e1e2e; --text: #e0e0e0; --muted: #888;
-            --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --accent: #6366f1; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-           background: var(--bg); color: var(--text); padding: 1.5rem; min-height: 100vh; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--accent); }
-    .header { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
-    .meta { color: var(--muted); font-size: 0.8rem; }
-    .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-            padding: 1rem; text-align: center; }
-    .stat-value { font-size: 1.8rem; font-weight: 700; }
-    .stat-value.pass { color: var(--green); }
-    .stat-value.fail { color: var(--red); }
-    .stat-value.skip { color: var(--amber); }
-    .stat-value.rate { color: var(--accent); }
-    .stat-label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; margin-top: 0.25rem; }
-    .section { margin-bottom: 1.5rem; }
-    .suite { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-             overflow: hidden; margin-bottom: 0.75rem; }
-    .suite-header { display: flex; justify-content: space-between; padding: 0.75rem 1rem;
-                    border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
-    .suite-name { font-weight: 600; font-size: 0.85rem; }
-    .suite-status { font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 4px; }
-    .suite-status.pass { background: rgba(34,197,94,0.15); color: var(--green); }
-    .suite-status.fail { background: rgba(239,68,68,0.15); color: var(--red); }
-    .tests { width: 100%; border-collapse: collapse; }
-    .tests tr { border-bottom: 1px solid var(--border); }
-    .tests tr:last-child { border-bottom: none; }
-    .tests td { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
-    .tests tr.pass .icon { color: var(--green); }
-    .tests tr.fail .icon { color: var(--red); }
-    .tests tr.skip .icon { color: var(--amber); }
-    .icon { width: 24px; font-size: 1rem; }
-    .test-name { flex: 1; }
-    .status { font-weight: 600; font-size: 0.7rem; text-align: right; }
-    .dur { color: var(--muted); font-size: 0.7rem; text-align: right; width: 60px; }
-    .error { background: rgba(239,68,68,0.1); color: var(--red); padding: 0.5rem; border-radius: 4px;
-             font-size: 0.7rem; overflow-x: auto; max-height: 150px; white-space: pre-wrap; word-break: break-word; }
-    .error-row td { padding: 0 0.75rem 0.5rem 3rem; }
-    .improvements { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .improvements th { background: rgba(255,255,255,0.03); text-align: left; padding: 0.6rem; font-size: 0.7rem;
-                       text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
-    .improvements td { padding: 0.6rem; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
-    .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem; }
-    .error-inline { background: rgba(239,68,68,0.1); color: var(--red); padding: 0.25rem 0.5rem;
-                    border-radius: 3px; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
-    .all-pass { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2);
-                border-radius: 10px; padding: 1.5rem; text-align: center; }
-    .all-pass h2 { color: var(--green); }
-    .bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1.5rem; }
-    .bar-fill { height: 100%; border-radius: 4px; }
-    .bar-fill.good { background: var(--green); }
-    .bar-fill.warn { background: var(--amber); }
-    .bar-fill.bad { background: var(--red); }
-    @media (max-width: 768px) { .summary { grid-template-columns: repeat(3, 1fr); } }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALEX Test Report - ${timestamp.split('T')[0]}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            color: #1f2937;
+        }
+        h1, h2, h3 { margin-top: 0; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+        }
+    </style>
 </head>
 <body>
-    <div class="header">
-        <h1>ALEX — Test Report</h1>
-        <div class="meta">${timestamp} | navada-1 | vitest</div>
+    <h1>ALEX Test Report</h1>
+    <p style="color: #6b7280;">Generated: ${timestamp}</p>
+
+    <div style="padding: 16px; background: ${statusColor}15; border: 2px solid ${statusColor}; border-radius: 8px; margin: 20px 0;">
+        <h2 style="margin: 0; color: ${statusColor};">${statusText}</h2>
+        <p style="margin: 8px 0 0 0;">Pass Rate: <strong>${passRate}%</strong> | Duration: ${durationStr}</p>
     </div>
 
-    <div class="summary">
-        <div class="stat"><div class="stat-value">${totalTests}</div><div class="stat-label">Total Tests</div></div>
-        <div class="stat"><div class="stat-value pass">${passed}</div><div class="stat-label">Passed</div></div>
-        <div class="stat"><div class="stat-value fail">${failed}</div><div class="stat-label">Failed</div></div>
-        <div class="stat"><div class="stat-value skip">${skipped}</div><div class="stat-label">Skipped</div></div>
-        <div class="stat"><div class="stat-value rate">${passRate}%</div><div class="stat-label">Pass Rate</div></div>
+    <div class="summary-grid">
+        <div class="stat-card">
+            <div class="stat-value" style="color: #3b82f6;">${numTotalTests}</div>
+            <div class="stat-label">Total Tests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #22c55e;">${numPassedTests}</div>
+            <div class="stat-label">Passed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #ef4444;">${numFailedTests}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #f59e0b;">${numPendingTests}</div>
+            <div class="stat-label">Skipped</div>
+        </div>
     </div>
 
-    <div class="bar">
-        <div class="bar-fill ${parseFloat(passRate) >= 90 ? 'good' : parseFloat(passRate) >= 70 ? 'warn' : 'bad'}"
-             style="width:${passRate}%"></div>
+    <div class="summary-grid">
+        <div class="stat-card">
+            <div class="stat-value">${numTotalTestSuites}</div>
+            <div class="stat-label">Test Suites</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #22c55e;">${numPassedTestSuites}</div>
+            <div class="stat-label">Suites Passed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #ef4444;">${numFailedTestSuites}</div>
+            <div class="stat-label">Suites Failed</div>
+        </div>
     </div>
 
-    <div class="section">
-        <h2>Test Suites (${duration}s)</h2>
-        ${suitesHtml}
-    </div>
+    ${improvementPlan}
 
-    ${improvementHtml}
+    <h2 style="margin-top: 32px;">Test Suite Details</h2>
+    ${suitesHtml}
 
-    <div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.7rem;">
-        ALEX Test Report — NAVADA — Generated automatically by vitest + generate-report.js
-    </div>
+    <footer style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 14px;">
+        ALEX Test Suite | NAVADA | ${timestamp.split('T')[0]}
+    </footer>
 </body>
 </html>`;
 
-    await writeFile(HTML_FILE, html);
-    console.log(`\nTest report written to: ${HTML_FILE}`);
-    console.log(`  Total: ${totalTests} | Passed: ${passed} | Failed: ${failed} | Skipped: ${skipped} | Rate: ${passRate}%`);
-    if (failures.length > 0) {
-        console.log(`\n  Failures to fix:`);
-        for (const f of failures) {
-            console.log(`    - ${f.ancestors} > ${f.test}`);
-        }
-    }
-}
+    writeFileSync(outputPath, html);
+    console.log(`HTML report generated: ${outputPath}`);
+    console.log(`Summary: ${numPassedTests}/${numTotalTests} tests passed (${passRate}%)`);
 
-function escHtml(s) {
-    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+} catch (error) {
+    console.error('Error generating report:', error.message);
+    process.exit(1);
 }
-
-generate();
