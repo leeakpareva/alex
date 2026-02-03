@@ -114,30 +114,23 @@ export async function createPost({ text, linkUrl }, config) {
     const body = {
         author: config.linkedin_person_urn,
         lifecycleState: 'PUBLISHED',
-        visibility: 'PUBLIC',
-        commentary: text,
-        distribution: {
-            feedDistribution: 'MAIN_FEED',
-            targetEntities: [],
-            thirdPartyDistributionChannels: [],
+        specificContent: {
+            'com.linkedin.ugc.ShareContent': {
+                shareCommentary: { text },
+                shareMediaCategory: linkUrl ? 'ARTICLE' : 'NONE',
+                ...(linkUrl ? { media: [{ status: 'READY', originalUrl: linkUrl }] } : {}),
+            },
+        },
+        visibility: {
+            'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
         },
     };
 
-    if (linkUrl) {
-        body.content = {
-            article: {
-                source: linkUrl,
-                title: text.substring(0, 200),
-            },
-        };
-    }
-
-    const res = await fetch('https://api.linkedin.com/rest/posts', {
+    const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${config.linkedin_access_token}`,
             'Content-Type': 'application/json',
-            'LinkedIn-Version': '202401',
             'X-Restli-Protocol-Version': '2.0.0',
         },
         body: JSON.stringify(body),
@@ -148,8 +141,9 @@ export async function createPost({ text, linkUrl }, config) {
         throw new Error(`LinkedIn post failed (${res.status}): ${errText}`);
     }
 
-    const postId = res.headers.get('x-restli-id') || 'unknown';
-    return { success: true, postId, message: 'Posted to LinkedIn successfully.' };
+    const data = await res.json();
+    const postId = data.id || 'unknown';
+    return { success: true, postId, message: `Posted to LinkedIn successfully. Post ID: ${postId}` };
 }
 
 /**
