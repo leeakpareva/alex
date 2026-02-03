@@ -2,356 +2,183 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ALEX — NAVADA VC Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALEX Dashboard</title>
   <style>
     :root {
       --bg: #0a0a0f;
       --card: #12121a;
-      --card-hover: #1a1a24;
       --border: #1e1e2e;
       --text: #e0e0e0;
       --muted: #888;
-      --accent: #6366f1;
       --green: #22c55e;
       --amber: #f59e0b;
       --red: #ef4444;
       --blue: #3b82f6;
-      --purple: #a855f7;
-      --cyan: #06b6d4;
-      --pink: #ec4899;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      -webkit-text-size-adjust: 100%;
+      font-size: 14px;
     }
-    .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
 
-    /* Header — stacks on mobile */
     .header {
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 1.5rem; padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border); gap: 0.75rem; flex-wrap: wrap;
+      padding: 1rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem;
     }
-    .header-left { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-    .logo { font-size: 1.5rem; }
-    .header h1 { font-size: 1.2rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .header-time { color: var(--muted); font-size: 0.75rem; }
-    .header-updated { color: var(--muted); font-size: 0.65rem; margin-top: 0.15rem; }
-    .status-badge {
-      display: flex; align-items: center; gap: 0.4rem;
-      padding: 0.4rem 0.75rem; border-radius: 999px;
-      font-size: 0.75rem; font-weight: 600; flex-shrink: 0;
+    .header h1 { font-size: 1.25rem; font-weight: 600; }
+    .header-info { text-align: right; color: var(--muted); font-size: 0.75rem; }
+    .status {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
     }
-    .status-badge.online { background: rgba(34,197,94,0.15); color: var(--green); }
-    .status-badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; animation: pulse 2s infinite; }
-    .status-badge.online .status-dot { background: var(--green); }
-    .status-badge.offline .status-dot { background: var(--red); }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .status.online { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-    /* Nav */
-    .nav-links { margin-bottom: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .nav-link {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      background: rgba(99,102,241,0.15); border: 1px solid var(--border);
-      color: var(--text); text-decoration: none;
-      padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem;
-    }
-
-    /* Grid system — responsive */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
-    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
-    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
-    .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
-
+    .grid { display: grid; gap: 1rem; margin-bottom: 1rem; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 2fr 1fr 1fr; }
     @media (max-width: 768px) {
-      .container { padding: 0.75rem; }
-      .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); }
-      .main-grid { grid-template-columns: 1fr; }
-      .header h1 { font-size: 1rem; }
-      .hide-mobile { display: none !important; }
-      .task-table { font-size: 0.75rem; }
-      .task-table th, .task-table td { padding: 0.5rem 0.4rem; }
-      .model-table th, .model-table td { padding: 0.4rem; font-size: 0.7rem; }
-      .card-body { padding: 0.75rem; }
-      .card-header { padding: 0.75rem; }
-      .commit-item { flex-wrap: wrap; gap: 0.25rem; }
-      .commit-date { width: 100%; }
-    }
-    @media (max-width: 480px) {
-      .grid-4, .grid-5 { grid-template-columns: 1fr 1fr; }
-      .summary-value { font-size: 1.3rem; }
-      .roi-value { font-size: 1.1rem; }
+      .grid-4, .grid-3 { grid-template-columns: 1fr 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
     }
 
-    /* Summary Cards */
-    .summary-card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 10px; padding: 1rem;
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
     }
-    .summary-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; margin-bottom: 0.5rem;
+    .card-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
     }
-    .summary-icon svg { width: 16px; height: 16px; }
-    .summary-icon.purple { background: rgba(99,102,241,0.2); }
-    .summary-icon.green { background: rgba(34,197,94,0.2); }
-    .summary-icon.blue { background: rgba(59,130,246,0.2); }
-    .summary-icon.red { background: rgba(239,68,68,0.2); }
-    .summary-value { font-size: 1.5rem; font-weight: 700; }
-    .summary-label { color: var(--muted); font-size: 0.75rem; margin-top: 0.15rem; }
+    .card-value { font-size: 1.5rem; font-weight: 600; }
+    .card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
 
-    /* ROI Cards */
-    .roi-card {
-      background: linear-gradient(135deg, var(--card) 0%, rgba(34,197,94,0.06) 100%);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 0.85rem; text-align: center;
+    .section { margin-bottom: 1.5rem; }
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
     }
-    .roi-value { font-size: 1.2rem; font-weight: 700; color: var(--green); }
-    .roi-value.cost { color: var(--amber); }
-    .roi-label { color: var(--muted); font-size: 0.65rem; margin-top: 0.15rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
-    /* Cards */
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
-    .card-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0.85rem 1rem; border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,0.02);
-    }
-    .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-    .card-body { padding: 0.85rem 1rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    td { padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    .empty { color: var(--muted); font-style: italic; padding: 1rem; text-align: center; }
 
-    /* Tables */
-    .task-table, .model-table { width: 100%; border-collapse: collapse; }
-    .task-table th, .model-table th {
-      text-align: left; padding: 0.6rem 0.5rem; font-size: 0.65rem;
-      text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--muted); border-bottom: 1px solid var(--border);
-    }
-    .task-table td, .model-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
-    .task-table tr:last-child td, .model-table tr:last-child td { border-bottom: none; }
-    .task-name { font-weight: 500; word-break: break-word; }
-    .task-status {
-      display: inline-block; padding: 0.2rem 0.4rem; border-radius: 4px;
-      font-size: 0.65rem; font-weight: 600; text-transform: uppercase; white-space: nowrap;
-    }
-    .task-status.completed { background: rgba(34,197,94,0.15); color: var(--green); }
-    .task-status.in_progress, .task-status.in-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
-    .task-status.failed { background: rgba(239,68,68,0.15); color: var(--red); }
-    .task-status.pending { background: rgba(245,158,11,0.15); color: var(--amber); }
-    .task-category { font-size: 0.65rem; padding: 0.15rem 0.35rem; background: rgba(99,102,241,0.15); color: var(--accent); border-radius: 3px; white-space: nowrap; }
-    .task-tokens { font-family: 'SF Mono', 'Consolas', monospace; color: var(--purple); font-size: 0.75rem; }
-    .task-cost { font-family: 'SF Mono', 'Consolas', monospace; color: var(--green); font-size: 0.75rem; }
-    .task-time { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+    .status-tag { padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.7rem; font-weight: 500; }
+    .status-tag.online, .status-tag.completed, .status-tag.active { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status-tag.offline, .status-tag.failed { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status-tag.pending, .status-tag.disabled { background: rgba(136,136,136,0.15); color: var(--muted); }
+    .status-tag.in-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
 
-    /* Responsive table wrapper */
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .activity-item { display: flex; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    .activity-time { color: var(--muted); min-width: 60px; }
 
-    /* Progress */
-    .progress-container { padding: 0.75rem 1rem; background: rgba(255,255,255,0.02); }
-    .progress-label { display: flex; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.8rem; }
-    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 3px; transition: width 0.3s; }
+    .commit-item { display: flex; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; align-items: center; }
+    .commit-hash { font-family: monospace; color: var(--blue); min-width: 60px; }
+    .commit-msg { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .commit-date { color: var(--muted); min-width: 90px; text-align: right; }
 
-    /* News */
-    .news-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
-    .news-item:last-child { border-bottom: none; }
-    .news-severity { width: 3px; border-radius: 3px; flex-shrink: 0; }
-    .news-severity.high { background: var(--red); }
-    .news-severity.medium { background: var(--amber); }
-    .news-severity.low { background: var(--green); }
-    .news-severity.info { background: var(--blue); }
-    .news-content { flex: 1; min-width: 0; }
-    .news-headline { font-weight: 600; margin-bottom: 0.3rem; line-height: 1.3; font-size: 0.85rem; }
-    .news-summary { color: var(--muted); font-size: 0.8rem; line-height: 1.4; margin-bottom: 0.3rem; word-break: break-word; }
-    .news-meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--muted); flex-wrap: wrap; }
-
-    /* Jobs / Services */
-    .job-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem; }
-    .job-item:last-child { border-bottom: none; }
-    .job-info { flex: 1; min-width: 0; }
-    .job-name { font-weight: 600; font-size: 0.8rem; }
-    .job-schedule { font-size: 0.7rem; color: var(--muted); font-family: 'SF Mono', monospace; }
-    .job-desc { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
-    .job-status { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; white-space: nowrap; }
-    .job-status.active, .job-status.running { background: rgba(34,197,94,0.15); color: var(--green); }
-    .job-status.stopped { background: rgba(239,68,68,0.15); color: var(--red); }
-
-    /* Activity Log */
-    .activity-item { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .activity-item:last-child { border-bottom: none; }
-    .activity-time { color: var(--accent); font-family: 'SF Mono', monospace; font-size: 0.7rem; white-space: nowrap; }
-    .activity-text { color: var(--text); word-break: break-word; }
-
-    /* Commits */
-    .commit-item { display: flex; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; align-items: baseline; }
-    .commit-item:last-child { border-bottom: none; }
-    .commit-hash { font-family: 'SF Mono', 'Consolas', monospace; color: var(--accent); font-size: 0.7rem; flex-shrink: 0; }
-    .commit-msg { color: var(--text); flex: 1; min-width: 0; word-break: break-word; }
-    .commit-date { color: var(--muted); font-size: 0.65rem; white-space: nowrap; flex-shrink: 0; }
-    .commit-tag { display: inline-block; font-size: 0.55rem; padding: 0.1rem 0.3rem; background: rgba(99,102,241,0.2); color: var(--accent); border-radius: 3px; margin-left: 0.3rem; }
-
-    /* Footer */
-    .footer { text-align: center; padding: 1.5rem 0.5rem; color: var(--muted); font-size: 0.7rem; }
-
-    /* Empty state */
-    .empty { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.8rem; }
-
-    /* Scrollable card body */
-    .scrollable { max-height: 350px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .scroll-box { max-height: 300px; overflow-y: auto; }
   </style>
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <div class="header-left">
-        <span class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg></span>
-        <div>
-          <h1 id="dash-title">ALEX — NAVADA VC</h1>
-          <div class="header-time" id="current-time">Loading...</div>
-          <div class="header-updated" id="last-updated"></div>
+    <div class="header">
+      <div>
+        <h1 id="dash-title">ALEX Dashboard</h1>
+      </div>
+      <div class="header-info">
+        <div id="current-time"></div>
+        <div id="last-updated"></div>
+        <div style="margin-top:0.5rem">
+          <span id="status-badge" class="status offline">
+            <span class="status-dot"></span>
+            <span id="status-text">OFFLINE</span>
+          </span>
         </div>
       </div>
-      <div class="status-badge online" id="status-badge">
-        <span class="status-dot"></span>
-        <span id="status-text">ONLINE</span>
-      </div>
-    </header>
-
-    <div class="nav-links">
-      <a href="uk-economy.html" class="nav-link">📈 UK Economy</a>
     </div>
 
-    <!-- Summary -->
-    <div class="grid-4">
-      <div class="summary-card">
-        <div class="summary-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg></div>
-        <div class="summary-value" id="total-tasks">0</div>
-        <div class="summary-label">Total Tasks</div>
+    <div class="grid grid-4">
+      <div class="card">
+        <div class="card-title">Today's Cost</div>
+        <div class="card-value" id="roi-cost">£0.00</div>
+        <div class="card-sub"><span id="roi-calls">0</span> API calls</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>
-        <div class="summary-value" id="completed-tasks">0</div>
-        <div class="summary-label">Completed</div>
+      <div class="card">
+        <div class="card-title">Tokens Used</div>
+        <div class="card-value" id="roi-tokens">0</div>
+        <div class="card-sub">Avg: £<span id="roi-avg">0.0000</span>/call</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
-        <div class="summary-value" id="in-progress-tasks">0</div>
-        <div class="summary-label">In Progress</div>
+      <div class="card">
+        <div class="card-title">Tasks</div>
+        <div class="card-value"><span id="completed-tasks">0</span>/<span id="total-tasks">0</span></div>
+        <div class="card-sub"><span id="in-progress-tasks">0</span> in progress, <span id="failed-tasks">0</span> failed</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg></div>
-        <div class="summary-value" id="failed-tasks">0</div>
-        <div class="summary-label">Failed</div>
+      <div class="card">
+        <div class="card-title">Date</div>
+        <div class="card-value" id="task-date" style="font-size:1rem"></div>
+        <div class="card-sub" id="roi-date"></div>
       </div>
     </div>
 
-    <!-- ROI -->
-    <div class="grid-5">
-      <div class="roi-card">
-        <div class="roi-value" id="roi-cost">£0.00</div>
-        <div class="roi-label">Today's Cost</div>
+    <div class="grid grid-3">
+      <div class="section">
+        <div class="section-title">Model Usage</div>
+        <div class="card" style="padding:0">
+          <table>
+            <thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead>
+            <tbody id="model-tbody"><tr><td colspan="5" class="empty">No data</td></tr></tbody>
+          </table>
+        </div>
       </div>
-      <div class="roi-card">
-        <div class="roi-value cost" id="roi-avg">£0.00</div>
-        <div class="roi-label">Avg / Call</div>
+      <div class="section">
+        <div class="section-title">Services</div>
+        <div class="card scroll-box" id="services-body"></div>
       </div>
-      <div class="roi-card">
-        <div class="roi-value" id="roi-calls" style="color:var(--accent);">0</div>
-        <div class="roi-label">API Calls</div>
-      </div>
-      <div class="roi-card">
-        <div class="roi-value" id="roi-tokens" style="color:var(--cyan);">0</div>
-        <div class="roi-label">Tokens</div>
-      </div>
-      <div class="roi-card">
-        <div class="roi-value" id="roi-tasks" style="color:var(--purple);">0</div>
-        <div class="roi-label">Done</div>
+      <div class="section">
+        <div class="section-title">Schedules</div>
+        <div class="card scroll-box" id="heartbeats-body"></div>
       </div>
     </div>
 
-    <!-- Model Costs -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Cost by Model</span>
-        <span style="font-size:0.65rem;color:var(--muted);" id="roi-date"></span>
+    <div class="grid grid-2">
+      <div class="section">
+        <div class="section-title">Activity Log</div>
+        <div class="card scroll-box" id="activity-body"></div>
       </div>
-      <div class="table-wrap" style="padding:0;">
-        <table class="model-table">
-          <thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead>
-          <tbody id="model-tbody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+      <div class="section">
+        <div class="section-title">Recent Commits (<span id="commit-count">0</span>)</div>
+        <div class="card scroll-box" id="commits-body"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Tasks</div>
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr><th>Task</th><th>Category</th><th>Status</th><th>Time</th><th>Tokens</th><th>Cost</th></tr></thead>
+          <tbody id="task-tbody"><tr><td colspan="6" class="empty">No tasks</td></tr></tbody>
         </table>
       </div>
     </div>
-
-    <!-- Task History -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>Task History</span>
-        <span style="font-size:0.65rem;color:var(--muted);" id="task-date"></span>
-      </div>
-      <div class="table-wrap" style="padding:0;">
-        <table class="task-table">
-          <thead><tr><th>Task</th><th>Category</th><th>Status</th><th class="hide-mobile">Time</th><th>Tokens</th><th>Cost</th></tr></thead>
-          <tbody id="task-tbody"><tr><td colspan="6" class="empty">No tasks yet</td></tr></tbody>
-        </table>
-      </div>
-      <div class="progress-container">
-        <div class="progress-label"><span>Completion</span><span id="progress-text">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
-      </div>
-    </div>
-
-    <!-- Main Grid -->
-    <div class="main-grid">
-      <div>
-        <!-- News -->
-        <div class="card">
-          <div class="card-header"><span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M10 6h8"/><path d="M10 10h8"/><path d="M10 14h4"/></svg>News & Insights</span></div>
-          <div class="card-body scrollable" id="news-body"><div class="empty">No news yet</div></div>
-        </div>
-
-        <!-- Activity Log -->
-        <div class="card">
-          <div class="card-header"><span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>Activity Log</span></div>
-          <div class="card-body scrollable" id="activity-body"><div class="empty">No activity yet</div></div>
-        </div>
-      </div>
-
-      <div>
-        <!-- Heartbeats -->
-        <div class="card">
-          <div class="card-header"><span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Heartbeats</span></div>
-          <div class="card-body" id="heartbeats-body"></div>
-        </div>
-
-        <!-- Services -->
-        <div class="card">
-          <div class="card-header"><span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>Services</span></div>
-          <div class="card-body" id="services-body"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Git Commits -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 009 9"/></svg>Version History</span>
-        <span style="font-size:0.65rem;color:var(--muted);" id="commit-count"></span>
-      </div>
-      <div class="card-body scrollable" id="commits-body"><div class="empty">Loading commits...</div></div>
-    </div>
-
-    <footer class="footer">
-      ALEX Activity Tracker — NAVADA VC — Auto-refreshes every 15s<br>
-      <span style="color:var(--accent);">Raspberry Pi 5</span>
-    </footer>
   </div>
 
   <script>
@@ -364,145 +191,116 @@
           fetch('/api/tokens?_='+Date.now()).then(r=>r.json()),
           fetch('/api/commits?_='+Date.now()).then(r=>r.json()),
         ]);
-        data = d; tokenData = t; commitsData = c.commits || [];
+        data = d || {}; tokenData = t || {}; commitsData = (c && c.commits) || [];
         render();
       } catch(e) { console.error('Load failed:', e); }
     }
 
     function fmt(n) {
-      if (typeof n !== 'number') return n || '—';
+      if (typeof n !== 'number') return n || '-';
       if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
       if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
       return n.toLocaleString();
     }
 
-    function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+    function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
     function render() {
       if (data.title) document.getElementById('dash-title').textContent = data.title;
 
-      // Status
       const badge = document.getElementById('status-badge');
-      badge.className = 'status-badge ' + (data.status === 'online' ? 'online' : 'offline');
+      badge.className = 'status ' + (data.status === 'online' ? 'online' : 'offline');
       document.getElementById('status-text').textContent = (data.status || 'offline').toUpperCase();
 
       if (data.last_updated) {
         document.getElementById('last-updated').textContent = 'Updated: ' + new Date(data.last_updated).toLocaleString('en-GB', {timeZone:'Europe/London'});
       }
 
-      // Summary
       const s = data.summary || {};
       document.getElementById('total-tasks').textContent = s.total_tasks || 0;
       document.getElementById('completed-tasks').textContent = s.completed || 0;
       document.getElementById('in-progress-tasks').textContent = s.in_progress || 0;
       document.getElementById('failed-tasks').textContent = s.failed || 0;
 
-      // Progress
-      const total = s.total_tasks||0, done = s.completed||0;
-      const pct = total > 0 ? Math.round(done/total*100) : 0;
-      document.getElementById('progress-text').textContent = pct+'% ('+done+'/'+total+')';
-      document.getElementById('progress-fill').style.width = pct+'%';
-
-      // ROI
       const t = tokenData || {};
       document.getElementById('roi-cost').textContent = '£'+(t.total_cost_gbp||0).toFixed(2);
-      document.getElementById('roi-avg').textContent = '£'+(t.avg_cost_per_task_gbp||0).toFixed(4);
+      document.getElementById('roi-avg').textContent = (t.avg_cost_per_task_gbp||0).toFixed(4);
       document.getElementById('roi-calls').textContent = fmt(t.total_calls||0);
       document.getElementById('roi-tokens').textContent = fmt(t.total_tokens||0);
-      document.getElementById('roi-tasks').textContent = s.completed||0;
       document.getElementById('roi-date').textContent = t.date||'';
       document.getElementById('task-date').textContent = t.date||new Date().toISOString().split('T')[0];
 
-      // Model breakdown
       const models = t.by_model || [];
       const mBody = document.getElementById('model-tbody');
       if (!models.length) {
         mBody.innerHTML = '<tr><td colspan="5" class="empty">No API calls today</td></tr>';
       } else {
         mBody.innerHTML = models.map(m=>`<tr>
-          <td style="font-weight:600">${esc(m.model)}</td>
+          <td>${esc(m.model)}</td>
           <td>${m.calls}</td>
-          <td class="task-tokens">${fmt(m.input_tokens)}</td>
-          <td class="task-tokens">${fmt(m.output_tokens)}</td>
-          <td class="task-cost">£${m.cost_gbp.toFixed(4)}</td>
+          <td>${fmt(m.input_tokens)}</td>
+          <td>${fmt(m.output_tokens)}</td>
+          <td>£${m.cost_gbp.toFixed(4)}</td>
         </tr>`).join('');
       }
 
-      // Tasks
       const tasks = data.tasks || [];
       const tbody = document.getElementById('task-tbody');
       if (!tasks.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No tasks yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No tasks</td></tr>';
       } else {
         tbody.innerHTML = tasks.map(tk=>`<tr>
-          <td class="task-name">${esc(tk.name||'')}</td>
-          <td><span class="task-category">${esc(tk.category||'general')}</span></td>
-          <td><span class="task-status ${(tk.status||'').replace(/ /g,'-')}">${esc(tk.status||'pending')}</span></td>
-          <td class="task-time hide-mobile">${esc(tk.time||'')}</td>
-          <td class="task-tokens">${tk.tokens?fmt(tk.tokens):'—'}</td>
-          <td class="task-cost">${tk.cost?esc(tk.cost):'—'}</td>
+          <td>${esc(tk.name||'')}</td>
+          <td>${esc(tk.category||'general')}</td>
+          <td><span class="status-tag ${(tk.status||'').replace(/ /g,'-')}">${esc(tk.status||'pending')}</span></td>
+          <td>${esc(tk.time||'')}</td>
+          <td>${tk.tokens?fmt(tk.tokens):'-'}</td>
+          <td>${tk.cost?esc(tk.cost):'-'}</td>
         </tr>`).join('');
       }
 
-      // News
-      const news = data.news || [];
-      const nBody = document.getElementById('news-body');
-      if (!news.length) { nBody.innerHTML = '<div class="empty">No news yet</div>'; }
-      else {
-        nBody.innerHTML = news.map(n=>`<div class="news-item">
-          <div class="news-severity ${esc(n.severity||'info')}"></div>
-          <div class="news-content">
-            <div class="news-headline">${esc(n.headline||'')}</div>
-            <div class="news-summary">${esc(n.summary||'')}</div>
-            <div class="news-meta"><span>${esc(n.time||'')}</span>${n.source?'<span>'+esc(n.source)+'</span>':''}</div>
-          </div>
-        </div>`).join('');
-      }
-
-      // Activity
       const log = data.activity_log || [];
       const aBody = document.getElementById('activity-body');
-      if (!log.length) { aBody.innerHTML = '<div class="empty">No activity yet</div>'; }
+      if (!log.length) { aBody.innerHTML = '<div class="empty">No activity</div>'; }
       else {
-        aBody.innerHTML = log.map(a=>`<div class="activity-item">
+        aBody.innerHTML = log.slice(0,20).map(a=>`<div class="activity-item">
           <span class="activity-time">${esc(a.time||'')}</span>
-          <span class="activity-text">${esc(a.text||'')}</span>
+          <span>${esc(a.text||'')}</span>
         </div>`).join('');
       }
 
-      // Heartbeats
       const hb = data.heartbeats || [];
-      document.getElementById('heartbeats-body').innerHTML = hb.map(h=>`<div class="job-item">
-        <div class="job-info">
-          <div class="job-name">${esc(h.name||'')}</div>
-          <div class="job-schedule">${esc(h.schedule||'')}</div>
-          ${h.description?'<div class="job-desc">'+esc(h.description)+'</div>':''}
-        </div>
-        <span class="job-status ${esc(h.status||'active')}">${(h.status||'active').toUpperCase()}</span>
-      </div>`).join('') || '<div class="empty">None</div>';
+      const hBody = document.getElementById('heartbeats-body');
+      if (!hb.length) { hBody.innerHTML = '<div class="empty">None</div>'; }
+      else {
+        hBody.innerHTML = hb.map(h=>`<div class="activity-item">
+          <span class="activity-time">${esc(h.schedule||'')}</span>
+          <span>${esc(h.name||'')}</span>
+          <span class="status-tag ${esc(h.status||'active')}">${(h.status||'active').toUpperCase()}</span>
+        </div>`).join('');
+      }
 
-      // Services
       const svc = data.services || [];
-      document.getElementById('services-body').innerHTML = svc.map(sv=>`<div class="job-item">
-        <div class="job-info">
-          <div class="job-name">${esc(sv.name||'')}</div>
-          <div class="job-schedule">${esc(sv.port||'')}</div>
-        </div>
-        <span class="job-status ${esc(sv.status||'running')}">${(sv.status||'running').toUpperCase()}</span>
-      </div>`).join('') || '<div class="empty">None</div>';
+      const sBody = document.getElementById('services-body');
+      if (!svc.length) { sBody.innerHTML = '<div class="empty">None</div>'; }
+      else {
+        sBody.innerHTML = svc.map(sv=>`<div class="activity-item">
+          <span class="activity-time">${esc(sv.port||'')}</span>
+          <span>${esc(sv.name||'')}</span>
+          <span class="status-tag ${esc(sv.status||'online')}">${(sv.status||'online').toUpperCase()}</span>
+        </div>`).join('');
+      }
 
-      // Commits
       const cBody = document.getElementById('commits-body');
-      document.getElementById('commit-count').textContent = commitsData.length+' commits';
+      document.getElementById('commit-count').textContent = commitsData.length;
       if (!commitsData.length) { cBody.innerHTML = '<div class="empty">No commits</div>'; }
       else {
-        cBody.innerHTML = commitsData.map(c=>{
+        cBody.innerHTML = commitsData.slice(0,15).map(c=>{
           const d = new Date(c.date);
-          const ds = d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'});
-          const refs = c.refs ? c.refs.split(',').filter(r=>r.trim()).map(r=>'<span class="commit-tag">'+esc(r.trim())+'</span>').join('') : '';
+          const ds = d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
           return `<div class="commit-item">
             <span class="commit-hash">${esc(c.short_hash)}</span>
-            <span class="commit-msg">${esc(c.message)}${refs}</span>
+            <span class="commit-msg">${esc(c.message)}</span>
             <span class="commit-date">${ds}</span>
           </div>`;
         }).join('');
@@ -511,9 +309,9 @@
 
     function updateTime() {
       document.getElementById('current-time').textContent = new Date().toLocaleString('en-GB', {
-        weekday:'long',year:'numeric',month:'long',day:'numeric',
+        weekday:'short',day:'numeric',month:'short',year:'numeric',
         hour:'2-digit',minute:'2-digit',second:'2-digit',
-        timeZone:'Europe/London',timeZoneName:'short'
+        timeZone:'Europe/London'
       });
     }
 

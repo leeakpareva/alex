@@ -3740,6 +3740,16 @@ async function init() {
         { name: 'Slack Bot', port: 'polling', status: config.slack_token ? 'online' : 'disabled' },
     ]});
 
+    // Set heartbeat schedules
+    dashState.heartbeats = [
+        { name: 'Morning Briefing', schedule: '08:00', status: 'active' },
+        { name: 'Dashboard Sync', schedule: 'Hourly', status: 'active' },
+        { name: 'Inbox Review', schedule: '10:00, 15:00', status: 'active' },
+        { name: 'Evening Summary', schedule: '18:00', status: 'active' },
+        { name: 'Weekly Cleanup', schedule: 'Sun 02:00', status: 'active' },
+    ];
+    scheduleDashPush();
+
     // Write alive marker every 60s so catch-up knows when we were last running
     setInterval(async () => {
         try {
