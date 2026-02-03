@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a0f">
   <title>ALEX Dashboard</title>
   <style>
     :root {
@@ -17,88 +20,143 @@
       --blue: #3b82f6;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       font-size: 14px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
     }
     .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
 
+    /* Header */
     .header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 1rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+      padding: 0.75rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; gap: 0.5rem;
     }
-    .header h1 { font-size: 1.25rem; font-weight: 600; }
-    .header-info { text-align: right; color: var(--muted); font-size: 0.75rem; }
+    .header h1 { font-size: 1.1rem; font-weight: 600; }
+    .header-info { text-align: right; color: var(--muted); font-size: 0.7rem; }
     .status {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
     }
     .status.online { background: rgba(34,197,94,0.15); color: var(--green); }
     .status.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status.loading { background: rgba(59,130,246,0.15); color: var(--blue); }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status.online .status-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-    .grid { display: grid; gap: 1rem; margin-bottom: 1rem; }
+    /* Connection indicator */
+    .conn-status { font-size: 0.65rem; margin-top: 0.25rem; }
+    .conn-status.ok { color: var(--green); }
+    .conn-status.error { color: var(--red); }
+
+    /* Grid system */
+    .grid { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
     .grid-4 { grid-template-columns: repeat(4, 1fr); }
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-3 { grid-template-columns: 2fr 1fr 1fr; }
-    @media (max-width: 768px) {
-      .grid-4, .grid-3 { grid-template-columns: 1fr 1fr; }
-      .grid-2 { grid-template-columns: 1fr; }
-    }
 
+    /* Cards */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 1rem;
+      padding: 0.75rem;
     }
     .card-title {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .card-value { font-size: 1.4rem; font-weight: 600; }
+    .card-sub { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* Sections */
+    .section { margin-bottom: 1rem; }
+    .section-title {
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--muted);
       margin-bottom: 0.5rem;
-    }
-    .card-value { font-size: 1.5rem; font-weight: 600; }
-    .card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
-
-    .section { margin-bottom: 1.5rem; }
-    .section-title {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      margin-bottom: 0.75rem;
-      padding-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
       border-bottom: 1px solid var(--border);
     }
 
-    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
-    td { padding: 0.5rem; border-bottom: 1px solid var(--border); }
-    .empty { color: var(--muted); font-style: italic; padding: 1rem; text-align: center; }
+    /* Tables */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 400px; }
+    th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.4rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 0.4rem; border-bottom: 1px solid var(--border); }
+    .empty { color: var(--muted); font-style: italic; padding: 0.75rem; text-align: center; }
 
-    .status-tag { padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.7rem; font-weight: 500; }
+    /* Status tags */
+    .status-tag { padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; font-weight: 500; white-space: nowrap; }
     .status-tag.online, .status-tag.completed, .status-tag.active { background: rgba(34,197,94,0.15); color: var(--green); }
     .status-tag.offline, .status-tag.failed { background: rgba(239,68,68,0.15); color: var(--red); }
     .status-tag.pending, .status-tag.disabled { background: rgba(136,136,136,0.15); color: var(--muted); }
     .status-tag.in-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
 
-    .activity-item { display: flex; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
-    .activity-time { color: var(--muted); min-width: 60px; }
+    /* List items */
+    .list-item {
+      display: flex; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.75rem; align-items: center; flex-wrap: wrap;
+    }
+    .list-item:last-child { border-bottom: none; }
+    .list-time { color: var(--muted); min-width: 50px; flex-shrink: 0; }
+    .list-text { flex: 1; min-width: 0; word-break: break-word; }
 
-    .commit-item { display: flex; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; align-items: center; }
-    .commit-hash { font-family: monospace; color: var(--blue); min-width: 60px; }
-    .commit-msg { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .commit-date { color: var(--muted); min-width: 90px; text-align: right; }
+    /* Commits */
+    .commit-hash { font-family: monospace; color: var(--blue); font-size: 0.7rem; }
+    .commit-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .commit-date { color: var(--muted); font-size: 0.65rem; flex-shrink: 0; }
 
-    .scroll-box { max-height: 300px; overflow-y: auto; }
+    .scroll-box { max-height: 250px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Mobile: < 768px */
+    @media (max-width: 768px) {
+      .container { padding: 0.75rem; }
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .card-value { font-size: 1.2rem; }
+      .scroll-box { max-height: 200px; }
+      table { min-width: 350px; }
+    }
+
+    /* Small mobile: < 480px */
+    @media (max-width: 480px) {
+      body { font-size: 13px; }
+      .container { padding: 0.5rem; }
+      .header { padding: 0.5rem 0; }
+      .header h1 { font-size: 1rem; }
+      .grid { gap: 0.5rem; }
+      .card { padding: 0.6rem; }
+      .card-value { font-size: 1.1rem; }
+      .card-title { font-size: 0.6rem; }
+      .section-title { font-size: 0.7rem; }
+      .list-item { font-size: 0.7rem; gap: 0.4rem; }
+      .list-time { min-width: 45px; font-size: 0.65rem; }
+    }
+
+    /* Pull to refresh indicator */
+    .refresh-indicator {
+      position: fixed; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--blue); transform: scaleX(0); transform-origin: left;
+      transition: transform 0.3s; z-index: 1000;
+    }
+    .refresh-indicator.active { transform: scaleX(1); }
   </style>
 </head>
 <body>
+  <div class="refresh-indicator" id="refresh-bar"></div>
   <div class="container">
     <div class="header">
       <div>
@@ -107,10 +165,11 @@
       <div class="header-info">
         <div id="current-time"></div>
         <div id="last-updated"></div>
-        <div style="margin-top:0.5rem">
-          <span id="status-badge" class="status offline">
+        <div class="conn-status" id="conn-status"></div>
+        <div style="margin-top:0.4rem">
+          <span id="status-badge" class="status loading">
             <span class="status-dot"></span>
-            <span id="status-text">OFFLINE</span>
+            <span id="status-text">LOADING</span>
           </span>
         </div>
       </div>
@@ -119,22 +178,22 @@
     <div class="grid grid-4">
       <div class="card">
         <div class="card-title">Today's Cost</div>
-        <div class="card-value" id="roi-cost">£0.00</div>
-        <div class="card-sub"><span id="roi-calls">0</span> API calls</div>
+        <div class="card-value" id="roi-cost">--</div>
+        <div class="card-sub"><span id="roi-calls">-</span> API calls</div>
       </div>
       <div class="card">
-        <div class="card-title">Tokens Used</div>
-        <div class="card-value" id="roi-tokens">0</div>
-        <div class="card-sub">Avg: £<span id="roi-avg">0.0000</span>/call</div>
+        <div class="card-title">Tokens</div>
+        <div class="card-value" id="roi-tokens">--</div>
+        <div class="card-sub">Avg: <span id="roi-avg">-</span>/call</div>
       </div>
       <div class="card">
         <div class="card-title">Tasks</div>
-        <div class="card-value"><span id="completed-tasks">0</span>/<span id="total-tasks">0</span></div>
-        <div class="card-sub"><span id="in-progress-tasks">0</span> in progress, <span id="failed-tasks">0</span> failed</div>
+        <div class="card-value"><span id="completed-tasks">-</span>/<span id="total-tasks">-</span></div>
+        <div class="card-sub"><span id="in-progress-tasks">0</span> active</div>
       </div>
       <div class="card">
         <div class="card-title">Date</div>
-        <div class="card-value" id="task-date" style="font-size:1rem"></div>
+        <div class="card-value" id="task-date" style="font-size:0.95rem">--</div>
         <div class="card-sub" id="roi-date"></div>
       </div>
     </div>
@@ -143,162 +202,235 @@
       <div class="section">
         <div class="section-title">Model Usage</div>
         <div class="card" style="padding:0">
-          <table>
-            <thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead>
-            <tbody id="model-tbody"><tr><td colspan="5" class="empty">No data</td></tr></tbody>
-          </table>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead>
+              <tbody id="model-tbody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="section">
         <div class="section-title">Services</div>
-        <div class="card scroll-box" id="services-body"></div>
+        <div class="card scroll-box" id="services-body"><div class="empty">Loading...</div></div>
       </div>
       <div class="section">
         <div class="section-title">Schedules</div>
-        <div class="card scroll-box" id="heartbeats-body"></div>
+        <div class="card scroll-box" id="heartbeats-body"><div class="empty">Loading...</div></div>
       </div>
     </div>
 
     <div class="grid grid-2">
       <div class="section">
-        <div class="section-title">Activity Log</div>
-        <div class="card scroll-box" id="activity-body"></div>
+        <div class="section-title">Activity</div>
+        <div class="card scroll-box" id="activity-body"><div class="empty">Loading...</div></div>
       </div>
       <div class="section">
-        <div class="section-title">Recent Commits (<span id="commit-count">0</span>)</div>
-        <div class="card scroll-box" id="commits-body"></div>
+        <div class="section-title">Commits (<span id="commit-count">0</span>)</div>
+        <div class="card scroll-box" id="commits-body"><div class="empty">Loading...</div></div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Tasks</div>
       <div class="card" style="padding:0">
-        <table>
-          <thead><tr><th>Task</th><th>Category</th><th>Status</th><th>Time</th><th>Tokens</th><th>Cost</th></tr></thead>
-          <tbody id="task-tbody"><tr><td colspan="6" class="empty">No tasks</td></tr></tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Task</th><th>Category</th><th>Status</th><th>Time</th><th>Cost</th></tr></thead>
+            <tbody id="task-tbody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
     let data = {}, tokenData = {}, commitsData = [];
+    let lastSuccess = null, retryCount = 0, isLoading = false;
+    const MAX_RETRIES = 3, RETRY_DELAY = 5000, REFRESH_INTERVAL = 15000;
 
-    async function loadData() {
+    // Cache helpers
+    function saveCache() {
       try {
+        localStorage.setItem('alex-dash', JSON.stringify({ data, tokenData, commitsData, ts: Date.now() }));
+      } catch(e) {}
+    }
+    function loadCache() {
+      try {
+        const c = JSON.parse(localStorage.getItem('alex-dash') || '{}');
+        if (c.ts && Date.now() - c.ts < 300000) { // 5 min cache
+          data = c.data || {}; tokenData = c.tokenData || {}; commitsData = c.commitsData || [];
+          return true;
+        }
+      } catch(e) {}
+      return false;
+    }
+
+    async function loadData(isRetry = false) {
+      if (isLoading) return;
+      isLoading = true;
+      document.getElementById('refresh-bar').classList.add('active');
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
         const [d, t, c] = await Promise.all([
-          fetch('/api/data?_='+Date.now()).then(r=>r.json()),
-          fetch('/api/tokens?_='+Date.now()).then(r=>r.json()),
-          fetch('/api/commits?_='+Date.now()).then(r=>r.json()),
+          fetch('/api/data?_='+Date.now(), { signal: controller.signal }).then(r => {
+            if (!r.ok) throw new Error('API error');
+            return r.json();
+          }),
+          fetch('/api/tokens?_='+Date.now(), { signal: controller.signal }).then(r => r.ok ? r.json() : {}),
+          fetch('/api/commits?_='+Date.now(), { signal: controller.signal }).then(r => r.ok ? r.json() : { commits: [] }),
         ]);
+
+        clearTimeout(timeout);
         data = d || {}; tokenData = t || {}; commitsData = (c && c.commits) || [];
+        lastSuccess = Date.now();
+        retryCount = 0;
+        saveCache();
+        updateConnStatus(true);
         render();
-      } catch(e) { console.error('Load failed:', e); }
+      } catch(e) {
+        console.error('Load failed:', e.message);
+        updateConnStatus(false, e.message);
+
+        if (!isRetry && retryCount < MAX_RETRIES) {
+          retryCount++;
+          setTimeout(() => loadData(true), RETRY_DELAY * retryCount);
+        } else if (loadCache()) {
+          render(); // Show cached data
+        }
+      } finally {
+        isLoading = false;
+        document.getElementById('refresh-bar').classList.remove('active');
+      }
+    }
+
+    function updateConnStatus(ok, err) {
+      const el = document.getElementById('conn-status');
+      if (ok) {
+        el.className = 'conn-status ok';
+        el.textContent = 'Connected';
+      } else {
+        el.className = 'conn-status error';
+        el.textContent = err === 'The operation was aborted' ? 'Timeout' : 'Reconnecting...';
+      }
     }
 
     function fmt(n) {
-      if (typeof n !== 'number') return n || '-';
+      if (typeof n !== 'number' || isNaN(n)) return '-';
       if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
       if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
       return n.toLocaleString();
     }
 
-    function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
     function render() {
       if (data.title) document.getElementById('dash-title').textContent = data.title;
 
       const badge = document.getElementById('status-badge');
-      badge.className = 'status ' + (data.status === 'online' ? 'online' : 'offline');
-      document.getElementById('status-text').textContent = (data.status || 'offline').toUpperCase();
+      const status = data.status || 'offline';
+      badge.className = 'status ' + (status === 'online' ? 'online' : 'offline');
+      document.getElementById('status-text').textContent = status.toUpperCase();
 
       if (data.last_updated) {
-        document.getElementById('last-updated').textContent = 'Updated: ' + new Date(data.last_updated).toLocaleString('en-GB', {timeZone:'Europe/London'});
+        const d = new Date(data.last_updated);
+        document.getElementById('last-updated').textContent = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       }
 
       const s = data.summary || {};
       document.getElementById('total-tasks').textContent = s.total_tasks || 0;
       document.getElementById('completed-tasks').textContent = s.completed || 0;
       document.getElementById('in-progress-tasks').textContent = s.in_progress || 0;
-      document.getElementById('failed-tasks').textContent = s.failed || 0;
 
       const t = tokenData || {};
-      document.getElementById('roi-cost').textContent = '£'+(t.total_cost_gbp||0).toFixed(2);
-      document.getElementById('roi-avg').textContent = (t.avg_cost_per_task_gbp||0).toFixed(4);
-      document.getElementById('roi-calls').textContent = fmt(t.total_calls||0);
-      document.getElementById('roi-tokens').textContent = fmt(t.total_tokens||0);
-      document.getElementById('roi-date').textContent = t.date||'';
-      document.getElementById('task-date').textContent = t.date||new Date().toISOString().split('T')[0];
+      document.getElementById('roi-cost').textContent = '£' + (t.total_cost_gbp || 0).toFixed(2);
+      document.getElementById('roi-avg').textContent = '£' + (t.avg_cost_per_task_gbp || 0).toFixed(4);
+      document.getElementById('roi-calls').textContent = fmt(t.total_calls || 0);
+      document.getElementById('roi-tokens').textContent = fmt(t.total_tokens || 0);
+      document.getElementById('roi-date').textContent = t.date || '';
+      document.getElementById('task-date').textContent = t.date || new Date().toISOString().split('T')[0];
 
+      // Model usage
       const models = t.by_model || [];
       const mBody = document.getElementById('model-tbody');
       if (!models.length) {
-        mBody.innerHTML = '<tr><td colspan="5" class="empty">No API calls today</td></tr>';
+        mBody.innerHTML = '<tr><td colspan="5" class="empty">No calls today</td></tr>';
       } else {
-        mBody.innerHTML = models.map(m=>`<tr>
+        mBody.innerHTML = models.map(m => `<tr>
           <td>${esc(m.model)}</td>
           <td>${m.calls}</td>
           <td>${fmt(m.input_tokens)}</td>
           <td>${fmt(m.output_tokens)}</td>
-          <td>£${m.cost_gbp.toFixed(4)}</td>
+          <td>£${(m.cost_gbp || 0).toFixed(4)}</td>
         </tr>`).join('');
       }
 
+      // Tasks table
       const tasks = data.tasks || [];
       const tbody = document.getElementById('task-tbody');
       if (!tasks.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No tasks</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No tasks</td></tr>';
       } else {
-        tbody.innerHTML = tasks.map(tk=>`<tr>
-          <td>${esc(tk.name||'')}</td>
-          <td>${esc(tk.category||'general')}</td>
-          <td><span class="status-tag ${(tk.status||'').replace(/ /g,'-')}">${esc(tk.status||'pending')}</span></td>
-          <td>${esc(tk.time||'')}</td>
-          <td>${tk.tokens?fmt(tk.tokens):'-'}</td>
-          <td>${tk.cost?esc(tk.cost):'-'}</td>
+        tbody.innerHTML = tasks.slice(0, 20).map(tk => `<tr>
+          <td>${esc(tk.name || '')}</td>
+          <td>${esc(tk.category || '-')}</td>
+          <td><span class="status-tag ${(tk.status || '').replace(/ /g, '-')}">${esc(tk.status || 'pending')}</span></td>
+          <td>${esc(tk.time || '-')}</td>
+          <td>${tk.cost ? esc(tk.cost) : '-'}</td>
         </tr>`).join('');
       }
 
+      // Activity log
       const log = data.activity_log || [];
       const aBody = document.getElementById('activity-body');
-      if (!log.length) { aBody.innerHTML = '<div class="empty">No activity</div>'; }
-      else {
-        aBody.innerHTML = log.slice(0,20).map(a=>`<div class="activity-item">
-          <span class="activity-time">${esc(a.time||'')}</span>
-          <span>${esc(a.text||'')}</span>
+      if (!log.length) {
+        aBody.innerHTML = '<div class="empty">No activity</div>';
+      } else {
+        aBody.innerHTML = log.slice(0, 15).map(a => `<div class="list-item">
+          <span class="list-time">${esc(a.time || '')}</span>
+          <span class="list-text">${esc(a.text || '')}</span>
         </div>`).join('');
       }
 
+      // Schedules
       const hb = data.heartbeats || [];
       const hBody = document.getElementById('heartbeats-body');
-      if (!hb.length) { hBody.innerHTML = '<div class="empty">None</div>'; }
-      else {
-        hBody.innerHTML = hb.map(h=>`<div class="activity-item">
-          <span class="activity-time">${esc(h.schedule||'')}</span>
-          <span>${esc(h.name||'')}</span>
-          <span class="status-tag ${esc(h.status||'active')}">${(h.status||'active').toUpperCase()}</span>
+      if (!hb.length) {
+        hBody.innerHTML = '<div class="empty">None</div>';
+      } else {
+        hBody.innerHTML = hb.map(h => `<div class="list-item">
+          <span class="list-time">${esc(h.schedule || '')}</span>
+          <span class="list-text">${esc(h.name || '')}</span>
+          <span class="status-tag ${esc(h.status || 'active')}">${(h.status || 'active').toUpperCase()}</span>
         </div>`).join('');
       }
 
+      // Services
       const svc = data.services || [];
       const sBody = document.getElementById('services-body');
-      if (!svc.length) { sBody.innerHTML = '<div class="empty">None</div>'; }
-      else {
-        sBody.innerHTML = svc.map(sv=>`<div class="activity-item">
-          <span class="activity-time">${esc(sv.port||'')}</span>
-          <span>${esc(sv.name||'')}</span>
-          <span class="status-tag ${esc(sv.status||'online')}">${(sv.status||'online').toUpperCase()}</span>
+      if (!svc.length) {
+        sBody.innerHTML = '<div class="empty">None</div>';
+      } else {
+        sBody.innerHTML = svc.map(sv => `<div class="list-item">
+          <span class="list-time">${esc(sv.port || '')}</span>
+          <span class="list-text">${esc(sv.name || '')}</span>
+          <span class="status-tag ${esc(sv.status || 'online')}">${(sv.status || 'online').toUpperCase()}</span>
         </div>`).join('');
       }
 
+      // Commits
       const cBody = document.getElementById('commits-body');
       document.getElementById('commit-count').textContent = commitsData.length;
-      if (!commitsData.length) { cBody.innerHTML = '<div class="empty">No commits</div>'; }
-      else {
-        cBody.innerHTML = commitsData.slice(0,15).map(c=>{
+      if (!commitsData.length) {
+        cBody.innerHTML = '<div class="empty">No commits</div>';
+      } else {
+        cBody.innerHTML = commitsData.slice(0, 10).map(c => {
           const d = new Date(c.date);
-          const ds = d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
-          return `<div class="commit-item">
+          const ds = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          return `<div class="list-item">
             <span class="commit-hash">${esc(c.short_hash)}</span>
             <span class="commit-msg">${esc(c.message)}</span>
             <span class="commit-date">${ds}</span>
@@ -308,15 +440,42 @@
     }
 
     function updateTime() {
-      document.getElementById('current-time').textContent = new Date().toLocaleString('en-GB', {
-        weekday:'short',day:'numeric',month:'short',year:'numeric',
-        hour:'2-digit',minute:'2-digit',second:'2-digit',
-        timeZone:'Europe/London'
+      const now = new Date();
+      document.getElementById('current-time').textContent = now.toLocaleString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short',
+        hour: '2-digit', minute: '2-digit',
+        timeZone: 'Europe/London'
       });
     }
 
-    updateTime(); setInterval(updateTime,1000);
-    loadData(); setInterval(loadData,15000);
+    // Visibility API - pause when hidden
+    let refreshTimer = null;
+    function startRefresh() {
+      if (refreshTimer) return;
+      loadData();
+      refreshTimer = setInterval(loadData, REFRESH_INTERVAL);
+    }
+    function stopRefresh() {
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopRefresh();
+      } else {
+        startRefresh();
+      }
+    });
+
+    // Online/offline detection
+    window.addEventListener('online', () => { retryCount = 0; loadData(); });
+    window.addEventListener('offline', () => updateConnStatus(false, 'Offline'));
+
+    // Init
+    updateTime();
+    setInterval(updateTime, 1000);
+    if (loadCache()) render(); // Show cached immediately
+    startRefresh();
   </script>
 </body>
 </html>
