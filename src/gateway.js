@@ -2379,6 +2379,9 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         { key: 'gpt-5-nano', label: 'GPT-5 Nano', model: 'gpt-5-nano', desc: 'Cheapest GPT-5. Quick tasks', price: '$0.05/$0.40 per 1M' },
         { key: 'gpt-5.1', label: 'GPT-5.1', model: 'gpt-5.1', desc: 'Enhanced reasoning over GPT-5', price: '$1.25/$10.00 per 1M' },
         { key: 'gpt-5.2', label: 'GPT-5.2', model: 'gpt-5.2', desc: 'Strongest OpenAI model', price: '$1.75/$14.00 per 1M' },
+        // Kimi
+        { key: 'kimi', label: 'Kimi K2', model: 'kimi-k2', desc: 'Full tool access. 128K context. Fast and cheap', price: '$0.50/$2.00 per 1M' },
+        { key: 'kimi-thinking', label: 'Kimi K2 Thinking', model: 'kimi-k2-thinking', desc: 'Reasoning mode. 256K context', price: '$1.00/$4.00 per 1M' },
         // Other
         { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. Text only', price: '$0.14/$0.28 per 1M' },
     ];
