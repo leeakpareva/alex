@@ -41,6 +41,12 @@ const OPTIONAL_KEYS = {
     alphavantage_api_key: { type: 'string' },
     full_access_users: { type: 'array' },
     do_not_disturb: { type: 'boolean' },
+    linkedin_client_id: { type: 'string' },
+    linkedin_client_secret: { type: 'string' },
+    linkedin_access_token: { type: 'string' },
+    linkedin_refresh_token: { type: 'string' },
+    linkedin_token_expires_at: { type: 'number' },
+    linkedin_person_urn: { type: 'string' },
 };
 
 export async function loadConfig() {

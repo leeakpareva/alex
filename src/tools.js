@@ -619,6 +619,18 @@ export const TOOLS = [
         }
     },
     {
+        name: "linkedin_post",
+        description: "Post to LinkedIn. Creates a text post on the user's LinkedIn profile. Only use when the user explicitly asks to post to LinkedIn. Max 3000 characters.",
+        input_schema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "The post text content (max 3000 characters)" },
+                link_url: { type: "string", description: "Optional URL to attach as a link preview" }
+            },
+            required: ["text"]
+        }
+    },
+    {
         name: "fetch_url",
         description: "Fetch any URL and return the response body. Use for API calls, web scraping, downloading data, checking endpoints. Supports GET and POST with custom headers and body.",
         input_schema: {
@@ -651,7 +663,9 @@ export function maskSensitive(text) {
         .replace(/\b([a-z]{4}) [a-z]{4} [a-z]{4} [a-z]{4}\b/g, '$1 xxxx xxxx xxxx')
         .replace(/"(api_key|api_token|password|secret|token|app_password|redis_token|control_api_token)"\s*:\s*"([^"]{4})[^"]+"/gi,
             '"$1": "$2xxxxxxxxxxxx"')
-        .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx');
+        .replace(/\b(\d{8,12}:AA[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, '$1xxxxxxxxxxxx')
+        .replace(/"(linkedin_access_token|linkedin_refresh_token|linkedin_client_secret)"\s*:\s*"([^"]{4})[^"]+"/gi,
+            '"$1": "$2xxxxxxxxxxxx"');
 }
 
 // Users with full owner-level access (for testing/delegation)
@@ -664,7 +678,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
-    'manage_user', 'generate_webapp',
+    'manage_user', 'generate_webapp', 'linkedin_post',
 ]);
 
 // Per-tool timeout limits (milliseconds)
@@ -1206,6 +1220,14 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const { stdout, stderr } = await execAsync(input.command, deleteOptions);
                 console.log(`[GUARDRAIL] Delete executed after password verification: ${input.command}`);
                 return { success: true, stdout, stderr, note: 'Delete command executed after password verification.' };
+            }
+
+            case 'linkedin_post': {
+                const { createPost } = await import('./linkedin.js');
+                if (input.text && input.text.length > 3000) {
+                    return { success: false, error: 'Post text exceeds 3000 character limit.' };
+                }
+                return await createPost({ text: input.text, linkUrl: input.link_url }, config);
             }
 
             case 'fetch_url': {

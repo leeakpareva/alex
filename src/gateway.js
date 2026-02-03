@@ -1680,6 +1680,61 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
     });
 
     // ========================================================================
+    // LINKEDIN OAUTH COMMAND
+    // ========================================================================
+
+    bot.onText(/\/linkedin(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "LinkedIn connection is owner-only.");
+            return;
+        }
+
+        const { getAuthUrl, exchangeCodeForToken, getProfile } = await import('./linkedin.js');
+
+        if (!config.linkedin_client_id || !config.linkedin_client_secret) {
+            await bot.sendMessage(chatId, 'LinkedIn not configured. Add linkedin_client_id and linkedin_client_secret to config.json.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            // Step 1: send OAuth URL
+            const url = getAuthUrl(config.linkedin_client_id);
+            await bot.sendMessage(chatId,
+                `<b>LinkedIn — Connect</b>\n\n1. Open this link in your browser:\n<code>${url}</code>\n\n2. Authorize the app\n3. You'll be redirected to a localhost URL that won't load — that's fine\n4. Copy the full URL from your browser and send it here:\n<code>/linkedin https://localhost:9090/api/linkedin/callback?code=...</code>`,
+                { parse_mode: 'HTML' });
+            return;
+        }
+
+        // Step 2: extract code from pasted URL or raw code
+        let code = arg;
+        try {
+            const parsed = new URL(arg);
+            code = parsed.searchParams.get('code') || arg;
+        } catch {
+            // arg is the raw code itself
+        }
+
+        try {
+            await exchangeCodeForToken(code, config);
+            const profile = await getProfile(config.linkedin_access_token);
+            config.linkedin_person_urn = profile.personUrn;
+            // Save URN back
+            const rawConfig = JSON.parse(await readFile(config._configPath, 'utf-8'));
+            rawConfig.linkedin_person_urn = profile.personUrn;
+            await writeFile(config._configPath, JSON.stringify(rawConfig, null, 2));
+
+            await bot.sendMessage(chatId,
+                `<b>LinkedIn connected!</b>\n\nLogged in as: ${profile.name}\nURN: <code>${profile.personUrn}</code>\n\nYou can now ask me to post on LinkedIn.`,
+                { parse_mode: 'HTML' });
+        } catch (err) {
+            await bot.sendMessage(chatId, `LinkedIn auth failed: ${err.message}`);
+        }
+    });
+
+    // ========================================================================
     // EMAIL INBOX COMMANDS
     // ========================================================================
 
@@ -2829,6 +2884,7 @@ Rules for Python Mode:
         { command: 'id', description: 'Your Telegram user and chat ID' },
         { command: 'inbox', description: 'Email queue (not_started by default)' },
         { command: 'learn', description: 'Educational mode (What/How/Why)' },
+        { command: 'linkedin', description: 'Connect or post to LinkedIn' },
         { command: 'logs', description: 'Recent audit log entries' },
         { command: 'mathematician', description: 'Quantitative and computational' },
         { command: 'memory', description: 'Browse memory banks' },
