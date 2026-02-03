@@ -3129,6 +3129,7 @@ Rules for Python Mode:
         { command: 'projection', description: 'Monthly cost projection' },
         { command: 'python', description: 'Python data analysis mode' },
         { command: 'research', description: 'Deep research on demand' },
+        { command: 'security', description: 'Security scan and audit' },
         { command: 'skills', description: 'List and manage skills' },
         { command: 'spend', description: 'Daily cost breakdown' },
         { command: 'start', description: 'Welcome message' },
