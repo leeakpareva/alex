@@ -197,6 +197,11 @@ export async function runDashboardSync() {
                 else if (m === 'gpt-4.1-nano') { costUsd = inp / 1e6 * 0.1 + out / 1e6 * 0.4; modelName = 'GPT-4.1 Nano'; }
                 else if (m === 'gpt-4.1-mini') { costUsd = inp / 1e6 * 0.4 + out / 1e6 * 1.6; modelName = 'GPT-4.1 Mini'; }
                 else if (m === 'gpt-4.1') { costUsd = inp / 1e6 * 2 + out / 1e6 * 8; modelName = 'GPT-4.1'; }
+                else if (m === 'gpt-5') { costUsd = inp / 1e6 * 1.25 + out / 1e6 * 10; modelName = 'GPT-5'; }
+                else if (m === 'gpt-5-mini') { costUsd = inp / 1e6 * 0.25 + out / 1e6 * 2; modelName = 'GPT-5 Mini'; }
+                else if (m === 'gpt-5-nano') { costUsd = inp / 1e6 * 0.05 + out / 1e6 * 0.4; modelName = 'GPT-5 Nano'; }
+                else if (m === 'gpt-5.1') { costUsd = inp / 1e6 * 1.25 + out / 1e6 * 10; modelName = 'GPT-5.1'; }
+                else if (m === 'gpt-5.2') { costUsd = inp / 1e6 * 1.75 + out / 1e6 * 14; modelName = 'GPT-5.2'; }
                 else if (m.includes('gpt')) { costUsd = inp / 1e6 * 2.5 + out / 1e6 * 10; modelName = 'GPT-4o'; }
                 else if (m.includes('sonnet')) { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
                 else { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; }

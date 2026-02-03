@@ -2259,6 +2259,11 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         { key: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', model: 'gpt-4.1-mini', desc: 'Balanced speed and quality', price: '$0.40/$1.60 per 1M' },
         { key: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', model: 'gpt-4.1-nano', desc: 'Fastest and cheapest OpenAI', price: '$0.10/$0.40 per 1M' },
         { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'Previous OpenAI flagship', price: '$2.50/$10.00 per 1M' },
+        { key: 'gpt-5', label: 'GPT-5', model: 'gpt-5', desc: 'Reasoning flagship. Complex multi-step tasks', price: '$1.25/$10.00 per 1M' },
+        { key: 'gpt-5-mini', label: 'GPT-5 Mini', model: 'gpt-5-mini', desc: 'Fast reasoning. Great value', price: '$0.25/$2.00 per 1M' },
+        { key: 'gpt-5-nano', label: 'GPT-5 Nano', model: 'gpt-5-nano', desc: 'Cheapest GPT-5. Quick tasks', price: '$0.05/$0.40 per 1M' },
+        { key: 'gpt-5.1', label: 'GPT-5.1', model: 'gpt-5.1', desc: 'Enhanced reasoning over GPT-5', price: '$1.25/$10.00 per 1M' },
+        { key: 'gpt-5.2', label: 'GPT-5.2', model: 'gpt-5.2', desc: 'Strongest OpenAI model', price: '$1.75/$14.00 per 1M' },
         // Other
         { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. Text only', price: '$0.14/$0.28 per 1M' },
     ];

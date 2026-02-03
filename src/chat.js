@@ -49,6 +49,11 @@ const MODEL_PRICING = {
     'gpt-4.1-nano': { input: 0.10, output: 0.40 },
     'o3': { input: 10.00, output: 40.00 },
     'o4-mini': { input: 1.10, output: 4.40 },
+    'gpt-5': { input: 1.25, output: 10.00 },
+    'gpt-5-mini': { input: 0.25, output: 2.00 },
+    'gpt-5-nano': { input: 0.05, output: 0.40 },
+    'gpt-5.1': { input: 1.25, output: 10.00 },
+    'gpt-5.2': { input: 1.75, output: 14.00 },
 };
 const USD_TO_GBP = 0.79;
 
@@ -80,6 +85,11 @@ function getModelLabel(model) {
     if (model.includes('deepseek')) return 'DeepSeek';
     if (model === 'o3') return 'o3';
     if (model === 'o4-mini') return 'o4-mini';
+    if (model === 'gpt-5.2') return 'GPT-5.2';
+    if (model === 'gpt-5.1') return 'GPT-5.1';
+    if (model === 'gpt-5-nano') return 'GPT-5 Nano';
+    if (model === 'gpt-5-mini') return 'GPT-5 Mini';
+    if (model === 'gpt-5') return 'GPT-5';
     if (model === 'gpt-4.1-nano') return 'GPT-4.1 Nano';
     if (model === 'gpt-4.1-mini') return 'GPT-4.1 Mini';
     if (model === 'gpt-4.1') return 'GPT-4.1';
@@ -270,13 +280,18 @@ const DEEPSEEK_PATTERNS = [
 // Explicit model override patterns — checked first, highest priority
 const EXPLICIT_OVERRIDES = [
     // OpenAI models — specific patterns first, generic "use gpt" last
+    { pattern: /\buse gpt[- ]?5\.2\b/i, model: 'gpt-5.2', label: 'gpt-5.2 (explicit)' },
+    { pattern: /\buse gpt[- ]?5\.1\b/i, model: 'gpt-5.1', label: 'gpt-5.1 (explicit)' },
+    { pattern: /\buse gpt[- ]?5[- ]?nano\b/i, model: 'gpt-5-nano', label: 'gpt-5-nano (explicit)' },
+    { pattern: /\buse gpt[- ]?5[- ]?mini\b/i, model: 'gpt-5-mini', label: 'gpt-5-mini (explicit)' },
+    { pattern: /\buse gpt[- ]?5\b/i, model: 'gpt-5', label: 'gpt-5 (explicit)' },
     { pattern: /\buse o3\b/i, model: 'o3', label: 'o3 (explicit)' },
     { pattern: /\buse o4[- ]?mini\b/i, model: 'o4-mini', label: 'o4-mini (explicit)' },
     { pattern: /\buse gpt[- ]?4\.1[- ]?nano\b/i, model: 'gpt-4.1-nano', label: 'gpt-4.1-nano (explicit)' },
     { pattern: /\buse gpt[- ]?4\.1[- ]?mini\b/i, model: 'gpt-4.1-mini', label: 'gpt-4.1-mini (explicit)' },
     { pattern: /\buse gpt[- ]?4\.1\b/i, model: 'gpt-4.1', label: 'gpt-4.1 (explicit)' },
     { pattern: /\buse gpt[- ]?4o\b/i, model: 'gpt-4o', label: 'gpt-4o (explicit)' },
-    { pattern: /\buse (openai|gpt)\b/i, model: 'gpt-4.1', label: 'gpt-4.1 (explicit)' },
+    { pattern: /\buse (openai|gpt)\b/i, model: 'gpt-5.2', label: 'gpt-5.2 (explicit)' },
     // DeepSeek
     { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
     // Claude models
@@ -842,8 +857,8 @@ ${contextBlock}`;
         }
 
         // OpenAI model routing — text-only, no tool loop
-        const OPENAI_MODELS = new Set(['gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o3', 'o4-mini']);
-        const REASONING_MODELS = new Set(['o3', 'o4-mini']);
+        const OPENAI_MODELS = new Set(['gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o3', 'o4-mini', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5.1', 'gpt-5.2']);
+        const REASONING_MODELS = new Set(['o3', 'o4-mini', 'gpt-5', 'gpt-5-mini', 'gpt-5.1', 'gpt-5.2']);
         if (OPENAI_MODELS.has(model) && openaiClient) {
             console.log(`[OPENAI] Calling ${model} (explicit request)...`);
             const openaiMessages = apiMessages.map(m => {
