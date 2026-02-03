@@ -257,7 +257,7 @@ export async function runDashboardSync() {
 }
 
 /**
- * Memory cleanup — clean up old conversations
+ * Memory cleanup — clean up old conversations and stale knowledge
  */
 export async function runCleanup(memory) {
     console.log('[CLEANUP] Running conversation cleanup');
@@ -271,5 +271,41 @@ export async function runCleanup(memory) {
         await archiveOldDone();
     } catch (err) {
         console.error('[CLEANUP] Email archive failed:', err.message);
+    }
+    // Prune knowledge entries older than 180 days (decay < 0.14)
+    try {
+        await pruneOldKnowledge(memory);
+    } catch (err) {
+        console.error('[CLEANUP] Knowledge prune failed:', err.message);
+    }
+}
+
+/**
+ * Prune knowledge entries older than 180 days
+ */
+async function pruneOldKnowledge(memory) {
+    const knowledgePath = path.join(WORKSPACE_PATH, 'KNOWLEDGE.md');
+    const content = await fs.readFile(knowledgePath, 'utf-8');
+    const sections = content.split(/\n(?=## )/).filter(s => s.trim());
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 180);
+
+    let prunedCount = 0;
+    const kept = sections.filter(section => {
+        const dateMatch = section.match(/## \[(\d{4}-\d{2}-\d{2})\]/);
+        if (!dateMatch) return true; // Keep non-dated sections (headers etc)
+        const sectionDate = new Date(dateMatch[1]);
+        if (sectionDate < cutoff) {
+            prunedCount++;
+            return false;
+        }
+        return true;
+    });
+
+    if (prunedCount > 0) {
+        await fs.writeFile(knowledgePath, kept.join('\n'));
+        await fs.chmod(knowledgePath, 0o600);
+        console.log(`[CLEANUP] Pruned ${prunedCount} knowledge entries older than 180 days`);
     }
 }

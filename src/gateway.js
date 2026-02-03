@@ -3508,6 +3508,13 @@ async function init() {
     await memory.init();
     console.log('[MEMORY] Initialized');
 
+    // One-time fix: ensure sensitive files have 0600 permissions
+    try {
+        await execAsync(`chmod 600 ${WORKSPACE_PATH}/conversations/*.json ${WORKSPACE_PATH}/memory/*.md ${WORKSPACE_PATH}/*.md ${WORKSPACE_PATH}/inbox/*.json ${WORKSPACE_PATH}/config.json 2>/dev/null || true`);
+        console.log('[SECURITY] File permissions secured');
+    } catch {}
+
+
     // Initialize skills system
     skills = new SkillsSystem(WORKSPACE_PATH);
     await skills.init();

@@ -281,6 +281,23 @@ const DEEPSEEK_PATTERNS = [
     /\bdetailed (research|analysis)\b/i,
 ];
 
+// Models with full tool/function calling support
+const TOOL_ENABLED_MODELS = new Set([
+    'claude-sonnet-4-20250514',
+    'claude-3-5-haiku-20241022',
+    'claude-opus-4-5-20251101',
+    'kimi-k2',
+    'kimi-k2-thinking'
+]);
+
+// Check if a model supports tool calling
+export function hasToolSupport(model) {
+    return TOOL_ENABLED_MODELS.has(model) || model.includes('claude') || model.startsWith('kimi');
+}
+
+// Patterns that suggest the user wants tool functionality
+const TOOL_REQUEST_PATTERNS = /\b(read|write|file|bash|email|send|schedule|generate|create|fetch|search|pdf|chart|image|diagram|mindmap|stock|quote|lookup|delete|edit|calendar|linkedin)\b/i;
+
 // Explicit model override patterns — checked first, highest priority
 const EXPLICIT_OVERRIDES = [
     // OpenAI models — specific patterns first, generic "use gpt" last
@@ -360,11 +377,12 @@ export function selectModel(userMessage) {
 // ============================================================================
 
 export class CircuitBreaker {
-    constructor(maxFailures = 5, resetTimeMs = 5 * 60 * 1000) {
+    constructor(maxFailures = 5, resetTimeMs = 5 * 60 * 1000, providerName = 'unknown') {
         this.failures = 0;
         this.maxFailures = maxFailures;
         this.resetTimeMs = resetTimeMs;
         this.openUntil = 0;
+        this.providerName = providerName;
     }
 
     isOpen() {
@@ -386,6 +404,16 @@ export class CircuitBreaker {
     recordSuccess() {
         this.failures = 0;
     }
+
+    getFriendlyError() {
+        const msgs = {
+            anthropic: "Claude is temporarily busy. I'll use GPT-4o as a backup, or you can say \"use kimi\" to try Kimi K2.",
+            deepseek: "DeepSeek is having issues. Say \"use claude\" or just ask again and I'll use Claude instead.",
+            openai: "OpenAI is experiencing delays. Say \"use claude\" or \"use kimi\" to try an alternative.",
+            kimi: "Kimi is temporarily unavailable. Say \"use claude\" or just ask again and I'll use Claude."
+        };
+        return msgs[this.providerName] || "The AI service is temporarily unavailable. Please try again in a few minutes.";
+    }
 }
 
 // ============================================================================
@@ -394,15 +422,15 @@ export class CircuitBreaker {
 
 export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, memory, skills, executeTool, TOOLS }) {
     const requestQueue = new RequestQueue();
-    const circuitBreaker = new CircuitBreaker();
-    const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
-    const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
-    const kimiBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+    const circuitBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'anthropic');
+    const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'deepseek');
+    const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'openai');
+    const kimiBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'kimi');
     let killed = false;
 
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
         if (circuitBreaker.isOpen()) {
-            throw new Error('Circuit breaker open — API calls temporarily suspended after repeated failures. Will retry automatically.');
+            throw new Error(circuitBreaker.getFriendlyError());
         }
 
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -446,7 +474,9 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
                     messages: openaiMessages,
                     max_tokens: params.max_tokens || 8192
                 });
-                const text = openaiResponse.choices?.[0]?.message?.content || '';
+                let text = openaiResponse.choices?.[0]?.message?.content || '';
+                // Add fallback note so user knows a different model responded
+                text = `_[Using GPT-4o — Claude is temporarily busy]_\n\n${text}`;
                 console.log('[FALLBACK] OpenAI GPT-4o succeeded');
                 circuitBreaker.recordSuccess();
                 openaiBreaker.recordSuccess();
@@ -581,7 +611,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
 
     async function callDeepSeek(messages, systemPrompt, context = {}) {
         if (deepseekBreaker.isOpen()) {
-            throw new Error('DeepSeek circuit breaker open — temporarily unavailable');
+            throw new Error(deepseekBreaker.getFriendlyError());
         }
         const openaiMessages = messages.map(m => {
             if (typeof m.content === 'string') return { role: m.role, content: m.content };
@@ -665,7 +695,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
      */
     async function callKimiWithTools(apiMessages, systemPrompt, model, tools, context = {}) {
         if (kimiBreaker.isOpen()) {
-            throw new Error('Kimi circuit breaker open — temporarily unavailable');
+            throw new Error(kimiBreaker.getFriendlyError());
         }
 
         const openaiTools = anthropicToolsToOpenAI(tools);
@@ -1002,6 +1032,10 @@ ${contextBlock}`;
             text = text.replace(/\{"type"\s*:\s*"tool_use"[\s\S]*?\}\s*\}?/g, '').trim();
             text = text.replace(/```json\s*\{[\s\S]*?"tool_use"[\s\S]*?```/g, '').trim();
             if (!text) text = 'I completed my research but the response was malformed. Please try rephrasing your request.';
+            // Warn if user seems to want tools but DeepSeek is text-only
+            if (TOOL_REQUEST_PATTERNS.test(userText)) {
+                text += `\n\n_Note: DeepSeek is text-only (great for research). For file/email/chart tools, say "use claude" or "use kimi"._`;
+            }
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;
@@ -1041,10 +1075,14 @@ ${contextBlock}`;
                 requestParams.max_tokens = model.includes('nano') ? 4096 : 8192;
             }
             const gptResponse = await openaiClient.chat.completions.create(requestParams);
-            const text = gptResponse.choices?.[0]?.message?.content || '';
+            let text = gptResponse.choices?.[0]?.message?.content || '';
             const usage = { input_tokens: gptResponse.usage?.prompt_tokens || 0, output_tokens: gptResponse.usage?.completion_tokens || 0 };
             logTokenUsage(model, usage, callContext);
             console.log(`[OPENAI] ${model} response received`);
+            // Warn if user seems to want tools but model is text-only
+            if (!hasToolSupport(model) && TOOL_REQUEST_PATTERNS.test(userText)) {
+                text += `\n\n_Note: ${getModelLabel(model)} is text-only. For file/email/chart tools, say "use claude" or "use kimi"._`;
+            }
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;

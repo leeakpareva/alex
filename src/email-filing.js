@@ -65,6 +65,8 @@ async function saveStore(store) {
     };
     await mkdir(INBOX_DIR, { recursive: true });
     await writeFile(EMAILS_FILE, JSON.stringify(store, null, 2));
+    const { chmod } = await import('fs/promises');
+    await chmod(EMAILS_FILE, 0o600);
 }
 
 // ============================================================================

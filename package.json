@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=test-report.json 2>&1; node tests/generate-report.js"
+    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=test-report.json 2>&1; node tests/generate-report.js",
+    "test:live": "vitest run tests/integration/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

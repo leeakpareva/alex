@@ -5,9 +5,11 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { loadEncryptedConfig, saveEncryptedConfig } from './secrets.js';
 
 export const CONFIG_PATH = process.env.ALEX_CONFIG || path.join(os.homedir(), '.alex/config.json');
 export const WORKSPACE_PATH = process.env.ALEX_WORKSPACE || path.join(os.homedir(), '.alex');
+export const SECRET_KEY = process.env.ALEX_SECRET_KEY || null;
 
 // Allowed directories for file writes
 export const ALLOWED_WRITE_PATHS = [
@@ -59,10 +61,12 @@ export async function loadConfig() {
     await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
 
     let config;
+    let configMeta;
     try {
-        config = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf-8'));
-    } catch {
-        console.error(`Config not found at ${CONFIG_PATH}`);
+        configMeta = await loadEncryptedConfig(CONFIG_PATH, SECRET_KEY);
+        config = configMeta.config;
+    } catch (err) {
+        console.error(`Config error: ${err.message}`);
         console.log('Run: alex-setup to configure');
         process.exit(1);
     }
@@ -90,11 +94,21 @@ export async function loadConfig() {
         config.auto_cc_email = 'lee@navada.info';
     }
 
-    // Store config path for tools that need to write back
+    // Store config path and encryption status for tools that need to write back
     config._configPath = CONFIG_PATH;
+    config._encrypted = configMeta.encrypted;
+    config._secretKey = SECRET_KEY;
 
     console.log('[CONFIG] Loaded and validated');
     return config;
+}
+
+/**
+ * Save config back to file (encrypted if key available)
+ */
+export async function saveConfig(config) {
+    const { _configPath, _encrypted, _secretKey, ...cleanConfig } = config;
+    await saveEncryptedConfig(cleanConfig, _configPath || CONFIG_PATH, _secretKey || SECRET_KEY);
 }
 
 /**

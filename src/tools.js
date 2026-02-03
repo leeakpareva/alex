@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 import nodemailer from 'nodemailer';
 import { WORKSPACE_PATH, ALLOWED_WRITE_PATHS, ALLOWED_ATTACHMENT_PATHS, isPathAllowed } from './config.js';
+import { calculateDecay } from './memory.js';
 
 const execAsync = promisify(exec);
 
@@ -78,7 +79,7 @@ export async function queryRAG(text) {
         }
     }
 
-    // Fallback: keyword search on KNOWLEDGE.md
+    // Fallback: keyword search on KNOWLEDGE.md with relevance decay
     try {
         const knowledgePath = path.join(WORKSPACE_PATH, 'KNOWLEDGE.md');
         const knowledge = await fs.readFile(knowledgePath, 'utf-8');
@@ -86,9 +87,14 @@ export async function queryRAG(text) {
         const sections = knowledge.split(/\n## /).filter(s => s.trim());
         const scored = sections.map(s => {
             const lower = s.toLowerCase();
-            const score = queryWords.reduce((sum, w) => sum + (lower.includes(w) ? 1 : 0), 0);
-            return { text: s.substring(0, 500), score };
-        }).filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+            // Calculate keyword match score
+            const keywordScore = queryWords.reduce((sum, w) => sum + (lower.includes(w) ? 1 : 0), 0);
+            // Extract date from section header (format: [YYYY-MM-DD])
+            const dateMatch = s.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+            const decay = dateMatch ? calculateDecay(dateMatch[1]) : 0.5;
+            // Final score: keyword relevance * temporal decay
+            return { text: s.substring(0, 500), score: keywordScore * decay, rawScore: keywordScore };
+        }).filter(s => s.rawScore > 0).sort((a, b) => b.score - a.score).slice(0, 3);
         if (scored.length > 0) {
             return scored.map(s => s.text).join('\n\n---\n\n');
         }

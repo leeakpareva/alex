@@ -1,5 +1,43 @@
+# Dependencies
 node_modules/
+
+# Environment and secrets (NEVER commit these)
+.env
+.env.*
+*.env
 .env.local
+.env.production
+*.pem
+*.key
+*.crt
+config.json
+config.json.enc
+config.json.backup
+
+# Logs
+*.log
+logs/
 dashboard/dashboard.log
+
+# Reports and generated files
 reports/*.html
 reports/*.json
+test-report.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+
+# Temp files
+*.tmp
+*.temp
+.cache/

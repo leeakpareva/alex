@@ -5,6 +5,22 @@
 import fs from 'fs/promises';
 import path from 'path';
 
+/**
+ * Calculate relevance decay based on age
+ * Exponential decay with ~62-day half-life (90-day time constant)
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @returns {number} Decay factor between 0 and 1
+ */
+export function calculateDecay(dateStr) {
+    try {
+        const ageInDays = (Date.now() - new Date(dateStr).getTime()) / (86400000);
+        // Exponential decay: e^(-t/90) gives half-life of ~62 days
+        return Math.exp(-ageInDays / 90);
+    } catch {
+        return 0.5; // Default for unparseable dates
+    }
+}
+
 export const IDENTITY_TEMPLATE = `# ALEX - Global Economist
 
 ## Who I Am
@@ -111,6 +127,7 @@ ${data.facts.map(f => `- ${f}`).join('\n') || '- None recorded yet'}
 ${data.lastUpdated}
 `;
         await fs.writeFile(this.userPath, markdown);
+        await fs.chmod(this.userPath, 0o600);
     }
 
     async appendMemory(category, content) {
@@ -118,6 +135,7 @@ ${data.lastUpdated}
         const timestamp = new Date().toISOString();
         const entry = `\n## ${timestamp}\n${content}\n`;
         await fs.appendFile(memoryFile, entry);
+        await fs.chmod(memoryFile, 0o600);
     }
 
     async getMemory(category) {
@@ -151,6 +169,7 @@ ${data.lastUpdated}
         const trimmed = messages.slice(-100);
         const data = { messages: trimmed, summary: summary || null };
         await fs.writeFile(convFile, JSON.stringify(data, null, 2));
+        await fs.chmod(convFile, 0o600);
     }
 
     async searchArchive(chatId, query) {
@@ -220,6 +239,7 @@ ${data.lastUpdated}
         prefs[String(userId)][key] = value;
         prefs[String(userId)].lastUpdated = new Date().toISOString();
         await fs.writeFile(this.userPrefsPath, JSON.stringify(prefs, null, 2));
+        await fs.chmod(this.userPrefsPath, 0o600);
     }
 
     async getAllUserPrefs() {
@@ -240,9 +260,11 @@ ${data.lastUpdated}
     }
 
     async appendKnowledge(content, reindexFn) {
-        const timestamp = new Date().toISOString();
-        const entry = `\n## Learned: ${timestamp}\n${content}\n`;
+        // Use date-only format for easier parsing and relevance decay
+        const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const entry = `\n## [${dateStr}] Learned\n${content}\n`;
         await fs.appendFile(this.knowledgePath, entry);
+        await fs.chmod(this.knowledgePath, 0o600);
         await this.trimKnowledge();
         if (reindexFn) reindexFn();
     }
