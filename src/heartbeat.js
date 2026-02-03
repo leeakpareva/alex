@@ -191,6 +191,8 @@ export async function runDashboardSync() {
                 let modelName = 'Sonnet';
                 const m = e.model || '';
                 if (m.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
+                else if (m === 'kimi-k2-thinking') { costUsd = inp / 1e6 * 1.0 + out / 1e6 * 4.0; modelName = 'Kimi K2 Think'; }
+                else if (m.startsWith('kimi')) { costUsd = inp / 1e6 * 0.5 + out / 1e6 * 2.0; modelName = 'Kimi K2'; }
                 else if (m.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
                 else if (m === 'o3') { costUsd = inp / 1e6 * 10 + out / 1e6 * 40; modelName = 'o3'; }
                 else if (m === 'o4-mini') { costUsd = inp / 1e6 * 1.1 + out / 1e6 * 4.4; modelName = 'o4-mini'; }
