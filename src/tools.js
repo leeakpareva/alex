@@ -167,6 +167,45 @@ async function alphaVantageQuery(params, apiKey) {
 }
 
 // ============================================================================
+// APIFY HELPER
+// ============================================================================
+
+async function apifyRunActor(actorId, input, apiKey, timeout = 120000) {
+    const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apiKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input),
+            signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            if (res.status === 402) throw new Error('Apify credits exhausted.');
+            throw new Error(`Apify API error (${res.status}): ${errorText.substring(0, 200)}`);
+        }
+        const data = await res.json();
+
+        // Track Apify API call on dashboard
+        dashPostFn('update_apify', {
+            actor: actorId,
+            results: Array.isArray(data) ? data.length : 0,
+        });
+
+        return data;
+    } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') throw new Error(`Apify request timed out after ${timeout/1000}s`);
+        throw err;
+    }
+}
+
+// ============================================================================
 // TOOL DEFINITIONS
 // ============================================================================
 
@@ -705,6 +744,99 @@ export const TOOLS = [
             },
             required: ["url"]
         }
+    },
+    {
+        name: "tiktok_scrape",
+        description: "Scrape TikTok videos by hashtag, profile, search query, or video URL. Returns video metadata including views, likes, shares, author info.",
+        input_schema: {
+            type: "object",
+            properties: {
+                hashtags: { type: "array", items: { type: "string" }, description: "Hashtags to scrape (without #)" },
+                profiles: { type: "array", items: { type: "string" }, description: "TikTok usernames to scrape" },
+                searchQueries: { type: "array", items: { type: "string" }, description: "Search terms" },
+                videoUrls: { type: "array", items: { type: "string" }, description: "Specific TikTok video URLs" },
+                resultsPerPage: { type: "number", description: "Number of results (default 20, max 100)" }
+            }
+        }
+    },
+    {
+        name: "tiktok_download",
+        description: "Download a TikTok video by URL and send it via Telegram. Use after tiktok_scrape to get actual video files.",
+        input_schema: {
+            type: "object",
+            properties: {
+                url: { type: "string", description: "TikTok video URL (e.g. https://tiktok.com/@user/video/123)" },
+                caption: { type: "string", description: "Optional caption for the video" }
+            },
+            required: ["url"]
+        }
+    },
+    {
+        name: "linkedin_posts_search",
+        description: "Search LinkedIn posts by keyword. Returns post content, author details, reactions, comments count, and media attachments. Supports OR operator and exact matching with quotes. Cost: ~$5 per 1,000 results.",
+        input_schema: {
+            type: "object",
+            properties: {
+                searchKeyword: { type: "string", description: "Keywords to search. Supports OR operator and exact matching with quotes. Example: 'AI OR Javascript' or '\"hiring\" OR \"growth\"'" },
+                sortType: { type: "string", description: "Sort by: 'Relevance' or 'Date' (default: Relevance)", enum: ["Relevance", "Date"] },
+                pageNumber: { type: "number", description: "Page number (default: 1)" },
+                dateFilter: { type: "string", description: "Filter by date: 'past-24h', 'past-week', 'past-month', or null", enum: ["past-24h", "past-week", "past-month"] },
+                resultLimit: { type: "number", description: "Max results to return (default: 50, max: 100)" }
+            },
+            required: ["searchKeyword"]
+        }
+    },
+    {
+        name: "indeed_job_search",
+        description: "Search Indeed job listings by position and location. Returns job titles, companies, salaries, locations, and application URLs. Cost: ~$5 per 1,000 jobs.",
+        input_schema: {
+            type: "object",
+            properties: {
+                position: { type: "string", description: "Job title or keywords to search for. Example: 'web developer', 'data scientist'" },
+                country: { type: "string", description: "Country to search in (default: United Kingdom). Options: United States, United Kingdom, Canada, Australia, Germany, etc." },
+                location: { type: "string", description: "City or region. Example: 'London', 'Remote', 'San Francisco'" },
+                maxItems: { type: "number", description: "Maximum jobs to return (default: 100, max: 200)" },
+                scrapeCompanyDetails: { type: "boolean", description: "Scrape additional company info (slower, default: false)" },
+                saveOnlyUniqueJobs: { type: "boolean", description: "Filter duplicate listings (default: true)" }
+            },
+            required: ["position"]
+        }
+    },
+    {
+        name: "google_maps_leads",
+        description: "Search Google Maps for businesses and extract leads with contact enrichment. Returns business info (name, address, phone, website, email, rating) plus employee contacts (name, job title, work email, LinkedIn). Cost: ~$4/1000 places + $0.005/lead.",
+        input_schema: {
+            type: "object",
+            properties: {
+                searchTerms: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "What to search for. Examples: ['tech startup', 'software company'], ['fintech'], ['SaaS company']"
+                },
+                location: {
+                    type: "string",
+                    description: "Where to search. Example: 'London, UK', 'Manchester, UK', 'New York, USA'"
+                },
+                maxResults: {
+                    type: "number",
+                    description: "Maximum places per search term (default: 20, max: 100)"
+                },
+                scrapeContacts: {
+                    type: "boolean",
+                    description: "Enable company contact enrichment - emails, phone from website (default: true)"
+                },
+                maxLeadsPerPlace: {
+                    type: "number",
+                    description: "Employee leads per company (default: 3, max: 10)"
+                },
+                leadsDepartments: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Departments to find contacts from. Default: ['C-Suite', 'Engineering & Technical', 'Information Technology']. Options: 'C-Suite', 'Sales', 'Marketing', 'Engineering & Technical', 'Information Technology', 'Human Resources', 'Finance', 'Operations'"
+                }
+            },
+            required: ["searchTerms", "location"]
+        }
     }
 ];
 
@@ -744,6 +876,11 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
     'manage_user', 'generate_webapp', 'linkedin_post',
     'calendar_list_events', 'calendar_create_event', 'calendar_update_event', 'calendar_delete_event',
+    'tiktok_scrape',
+    'tiktok_download',
+    'linkedin_posts_search',
+    'indeed_job_search',
+    'google_maps_leads',
 ]);
 
 // Per-tool timeout limits (milliseconds)
@@ -755,6 +892,11 @@ const TOOL_TIMEOUTS = {
     generate_image: 60000,
     generate_pdf: 30000,
     fetch_url: 30000,
+    tiktok_scrape: 180000,
+    tiktok_download: 120000,
+    linkedin_posts_search: 180000,
+    indeed_job_search: 180000,
+    google_maps_leads: 300000,  // 5 minutes - lead enrichment takes time
 };
 const DEFAULT_TOOL_TIMEOUT = 30000;
 
@@ -1505,6 +1647,252 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 }
 
                 return { success: false, error: `Unknown action: ${input.action}` };
+            }
+
+            case 'tiktok_scrape': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                const actorInput = { resultsPerPage: Math.min(input.resultsPerPage || 20, 100) };
+                if (input.hashtags?.length) actorInput.hashtags = input.hashtags;
+                if (input.profiles?.length) actorInput.profiles = input.profiles;
+                if (input.searchQueries?.length) actorInput.searchQueries = input.searchQueries;
+                if (input.videoUrls?.length) actorInput.videoUrls = input.videoUrls;
+
+                // Default to #fyp if nothing specified
+                if (!actorInput.hashtags && !actorInput.profiles && !actorInput.searchQueries && !actorInput.videoUrls) {
+                    actorInput.hashtags = ['fyp'];
+                }
+
+                try {
+                    const videos = await apifyRunActor('clockworks~tiktok-scraper', actorInput, apiKey, 180000);
+
+                    if (!Array.isArray(videos) || videos.length === 0) {
+                        return { success: true, message: 'No videos found.', videos: [] };
+                    }
+
+                    const formatted = videos.slice(0, 50).map((v, i) => ({
+                        index: i + 1,
+                        author: v.authorMeta?.name || v.author || 'unknown',
+                        description: (v.text || '').substring(0, 200),
+                        views: v.playCount || 0,
+                        likes: v.diggCount || 0,
+                        comments: v.commentCount || 0,
+                        shares: v.shareCount || 0,
+                        url: v.webVideoUrl || `https://tiktok.com/@${v.authorMeta?.id}/video/${v.id}`,
+                        hashtags: (v.hashtags || []).map(h => h.name || h).slice(0, 5),
+                    }));
+
+                    const totalViews = formatted.reduce((sum, v) => sum + v.views, 0);
+                    return {
+                        success: true,
+                        message: `Scraped ${videos.length} videos. Total views: ${totalViews.toLocaleString()}`,
+                        count: videos.length,
+                        videos: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `TikTok scrape failed: ${err.message}` };
+                }
+            }
+
+            case 'tiktok_download': {
+                const videosDir = path.join(WORKSPACE_PATH, 'outputs', 'tiktok');
+                await fs.mkdir(videosDir, { recursive: true });
+                const filename = `tiktok_${Date.now()}.mp4`;
+                const outputPath = path.join(videosDir, filename);
+
+                try {
+                    // Use tikwm.com API to get video download URL (free, no watermark)
+                    const apiRes = await fetch('https://www.tikwm.com/api/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'url=' + encodeURIComponent(input.url),
+                    });
+
+                    const apiData = await apiRes.json();
+
+                    if (apiData.code !== 0 || !apiData.data) {
+                        return { success: false, error: `Could not fetch video info: ${apiData.msg || 'unknown error'}` };
+                    }
+
+                    const videoUrl = apiData.data.hdplay || apiData.data.play;
+                    const author = apiData.data.author?.nickname || apiData.data.author?.unique_id || 'unknown';
+
+                    if (!videoUrl) {
+                        return { success: false, error: 'No download URL found for this video.' };
+                    }
+
+                    // Download the video file
+                    const videoRes = await fetch(videoUrl, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                    });
+
+                    if (!videoRes.ok) {
+                        return { success: false, error: `Failed to download video: HTTP ${videoRes.status}` };
+                    }
+
+                    const buffer = Buffer.from(await videoRes.arrayBuffer());
+
+                    // Check file size (Telegram limit is 50MB for bots)
+                    if (buffer.length > 50 * 1024 * 1024) {
+                        return { success: false, error: 'Video too large for Telegram (>50MB). Try a shorter video.' };
+                    }
+
+                    await fs.writeFile(outputPath, buffer);
+
+                    return {
+                        success: true,
+                        path: outputPath,
+                        message: `Video downloaded: ${filename} (${(buffer.length / 1024 / 1024).toFixed(1)}MB)`,
+                        send_document: true,
+                        caption: input.caption || `TikTok: @${author}`
+                    };
+                } catch (err) {
+                    return { success: false, error: `TikTok download failed: ${err.message}` };
+                }
+            }
+
+            case 'linkedin_posts_search': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                const actorInput = {
+                    searchKeyword: input.searchKeyword,
+                    sortType: input.sortType || 'Relevance',
+                    pageNumber: input.pageNumber || 1,
+                    resultLimit: Math.min(input.resultLimit || 50, 100),
+                };
+                if (input.dateFilter) actorInput.dateFilter = input.dateFilter;
+
+                try {
+                    const posts = await apifyRunActor('apimaestro~linkedin-posts-search-scraper-no-cookies', actorInput, apiKey, 180000);
+
+                    if (!Array.isArray(posts) || posts.length === 0) {
+                        return { success: true, message: 'No posts found.', posts: [] };
+                    }
+
+                    const formatted = posts.slice(0, 50).map((p, i) => ({
+                        index: i + 1,
+                        author: p.authorName || p.author?.name || 'unknown',
+                        authorHeadline: p.authorHeadline || p.author?.headline || '',
+                        authorProfileUrl: p.authorProfileUrl || p.author?.url || '',
+                        content: (p.text || p.content || '').substring(0, 500),
+                        reactions: p.totalReactionCount || p.reactions || 0,
+                        comments: p.commentsCount || p.comments || 0,
+                        reposts: p.repostsCount || p.reposts || 0,
+                        postUrl: p.postUrl || p.url || '',
+                        postedAt: p.postedAt || p.timestamp || '',
+                        hasMedia: !!(p.images?.length || p.video),
+                    }));
+
+                    const totalReactions = formatted.reduce((sum, p) => sum + p.reactions, 0);
+                    return {
+                        success: true,
+                        message: `Found ${posts.length} LinkedIn posts. Total reactions: ${totalReactions.toLocaleString()}`,
+                        count: posts.length,
+                        posts: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `LinkedIn search failed: ${err.message}` };
+                }
+            }
+
+            case 'indeed_job_search': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                const actorInput = {
+                    position: input.position,
+                    country: input.country || 'United Kingdom',
+                    maxItems: Math.min(input.maxItems || 100, 200),
+                    saveOnlyUniqueJobs: input.saveOnlyUniqueJobs !== false,
+                    scrapeCompanyDetails: input.scrapeCompanyDetails || false,
+                    followApplyRedirects: false,
+                };
+                if (input.location) actorInput.location = input.location;
+
+                try {
+                    const jobs = await apifyRunActor('misceres~indeed-scraper', actorInput, apiKey, 180000);
+
+                    if (!Array.isArray(jobs) || jobs.length === 0) {
+                        return { success: true, message: 'No jobs found.', jobs: [] };
+                    }
+
+                    const formatted = jobs.slice(0, 100).map((j, i) => ({
+                        index: i + 1,
+                        title: j.positionName || j.title || 'Unknown Position',
+                        company: j.company || 'Unknown Company',
+                        location: j.location || '',
+                        salary: j.salary || 'Not specified',
+                        rating: j.rating || null,
+                        reviewsCount: j.reviewsCount || 0,
+                        jobUrl: j.url || j.externalApplyLink || '',
+                        description: (j.description || '').substring(0, 300),
+                        postedAt: j.postedAt || '',
+                    }));
+
+                    return {
+                        success: true,
+                        message: `Found ${jobs.length} jobs for "${input.position}"${input.location ? ` in ${input.location}` : ''}.`,
+                        count: jobs.length,
+                        jobs: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `Indeed search failed: ${err.message}` };
+                }
+            }
+
+            case 'google_maps_leads': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                const actorInput = {
+                    searchStringsArray: input.searchTerms,
+                    locationQuery: input.location,
+                    maxCrawledPlacesPerSearch: Math.min(input.maxResults || 20, 100),
+                    scrapeContacts: input.scrapeContacts !== false,
+                    maxLeads: Math.min(input.maxLeadsPerPlace || 3, 10),
+                    leadsDepartments: input.leadsDepartments || ['C-Suite', 'Engineering & Technical', 'Information Technology'],
+                };
+
+                try {
+                    const places = await apifyRunActor('compass~crawler-google-places', actorInput, apiKey, 300000);
+
+                    if (!Array.isArray(places) || places.length === 0) {
+                        return { success: true, message: 'No businesses found.', places: [] };
+                    }
+
+                    const formatted = places.slice(0, 50).map((p, i) => ({
+                        index: i + 1,
+                        name: p.title || p.name || 'Unknown Business',
+                        address: p.address || '',
+                        phone: p.phone || p.phoneUnformatted || '',
+                        website: p.website || '',
+                        email: p.email || '',
+                        rating: p.totalScore || p.rating || null,
+                        reviewsCount: p.reviewsCount || 0,
+                        category: p.categoryName || p.category || '',
+                        placeUrl: p.url || '',
+                        leads: (p.leads || []).slice(0, 5).map(l => ({
+                            name: l.fullName || l.name || '',
+                            title: l.jobTitle || l.title || '',
+                            email: l.workEmail || l.email || '',
+                            phone: l.phone || '',
+                            linkedin: l.linkedInUrl || l.linkedin || '',
+                        })),
+                    }));
+
+                    const totalLeads = formatted.reduce((sum, p) => sum + (p.leads?.length || 0), 0);
+                    return {
+                        success: true,
+                        message: `Found ${places.length} businesses with ${totalLeads} leads for "${input.searchTerms.join(', ')}" in ${input.location}.`,
+                        count: places.length,
+                        totalLeads,
+                        places: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `Google Maps lead search failed: ${err.message}` };
+                }
             }
 
             default:

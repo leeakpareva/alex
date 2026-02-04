@@ -96,6 +96,7 @@ const dashState = {
     activity_log: [],
     heartbeats: [],
     services: [],
+    apify: { total_calls: 0, total_results: 0, last_call: null },
     last_updated: new Date().toISOString(),
 };
 
@@ -253,6 +254,13 @@ function postDashboard(action, payload) {
             }
             break;
         }
+        case 'update_apify': {
+            dashState.apify.total_calls++;
+            dashState.apify.total_results += payload.results || 0;
+            dashState.apify.last_call = now;
+            if (payload.actor) dashState.apify.last_actor = payload.actor;
+            break;
+        }
     }
     scheduleDashPush();
 }
@@ -321,6 +329,11 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /brief — Recent activity summary
 /news — Latest gathered news
 /stocks AAPL — Quick stock quote
+/tiktok — TikTok scraper (hashtags, profiles)
+/linkedinposts — LinkedIn posts search
+/indeed — Indeed job search
+/leads — Google Maps lead scraper
+/scrapers — View all Apify scrapers
 /status — System health and uptime
 /duties — All duties and schedules
 /models — Switch AI model
@@ -334,6 +347,30 @@ Just message me naturally — I'm here to help.
 
         await bot.sendMessage(chatId, welcome, { parse_mode: 'HTML' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
+    });
+
+    // Special greetings for Lee (owner)
+    bot.onText(/^my bro$/i, async (msg) => {
+        const chatId = msg.chat.id;
+        await bot.sendMessage(chatId, "How Far Big LEE!");
+    });
+
+    bot.onText(/^(hi|hey|hello|yo|sup)(\s+alex)?[!?.]?$/i, async (msg) => {
+        const chatId = msg.chat.id;
+        const isOwner = String(msg.from.id) === String(config.telegram_owner_id);
+        if (isOwner) {
+            const greetings = [
+                "Hey Lee, what can I do for you?",
+                "Hi Lee, how can I help?",
+                "Hey Lee, what's on your mind?",
+                "Hi Lee, ready when you are.",
+                "Hey Lee, what do you need?",
+            ];
+            const response = greetings[Math.floor(Math.random() * greetings.length)];
+            await bot.sendMessage(chatId, response);
+        } else {
+            await bot.sendMessage(chatId, "Hello! How can I help you today?");
+        }
     });
 
     bot.onText(/\/learn/, async (msg) => {
@@ -1964,6 +2001,511 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
     });
 
     // ========================================================================
+    // TIKTOK SCRAPER COMMAND
+    // ========================================================================
+
+    bot.onText(/\/tiktok(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "TikTok scraping is owner-only (API costs).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*TikTok Scraper*\n\n` +
+                `Usage:\n` +
+                `/tiktok hashtag viral 20\n` +
+                `/tiktok profile charlidamelio\n` +
+                `/tiktok search "AI tools"\n` +
+                `/tiktok trending\n\n` +
+                `Types: hashtag, profile, search, url, trending`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse: /tiktok <type> <value> [count]
+        const parts = arg.split(/\s+/);
+        const subcommand = parts[0].toLowerCase();
+        let actorInput = { resultsPerPage: 20 };
+
+        // Check for trailing number
+        if (/^\d+$/.test(parts[parts.length - 1]) && parts.length > 1) {
+            actorInput.resultsPerPage = Math.min(parseInt(parts.pop()), 100);
+        }
+        const value = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
+
+        switch (subcommand) {
+            case 'hashtag': case 'tag': case 'h':
+                actorInput.hashtags = [value.replace(/^#/, '')]; break;
+            case 'profile': case 'user': case 'p':
+                actorInput.profiles = [value.replace(/^@/, '')]; break;
+            case 'search': case 's':
+                actorInput.searchQueries = [value]; break;
+            case 'url': case 'video':
+                actorInput.videoUrls = [value]; break;
+            case 'trending': case 'fyp':
+                actorInput.hashtags = ['fyp']; break;
+            default:
+                // Assume it's a hashtag if no type specified
+                actorInput.hashtags = [subcommand.replace(/^#/, '')];
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `Scraping TikTok (${actorInput.resultsPerPage} videos)...`);
+
+        try {
+            const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`API error ${res.status}: ${errorText.substring(0, 100)}`);
+            }
+            const videos = await res.json();
+
+            if (!videos?.length) {
+                await bot.editMessageText('No videos found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            let text = `*TikTok Results* (${videos.length} videos)\n\n`;
+            for (const v of videos.slice(0, 10)) {
+                const author = v.authorMeta?.name || v.author || 'unknown';
+                const views = (v.playCount || 0).toLocaleString();
+                const likes = (v.diggCount || 0).toLocaleString();
+                text += `*@${author}* — ${views} views, ${likes} likes\n`;
+                text += `${(v.text || '').substring(0, 80)}${(v.text || '').length > 80 ? '...' : ''}\n\n`;
+            }
+
+            if (videos.length > 10) {
+                text += `_... and ${videos.length - 10} more videos_`;
+            }
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
+    // LINKEDIN POSTS SEARCH COMMAND
+    // ========================================================================
+
+    bot.onText(/\/linkedinposts(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "LinkedIn search is owner-only (API costs ~$5/1000 results).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*LinkedIn Posts Search*\n\n` +
+                `Usage:\n` +
+                `/linkedinposts AI startups\n` +
+                `/linkedinposts "hiring" OR "growth"\n` +
+                `/linkedinposts AI --date past-week\n` +
+                `/linkedinposts AI --sort Date --limit 20\n\n` +
+                `Options:\n` +
+                `--date: past-24h, past-week, past-month\n` +
+                `--sort: Relevance, Date\n` +
+                `--limit: max results (default 50)`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse options
+        let searchKeyword = arg;
+        let dateFilter = null;
+        let sortType = 'Relevance';
+        let resultLimit = 50;
+
+        // Extract --date option
+        const dateMatch = arg.match(/--date\s+(past-24h|past-week|past-month)/i);
+        if (dateMatch) {
+            dateFilter = dateMatch[1];
+            searchKeyword = searchKeyword.replace(dateMatch[0], '').trim();
+        }
+
+        // Extract --sort option
+        const sortMatch = arg.match(/--sort\s+(Relevance|Date)/i);
+        if (sortMatch) {
+            sortType = sortMatch[1];
+            searchKeyword = searchKeyword.replace(sortMatch[0], '').trim();
+        }
+
+        // Extract --limit option
+        const limitMatch = arg.match(/--limit\s+(\d+)/i);
+        if (limitMatch) {
+            resultLimit = Math.min(parseInt(limitMatch[1]), 100);
+            searchKeyword = searchKeyword.replace(limitMatch[0], '').trim();
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `Searching LinkedIn posts for "${searchKeyword}"...`);
+
+        try {
+            const actorInput = {
+                searchKeyword,
+                sortType,
+                pageNumber: 1,
+                resultLimit,
+            };
+            if (dateFilter) actorInput.dateFilter = dateFilter;
+
+            const url = `https://api.apify.com/v2/acts/apimaestro~linkedin-posts-search-scraper-no-cookies/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error ${res.status}: ${errText.substring(0, 100)}`);
+            }
+            const posts = await res.json();
+
+            if (!posts?.length) {
+                await bot.editMessageText('No posts found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            let text = `*LinkedIn Posts* (${posts.length} results)\n\n`;
+            for (const p of posts.slice(0, 8)) {
+                const author = p.authorName || p.author?.name || 'unknown';
+                const reactions = (p.totalReactionCount || 0).toLocaleString();
+                const content = (p.text || p.content || '').substring(0, 100);
+                text += `*${author}* — ${reactions} reactions\n`;
+                text += `${content}${content.length >= 100 ? '...' : ''}\n\n`;
+            }
+
+            if (posts.length > 8) {
+                text += `_... and ${posts.length - 8} more posts_`;
+            }
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
+    // APIFY SCRAPERS HUB COMMAND
+    // ========================================================================
+
+    bot.onText(/\/scrapers/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+
+        const { formatScrapersMenu } = await import('./apify-scrapers.js');
+        const menu = formatScrapersMenu();
+
+        await bot.sendMessage(chatId, menu, {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+        });
+    });
+
+    // ========================================================================
+    // INDEED JOB SEARCH COMMAND
+    // ========================================================================
+
+    bot.onText(/\/indeed(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "Indeed search is owner-only (API costs ~$5/1000 jobs).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*Indeed Job Search*\n\n` +
+                `Usage:\n` +
+                `/indeed web developer\n` +
+                `/indeed "data scientist" London\n` +
+                `/indeed AI engineer --country "United States"\n` +
+                `/indeed developer --limit 50\n\n` +
+                `Options:\n` +
+                `--country: United Kingdom (default), United States, Canada, etc.\n` +
+                `--limit: max jobs (default 100)\n\n` +
+                `Cost: ~$5 per 1,000 jobs`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse options
+        let searchText = arg;
+        let country = 'United Kingdom';
+        let maxItems = 100;
+        let location = null;
+
+        // Extract --country option
+        const countryMatch = arg.match(/--country\s+"([^"]+)"/i) || arg.match(/--country\s+(\S+)/i);
+        if (countryMatch) {
+            country = countryMatch[1];
+            searchText = searchText.replace(countryMatch[0], '').trim();
+        }
+
+        // Extract --limit option
+        const limitMatch = arg.match(/--limit\s+(\d+)/i);
+        if (limitMatch) {
+            maxItems = Math.min(parseInt(limitMatch[1]), 200);
+            searchText = searchText.replace(limitMatch[0], '').trim();
+        }
+
+        // Parse position and optional location from remaining text
+        // Format: "position" location OR position location
+        const quotedMatch = searchText.match(/^"([^"]+)"\s*(.*)$/);
+        let position;
+        if (quotedMatch) {
+            position = quotedMatch[1];
+            location = quotedMatch[2].trim() || null;
+        } else {
+            // Take first word(s) as position, last word as location if multiple words
+            const words = searchText.split(/\s+/);
+            if (words.length > 1) {
+                // Check if last word looks like a location (capitalized)
+                const lastWord = words[words.length - 1];
+                if (/^[A-Z]/.test(lastWord)) {
+                    location = lastWord;
+                    position = words.slice(0, -1).join(' ');
+                } else {
+                    position = searchText;
+                }
+            } else {
+                position = searchText;
+            }
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `Searching Indeed for "${position}"${location ? ` in ${location}` : ''}...`);
+
+        try {
+            const actorInput = {
+                position,
+                country,
+                maxItems,
+                saveOnlyUniqueJobs: true,
+            };
+            if (location) actorInput.location = location;
+
+            const url = `https://api.apify.com/v2/acts/misceres~indeed-scraper/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error ${res.status}: ${errText.substring(0, 100)}`);
+            }
+            const jobs = await res.json();
+
+            if (!jobs?.length) {
+                await bot.editMessageText('No jobs found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            let text = `*Indeed Jobs* (${jobs.length} results)\n\n`;
+            for (const j of jobs.slice(0, 8)) {
+                const title = j.positionName || j.title || 'Unknown';
+                const company = j.company || 'Unknown';
+                const loc = j.location || '';
+                const salary = j.salary || '';
+                text += `*${title}*\n`;
+                text += `${company}${loc ? ` — ${loc}` : ''}\n`;
+                if (salary) text += `${salary}\n`;
+                text += `\n`;
+            }
+
+            if (jobs.length > 8) {
+                text += `_... and ${jobs.length - 8} more jobs_`;
+            }
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
+    // GOOGLE MAPS LEAD SCRAPER COMMAND
+    // ========================================================================
+
+    bot.onText(/\/leads(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "Lead scraping is owner-only (API costs ~$4/1000 + $0.005/lead).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*Google Maps Lead Scraper*\n\n` +
+                `Usage:\n` +
+                `/leads "tech startup" London\n` +
+                `/leads "software company" Manchester --max 50\n` +
+                `/leads "fintech" "London, UK" --leads 5\n\n` +
+                `Options:\n` +
+                `--max: Max places per search (default 20)\n` +
+                `--leads: Leads per company (default 3)\n\n` +
+                `Returns: Business name, address, phone, website, email, rating + employee contacts (name, title, email, LinkedIn)\n\n` +
+                `Cost: ~$4 per 1,000 places + $0.005 per lead`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse options
+        let searchText = arg;
+        let maxResults = 20;
+        let maxLeads = 3;
+
+        const maxMatch = arg.match(/--max\s+(\d+)/i);
+        if (maxMatch) {
+            maxResults = Math.min(parseInt(maxMatch[1]), 100);
+            searchText = searchText.replace(maxMatch[0], '').trim();
+        }
+
+        const leadsMatch = arg.match(/--leads\s+(\d+)/i);
+        if (leadsMatch) {
+            maxLeads = Math.min(parseInt(leadsMatch[1]), 10);
+            searchText = searchText.replace(leadsMatch[0], '').trim();
+        }
+
+        // Parse "search term" location format
+        const parts = searchText.match(/^"([^"]+)"\s+(.+)$/) || searchText.match(/^(\S+)\s+(.+)$/);
+        if (!parts || parts.length < 3) {
+            await bot.sendMessage(chatId, 'Usage: /leads "search term" location\nExample: /leads "tech startup" London');
+            return;
+        }
+
+        const searchTerm = parts[1];
+        const location = parts[2].replace(/^["']|["']$/g, '');
+
+        const statusMsg = await bot.sendMessage(chatId, `Searching Google Maps for "${searchTerm}" in ${location}...`);
+
+        try {
+            const actorInput = {
+                searchStringsArray: [searchTerm],
+                locationQuery: location,
+                maxCrawledPlacesPerSearch: maxResults,
+                scrapeContacts: true,
+                maxLeads: maxLeads,
+                leadsDepartments: ['C-Suite', 'Engineering & Technical', 'Information Technology'],
+            };
+
+            const url = `https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error ${res.status}: ${errText.substring(0, 100)}`);
+            }
+            const places = await res.json();
+
+            if (!places?.length) {
+                await bot.editMessageText('No businesses found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            let text = `*Google Maps Leads* (${places.length} businesses)\n\n`;
+            for (const p of places.slice(0, 5)) {
+                const name = p.title || p.name || 'Unknown';
+                const rating = p.totalScore ? `${p.totalScore}/5` : '';
+                const phone = p.phone || '';
+                const website = p.website || '';
+                const leads = p.leads || [];
+
+                text += `*${name}*${rating ? ` (${rating})` : ''}\n`;
+                if (phone) text += `Phone: ${phone}\n`;
+                if (website) text += `Web: ${website}\n`;
+                if (leads.length > 0) {
+                    text += `Leads: ${leads.length}\n`;
+                    for (const l of leads.slice(0, 2)) {
+                        const lName = l.fullName || l.name || '';
+                        const lTitle = l.jobTitle || '';
+                        if (lName) text += `  - ${lName}${lTitle ? ` (${lTitle})` : ''}\n`;
+                    }
+                }
+                text += `\n`;
+            }
+
+            const totalLeads = places.reduce((sum, p) => sum + (p.leads?.length || 0), 0);
+            if (places.length > 5) {
+                text += `_... and ${places.length - 5} more businesses_\n`;
+            }
+            text += `\n*Total: ${places.length} places, ${totalLeads} leads*`;
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
     // EMAIL INBOX COMMANDS
     // ========================================================================
 
@@ -3114,11 +3656,14 @@ Rules for Python Mode:
         { command: 'health', description: 'Quick system health overview' },
         { command: 'help', description: 'Full guide with tips' },
         { command: 'id', description: 'Your Telegram user and chat ID' },
+        { command: 'indeed', description: 'Indeed job search' },
         { command: 'googlecalendar', description: 'Connect Google Calendar' },
         { command: 'inbox', description: 'Email queue (not_started by default)' },
         { command: 'kill', description: 'Stop all current activities instantly' },
+        { command: 'leads', description: 'Google Maps lead scraper' },
         { command: 'learn', description: 'Educational mode (What/How/Why)' },
         { command: 'linkedin', description: 'Connect or post to LinkedIn' },
+        { command: 'linkedinposts', description: 'Search LinkedIn posts' },
         { command: 'logs', description: 'Recent audit log entries' },
         { command: 'mathematician', description: 'Quantitative and computational' },
         { command: 'memory', description: 'Browse memory banks' },
@@ -3129,6 +3674,7 @@ Rules for Python Mode:
         { command: 'projection', description: 'Monthly cost projection' },
         { command: 'python', description: 'Python data analysis mode' },
         { command: 'research', description: 'Deep research on demand' },
+        { command: 'scrapers', description: 'View all Apify scrapers' },
         { command: 'security', description: 'Security scan and audit' },
         { command: 'skills', description: 'List and manage skills' },
         { command: 'spend', description: 'Daily cost breakdown' },
@@ -3138,6 +3684,7 @@ Rules for Python Mode:
         { command: 'strategist', description: 'Strategic frameworks and analysis' },
         { command: 'tasks', description: 'View scheduled tasks' },
         { command: 'testreport', description: 'Full system health report' },
+        { command: 'tiktok', description: 'TikTok scraper' },
         { command: 'tokens', description: 'Today\'s token usage' },
         { command: 'tracked', description: 'View tracked tasks' },
         { command: 'voice', description: 'Voice message replies' },
