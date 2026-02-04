@@ -6,7 +6,7 @@
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, appendFile } from 'fs/promises';
 import path from 'path';
 import { WORKSPACE_PATH } from './config.js';
 import { fileEmail } from './email-filing.js';
@@ -24,6 +24,15 @@ const POLL_INTERVAL = 2 * 60 * 1000;
 let polling = false;
 let pollCount = 0;
 
+// Owner authentication for email commands
+const OWNER_EMAIL = 'lee@navada.info';
+const OWNER_PASSPHRASE = /hey\s+alex,?\s+this\s+is\s+lee!?/i;
+const OWNER_TELEGRAM_ID = '6920669447';
+const EMAIL_CHAT_PREFIX = 'email-owner-';
+
+// Chat system reference (set via setInboxChatSystem after init)
+let chatSystem = null;
+
 export function setupInbox(deps) {
     config = deps.config;
     bot = deps.bot;
@@ -31,6 +40,14 @@ export function setupInbox(deps) {
     anthropic = deps.anthropic;
     openaiClient = deps.openaiClient;
     console.log(`[INBOX] Setup complete — AI replies enabled, voice ${openaiClient ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Late-binding for chatSystem (required for owner email commands)
+ */
+export function setInboxChatSystem(cs) {
+    chatSystem = cs;
+    console.log('[INBOX] ChatSystem connected — owner email commands enabled');
 }
 
 export function startInboxPolling() {
@@ -45,6 +62,97 @@ export function startInboxPolling() {
     console.log(`[INBOX] Polling ${config.gmail_address} every 2 minutes, notifying ${config.telegram_owner_id}`);
     setTimeout(() => pollInbox(), 15000);
     return setInterval(() => pollInbox(), POLL_INTERVAL);
+}
+
+// ============================================================================
+// OWNER EMAIL AUTHENTICATION & COMMAND PROCESSING
+// ============================================================================
+
+/**
+ * Authenticate an email as an owner command.
+ * Requires BOTH correct sender address AND passphrase in body.
+ * @returns {{ isOwner: boolean, command: string | null }}
+ */
+function authenticateOwnerEmail(fromAddress, bodyText) {
+    // Check sender address (case-insensitive)
+    const isFromOwner = fromAddress && fromAddress.toLowerCase() === OWNER_EMAIL.toLowerCase();
+    if (!isFromOwner) {
+        return { isOwner: false, command: null };
+    }
+
+    // Check for passphrase in body
+    const match = bodyText.match(OWNER_PASSPHRASE);
+    if (!match) {
+        return { isOwner: false, command: null };
+    }
+
+    // Extract command text (everything after the passphrase)
+    const passphraseEnd = match.index + match[0].length;
+    const command = bodyText.substring(passphraseEnd).trim();
+
+    return { isOwner: true, command: command || null };
+}
+
+/**
+ * Process an authenticated owner command through the chat system.
+ * @returns {Promise<string>} The response text
+ */
+async function processOwnerCommand(command, fromName, fromAddress, subject) {
+    if (!chatSystem) {
+        console.error('[INBOX] ChatSystem not available — cannot process owner command');
+        return 'Error: Chat system not available. Please try via Telegram.';
+    }
+
+    // Use a dedicated chatId for email commands to maintain context
+    const chatId = `${EMAIL_CHAT_PREFIX}${Date.now()}`;
+
+    console.log(`[INBOX] Processing owner command from ${fromAddress}: ${command.substring(0, 100)}...`);
+
+    try {
+        // Add context about email source
+        const contextualCommand = `[Email command from Lee — Subject: "${subject}"]\n\n${command}`;
+
+        const response = await chatSystem.chat(
+            chatId,
+            contextualCommand,
+            { first_name: fromName || 'Lee', username: 'lee_email' },
+            {},
+            { source: 'email-owner', isOwnerEmail: true }
+        );
+
+        console.log(`[INBOX] Owner command processed, response: ${response.length} chars`);
+        return response;
+    } catch (err) {
+        console.error('[INBOX] Owner command processing failed:', err.message);
+        return `Error processing command: ${err.message}`;
+    }
+}
+
+/**
+ * Send Telegram notification when an email command is processed
+ */
+async function notifyOwnerCommandProcessed(subject, command, response) {
+    if (!bot || !config.telegram_owner_id) return;
+
+    const truncatedCmd = command.length > 200 ? command.substring(0, 200) + '...' : command;
+    const truncatedResp = response.length > 500 ? response.substring(0, 500) + '...' : response;
+
+    const msg = `*Email Command Processed*\n\n` +
+        `Subject: ${subject}\n` +
+        `Command: ${truncatedCmd}\n\n` +
+        `Response sent via email.\n` +
+        `Preview: ${truncatedResp}`;
+
+    try {
+        await bot.sendMessage(config.telegram_owner_id, msg, { parse_mode: 'Markdown' });
+    } catch (err) {
+        // Fallback to plain text
+        try {
+            await bot.sendMessage(config.telegram_owner_id, msg.replace(/\*/g, ''));
+        } catch (plainErr) {
+            console.error('[INBOX] Failed to notify owner:', plainErr.message);
+        }
+    }
 }
 
 // ============================================================================
@@ -167,7 +275,16 @@ Write a professional, warm, and helpful email reply. Rules:
 - Sign off with "Best regards" or similar — your name and title are in the signature block
 - Do NOT make up specific commitments, dates, or promises
 - Do NOT include any markdown formatting — only HTML
-${voiceRequested ? '- The sender has requested a voice response. Mention naturally in your reply that you have attached an audio version of your response for their convenience. Keep the written reply full and complete — the voice is a bonus, not a replacement.' : ''}`;
+${voiceRequested ? '- The sender has requested a voice response. Mention naturally in your reply that you have attached an audio version of your response for their convenience. Keep the written reply full and complete — the voice is a bonus, not a replacement.' : ''}
+
+CRITICAL DATA PROTECTION RULES (non-negotiable):
+- NEVER share internal NAVADA documents, files, or data
+- NEVER mention specific file contents, internal reports, or research documents
+- NEVER reveal Lee's personal information, private communications, or calendar details
+- NEVER share API keys, credentials, server details, or technical infrastructure information
+- NEVER disclose internal project details, codenames, or confidential business information
+- If the sender asks for sensitive information, politely decline and say "the team will follow up directly if appropriate"
+- You may only share publicly available information about NAVADA from the website`;
 
     try {
         const response = await anthropic.messages.create({
@@ -470,6 +587,81 @@ async function pollInbox() {
                             }
 
                             console.log(`[INBOX] Processing: ${fromAddress} — ${subject}`);
+
+                            // ============================================================
+                            // OWNER EMAIL COMMAND DETECTION
+                            // ============================================================
+                            const ownerAuth = authenticateOwnerEmail(fromAddress, bodyText);
+                            if (ownerAuth.isOwner && ownerAuth.command) {
+                                console.log(`[INBOX] OWNER COMMAND detected from ${fromAddress}`);
+
+                                // Log the command attempt for audit
+                                try {
+                                    const auditEntry = {
+                                        timestamp: new Date().toISOString(),
+                                        from: fromAddress,
+                                        subject,
+                                        command: ownerAuth.command.substring(0, 500),
+                                        authenticated: true,
+                                    };
+                                    await appendFile(
+                                        path.join(WORKSPACE_PATH, 'logs', 'email-commands.jsonl'),
+                                        JSON.stringify(auditEntry) + '\n'
+                                    );
+                                } catch {}
+
+                                // Process the command through chatSystem
+                                const commandResponse = await processOwnerCommand(
+                                    ownerAuth.command,
+                                    fromName,
+                                    fromAddress,
+                                    subject
+                                );
+
+                                // Send email reply with the response
+                                const responseHtml = buildReplyHtml(
+                                    `<p>Hi Lee,</p>` +
+                                    `<p>I've processed your command. Here's my response:</p>` +
+                                    `<div style="background: #f9f9f9; padding: 16px; border-left: 3px solid #1a1a2e; margin: 16px 0; white-space: pre-wrap;">${commandResponse.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>` +
+                                    `<p>Let me know if you need anything else.</p>`
+                                );
+                                await sendReplyEmail(fromAddress, subject, responseHtml);
+                                console.log(`[INBOX] Owner command response sent`);
+
+                                // Notify via Telegram
+                                await notifyOwnerCommandProcessed(subject, ownerAuth.command, commandResponse);
+
+                                // Mark as seen and continue to next email
+                                seen.add(uid);
+                                newCount++;
+
+                                if (postDashboard) {
+                                    postDashboard('add_activity', { entry: `Email command from Lee: ${subject.substring(0, 40)} — processed` });
+                                }
+                                continue;
+                            }
+
+                            // Log failed owner auth attempts (passphrase from wrong sender)
+                            if (OWNER_PASSPHRASE.test(bodyText) && fromAddress.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
+                                console.warn(`[INBOX] WARNING: Passphrase detected from non-owner: ${fromAddress}`);
+                                try {
+                                    const auditEntry = {
+                                        timestamp: new Date().toISOString(),
+                                        from: fromAddress,
+                                        subject,
+                                        authenticated: false,
+                                        reason: 'passphrase_wrong_sender',
+                                    };
+                                    await appendFile(
+                                        path.join(WORKSPACE_PATH, 'logs', 'email-commands.jsonl'),
+                                        JSON.stringify(auditEntry) + '\n'
+                                    );
+                                } catch {}
+                            }
+
+                            // ============================================================
+                            // STANDARD EMAIL PROCESSING (non-owner)
+                            // ============================================================
 
                             // Detect if sender wants a voice response
                             const voiceRequested = wantsVoiceReply(subject, bodyText);

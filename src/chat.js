@@ -1034,7 +1034,17 @@ ${userMemory}
 - Include proper spacing between sections. Emails must look professional and polished.
 - Never send raw text or markdown as email body — always use HTML.
 - Structure emails with: greeting, clear sections with headings, data/analysis, conclusion, sign-off.
-- Example structure: <h2>Section Title</h2><p>Content with proper paragraph spacing.</p><ul><li>Key point one</li><li>Key point two</li></ul>` : '');
+- Example structure: <h2>Section Title</h2><p>Content with proper paragraph spacing.</p><ul><li>Key point one</li><li>Key point two</li></ul>` : '') + (context.isOwnerEmail ? `
+
+## Email Command Context
+You are responding to an authenticated email command from Lee (the owner).
+- You have FULL access to all tools — this is an authenticated owner session
+- Respond comprehensively for email readability — your response will be formatted into an email reply
+- You may access and share any NAVADA data, files, or internal documents since Lee is the owner
+- Execute commands fully and provide complete results
+- If the command involves multiple steps, complete all of them
+- Include relevant details in your response — Lee is reading this via email, not a chat interface
+` : '');
 
         const dynamicBlock = `## Current Context
 ${timeContext}

@@ -68,7 +68,7 @@ import { MemorySystem } from './memory.js';
 import { SkillsSystem } from './skills.js';
 import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost, FULL_ACCESS_USERS } from './tools.js';
 import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
-import { setupInbox, startInboxPolling } from './inbox.js';
+import { setupInbox, startInboxPolling, setInboxChatSystem } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
@@ -4818,8 +4818,9 @@ async function init() {
     setupEmailFiling({ config, bot, anthropic, postDashboard, memory });
     setEmailFilingChatSystem(chatSystem);
 
-    // Start Gmail inbox polling
+    // Start Gmail inbox polling with chatSystem for owner commands
     setupInbox({ config, bot, postDashboard, anthropic, openaiClient });
+    setInboxChatSystem(chatSystem);
     startInboxPolling();
 
     // Start Slack polling
