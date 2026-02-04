@@ -54,7 +54,8 @@ For comparison, a human doing the same job costs ~£50,000/year. ALEX delivers *
 | **Memory** | Persistent memory across conversations with rolling summaries, auto-fact extraction, and RAG |
 | **Skills** | Self-extending plugin system — the agent can create its own tools at runtime |
 | **Dashboard** | Live Vercel dashboard with real-time task tracking, token costs, and activity log |
-| **Multi-Platform** | Telegram + Slack + Gmail + LinkedIn + Google Calendar + CLI + Control API |
+| **Desktop Terminal** | PyQt5 desktop chat UI with voice I/O via Bluetooth speaker ([alex-terminal](https://github.com/leeakpareva/alex-terminal)) |
+| **Multi-Platform** | Telegram + Slack + Gmail + LinkedIn + Google Calendar + Desktop Terminal + Control API |
 | **Modes** | `/learn`, `/mathematician`, `/strategist`, `/python`, `/voice` — stackable specialist modes |
 | **User Management** | Add/remove Telegram users, grant/revoke full access with tiered permissions |
 
@@ -95,9 +96,9 @@ All models have independent circuit breakers — 5 consecutive failures trips th
 ┌──────────────────────────────────────────────────────────────────────┐
 │                          Agent Gateway                                │
 │                        (src/gateway.js)                               │
-├───────────┬──────────┬──────────┬───────────┬───────────────────────┤
-│ Telegram  │  Slack   │  Gmail   │ LinkedIn  │  Google Calendar      │
-│   Bot     │   Bot    │  Inbox   │  OAuth    │  Integration          │
+├──────────┬─────────┬─────────┬──────────┬──────────┬────────────────┤
+│ Telegram │  Slack  │  Gmail  │ LinkedIn │ Calendar │ Desktop        │
+│   Bot    │   Bot   │  Inbox  │  OAuth   │  G-Cal   │ Terminal       │
 ├───────────┴──────────┴──────────┴───────────┴───────────────────────┤
 │                      Chat System (src/chat.js)                        │
 │  Smart Model Routing → Priority Queue → Circuit Breakers → Retry     │
@@ -315,6 +316,18 @@ Authenticated REST API for programmatic access:
 | `/api/users` | GET | List known Telegram users |
 | `/api/broadcast` | POST | Message all known users |
 | `/api/health` | GET | Health check endpoint |
+| `/api/terminal-messages` | GET | Fetch and clear queued messages for ALEX Terminal |
+
+Localhost requests to `/api/trigger`, `/api/command`, `/api/health`, and `/api/terminal-messages` bypass authentication.
+
+### ALEX Terminal Integration
+
+The [ALEX Terminal](https://github.com/leeakpareva/alex-terminal) connects via `/api/command` with an `X-Terminal: true` header. This gives the terminal:
+
+- **Separate conversation context** (`terminal-chat` vs `control-api`) — terminal and Telegram conversations are independent
+- **Terminal-aware responses** — ALEX knows it's in a text-only terminal and avoids image/chart tools, keeps responses concise
+- **Autonomous notifications** — heartbeat task results are queued to `~/.alex/terminal-queue.json` and displayed in the terminal
+- **Voice I/O** — OpenAI TTS (onyx voice) + Whisper STT via USB mic, output through Bluetooth speaker
 
 ---
 
