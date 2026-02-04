@@ -4374,6 +4374,18 @@ Call the send_email tool now with exactly these parameters.`;
                     const isTerminal = req.headers['x-terminal'] === 'true';
                     const chatId = isTerminal ? terminalChatId : controlChatId;
                     const userName = isTerminal ? 'Terminal' : 'Claude Code';
+
+                    // Terminal context: guide ALEX to respond appropriately for a desktop text chat
+                    if (isTerminal) {
+                        userMessage = `[TERMINAL CONTEXT: You are responding via Lee's desktop ALEX Terminal — a text-only chat window on the Raspberry Pi. Rules for this channel:
+1. Be concise and direct — this is a small screen, keep replies short and useful
+2. You CANNOT see images, receive files, or display photos here — if the user asks you to look at something, explain this and suggest they send it via Telegram instead
+3. Do NOT attempt generate_chart, generate_image, generate_diagram, or generate_mindmap — there is no way to display visual output in this terminal
+4. Do NOT narrate your thinking process or failed attempts — just give the answer
+5. You CAN use all text-based tools: web_search, web_lookup, stock_quote, bash, read_file, write_file, memory, email, etc.
+6. Format for readability: use short paragraphs, avoid walls of text]\n\n${userMessage}`;
+                    }
+
                     currentCallerUserId = config.telegram_owner_id || null;
                     const response = await chatSystem.chat(chatId, userMessage, { first_name: userName, username: isTerminal ? 'terminal' : 'claude_code' }, {}, { source: 'api' });
                     currentCallerUserId = null;
