@@ -21,8 +21,13 @@ const SLACK_MODEL_OPTIONS = [
     { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing (default)' },
     { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast & cheap' },
     { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Balanced' },
+    { key: 'opus', label: 'Opus', model: 'claude-opus-4-5-20251101', desc: 'Maximum capability' },
     { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research' },
-    { key: 'gpt-4o', label: 'GPT-4o', model: 'gpt-4o', desc: 'OpenAI' },
+    { key: 'gpt', label: 'GPT-5.2', model: 'gpt-5.2', desc: 'OpenAI flagship' },
+    { key: 'gemini', label: 'Gemini Pro', model: 'google/gemini-2.5-pro', desc: 'Google flagship' },
+    { key: 'llama', label: 'Llama 3.3', model: 'meta-llama/llama-3.3-70b-instruct', desc: 'Meta open-weight' },
+    { key: 'mistral', label: 'Mistral', model: 'mistralai/mistral-large-2411', desc: 'Mistral flagship' },
+    { key: 'qwen', label: 'Qwen', model: 'qwen/qwen-2.5-72b-instruct', desc: 'Alibaba' },
 ];
 
 // Active threads ALEX has replied to — poll these for follow-ups
@@ -206,6 +211,59 @@ async function pollSlack() {
         const keys = [...activeThreads.keys()];
         keys.slice(0, keys.length - 50).forEach(k => activeThreads.delete(k));
     }
+}
+
+/**
+ * Send a message to Slack (exported for tool use)
+ * @param {string} channel - Channel ID or 'default' for main channel, 'owner' for owner DM
+ * @param {string} message - Message text
+ * @param {string} threadTs - Optional thread timestamp for replies
+ */
+export async function sendSlackMessage(channel, message, threadTs = null) {
+    if (!slack || !deps) {
+        return { success: false, error: 'Slack not configured' };
+    }
+
+    const { config } = deps;
+    let targetChannel = channel;
+
+    // Resolve special channel names
+    if (channel === 'default' || channel === 'main') {
+        targetChannel = config.slack_channel_id;
+    } else if (channel === 'owner' || channel === 'lee') {
+        // Find owner's DM channel (first DM channel, or create one)
+        if (dmChannels.size > 0) {
+            targetChannel = [...dmChannels][0];
+        } else {
+            return { success: false, error: 'No DM channels available. Send a message to ALEX on Slack first.' };
+        }
+    }
+
+    try {
+        const result = await slack.chat.postMessage({
+            channel: targetChannel,
+            text: message,
+            ...(threadTs ? { thread_ts: threadTs } : {}),
+        });
+        console.log(`[SLACK] Sent message to ${targetChannel}`);
+        return { success: true, channel: targetChannel, ts: result.ts };
+    } catch (err) {
+        console.error('[SLACK] Send error:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * Get Slack client status
+ */
+export function getSlackStatus() {
+    return {
+        connected: !!slack,
+        botUserId,
+        dmChannels: [...dmChannels],
+        activeThreads: activeThreads.size,
+        polling: !!pollInterval,
+    };
 }
 
 async function handleSlackMessage(msg, channelId, isDm, threadTs) {

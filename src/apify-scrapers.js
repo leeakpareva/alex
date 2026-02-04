@@ -48,6 +48,28 @@ export const APIFY_SCRAPERS = [
         usage: '/leads "tech startup" London --max 20',
         timeout: 300000,
     },
+    {
+        id: 'glassdoor',
+        name: 'Glassdoor Company Scraper',
+        actor: 'memo23~glassdoor-scraper-ppe',
+        tool: 'glassdoor_scrape',
+        command: '/glassdoor',
+        description: 'Scrape Glassdoor for company reviews, salaries, interviews, and benefits',
+        cost: '~$5 per 1,000 results',
+        usage: '/glassdoor Google --salaries --limit 50',
+        timeout: 180000,
+    },
+    {
+        id: 'linkedinprofiles',
+        name: 'LinkedIn Profile Scraper',
+        actor: 'GOvL4O4RwFqsdIqXF',
+        tool: 'linkedin_profile_scrape',
+        command: '/linkedinprofiles',
+        description: 'Scrape LinkedIn profiles for details, work history, and email addresses',
+        cost: '~$5 per 1,000 profiles',
+        usage: '/linkedinprofiles billgates satyanadella --email',
+        timeout: 180000,
+    },
 ];
 
 export function getScraperByCommand(cmd) {

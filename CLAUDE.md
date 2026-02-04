@@ -42,7 +42,7 @@ Telegram message → gateway.js:271 setupTelegram() (dedup + auth)
 |------|------:|---------|---------------|
 | **gateway.js** | 2491 | Entry point: Telegram bot, control API (port 9090), dep injection | `execToolWithDeps` :136, `heartbeatDeps` :159, `setupTelegram` :271, `setupControlAPI` :1975, `catchUpMissedTasks` :2300, `init` :2377 |
 | **chat.js** | 779 | Chat system factory, model routing, summarisation, API calls | `selectModel` :203, `CircuitBreaker` :247, `createChatSystem` :280, `callAnthropicWithRetry` :284, `summarizeOlderMessages` :366, `prepareMessages` :399, `buildSystemPrompt` :495, `processResponse` :593, `chat` :659, `smartSplit` :748 |
-| **tools.js** | 1220 | 31 tool definitions + `executeTool` switch | `TOOLS[]` :144–586, `OWNER_ONLY_TOOLS` :610, `executeTool` :618, `bash` :631, `generate_chart` :926, `generate_diagram` :1156, `generate_mindmap` :1174 |
+| **tools.js** | 1612 | 32 tool definitions + `executeTool` switch | `TOOLS[]` :173–755, `OWNER_ONLY_TOOLS` :785, `executeTool` :817, `bash` :833, `generate_chart` :1151, `generate_diagram` :1435, `generate_mindmap` :1453, `tiktok_scrape` :1601 |
 | **queue.js** | 67 | Priority request queue with 429 cooldown | `enqueue` :16, `_process` :27 |
 | **heartbeat.js** | 235 | Built-in scheduled tasks, dashboard sync, cleanup | `BUILTIN_TASKS` :21, `handleScheduledTask` :90, `runDashboardSync` :133, `runCleanup` :222 |
 | **memory.js** | 215 | Conversations, categorised memory, knowledge base | `MemorySystem.init` :57, `saveConversation` :131, `cleanupOldConversations` :194 |
@@ -58,7 +58,7 @@ Telegram message → gateway.js:271 setupTelegram() (dedup + auth)
 
 ## Tiered Auth System
 
-**Owner (user `6920669447`):** Full access to all 31 tools and all Telegram commands.
+**Owner (user `6920669447`):** Full access to all 32 tools and all Telegram commands.
 
 **Limited users:** Access only to safe, conversational tools. Everything that touches the Pi filesystem, shell, email, scheduling, or costs money is blocked.
 
@@ -68,7 +68,8 @@ Telegram message → gateway.js:271 setupTelegram() (dedup + auth)
 bash, read_file, write_file, edit_file, list_directory, grep, glob,
 send_email, schedule_task, delete_task, confirm_delete, fetch_url,
 generate_pdf, generate_image, create_skill,
-send_file, send_voice_message, update_dashboard, memory_save
+send_file, send_voice_message, update_dashboard, memory_save,
+tiktok_scrape
 ```
 
 ### Public tools (all users)
@@ -265,7 +266,8 @@ Actions: `add_task`, `add_activity`, `add_news`, `update_metrics`, `update_servi
 - **Token conservation**: System prompt includes skill names only (not full definitions), RAG top-3 chunks, rolling conversation summaries, last 12 messages verbatim.
 - **Queue priority**: User messages = 10, scheduled tasks = 1. Higher = processed first.
 - **Email signature**: Uses publicly hosted images (freeimage.host). Both template and non-template paths must be updated when changing signature.
-- **Alpha Vantage**: Financial tools use `alphaVantageQuery()` helper (`tools.js:129`). API key in config as `alphavantage_api_key`.
+- **Alpha Vantage**: Financial tools use `alphaVantageQuery()` helper (`tools.js:158`). API key in config as `alphavantage_api_key`.
+- **Apify**: TikTok scraper uses `apifyRunActor()` helper (`tools.js:173`). API key in config as `apify_api_key`. Uses `clockworks~tiktok-scraper` actor.
 
 ---
 
@@ -296,6 +298,7 @@ Markmap via `npx markmap-cli` + Puppeteer screenshot. Accepts markdown outline, 
 | `6850034` | Alpha Vantage financial tools, Slack integration, email filing |
 | Latest | Allow chart/diagram/mindmap tools for all users (removed from OWNER_ONLY_TOOLS) |
 | Latest | 25 improvements: rate limiting, CORS hardening, tool timeouts, health endpoint, prompt caching, bash blocklist, tool output truncation, RECENT_WINDOW=8, keyword index, conversation archiving, auto-fact extraction, user prefs, RAG fallback, enhanced briefing, deadline follow-ups, stock alerts, idle starters, auto-reminders, circuit breakers for DeepSeek/OpenAI, graceful shutdown, test suite |
+| Latest | TikTok scraper (`tiktok_scrape` tool + `/tiktok` command) via Apify API |
 
 ---
 

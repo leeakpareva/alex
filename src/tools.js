@@ -527,6 +527,19 @@ export const TOOLS = [
         }
     },
     {
+        name: "send_slack_message",
+        description: "Send a message to Slack. Use 'default' for main channel, 'owner' for Lee's DM, or a specific channel ID.",
+        input_schema: {
+            type: "object",
+            properties: {
+                channel: { type: "string", description: "Channel: 'default', 'owner', or channel ID" },
+                message: { type: "string", description: "Message text to send" },
+                thread_ts: { type: "string", description: "Optional thread timestamp for replies" }
+            },
+            required: ["channel", "message"]
+        }
+    },
+    {
         name: "get_recent_uploads",
         description: "Get list of files recently uploaded by the user in this chat (photos, documents). Returns file paths that can be used with send_email attachment_path.",
         input_schema: {
@@ -837,6 +850,48 @@ export const TOOLS = [
             },
             required: ["searchTerms", "location"]
         }
+    },
+    {
+        name: "glassdoor_scrape",
+        description: "Scrape Glassdoor for company reviews, salaries, interviews, and benefits. Accepts company URL or search query. Cost: ~$5 per 1,000 results.",
+        input_schema: {
+            type: "object",
+            properties: {
+                startUrls: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Glassdoor company URLs to scrape (e.g. https://www.glassdoor.com/Overview/Working-at-Google-EI_IE9079.htm)"
+                },
+                searchQuery: {
+                    type: "string",
+                    description: "Company name to search for (e.g. 'Google', 'Microsoft')"
+                },
+                scrapeReviews: { type: "boolean", description: "Scrape employee reviews (default: true)" },
+                scrapeInterviews: { type: "boolean", description: "Scrape interview experiences (default: true)" },
+                scrapeSalaries: { type: "boolean", description: "Scrape salary data (default: true)" },
+                scrapeBenefits: { type: "boolean", description: "Scrape benefits info (default: true)" },
+                maxItems: { type: "number", description: "Max results to return (default: 50, max: 100)" }
+            }
+        }
+    },
+    {
+        name: "linkedin_profile_scrape",
+        description: "Scrape LinkedIn profile details including name, headline, location, work experience, education, certifications, and optional email addresses. Cost: ~$5 per 1,000 profiles.",
+        input_schema: {
+            type: "object",
+            properties: {
+                profiles: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "LinkedIn profile usernames or full URLs (e.g. ['johndoe', 'https://linkedin.com/in/janedoe'])"
+                },
+                searchForEmail: {
+                    type: "boolean",
+                    description: "Search for email addresses associated with profiles (default: true)"
+                }
+            },
+            required: ["profiles"]
+        }
     }
 ];
 
@@ -873,7 +928,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'bash', 'read_file', 'write_file', 'edit_file', 'list_directory', 'grep', 'glob',
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_image', 'create_skill',
-    'send_file', 'send_voice_message', 'update_dashboard', 'memory_save',
+    'send_file', 'send_voice_message', 'send_slack_message', 'update_dashboard', 'memory_save',
     'manage_user', 'generate_webapp', 'linkedin_post',
     'calendar_list_events', 'calendar_create_event', 'calendar_update_event', 'calendar_delete_event',
     'tiktok_scrape',
@@ -881,6 +936,8 @@ const OWNER_ONLY_TOOLS = new Set([
     'linkedin_posts_search',
     'indeed_job_search',
     'google_maps_leads',
+    'glassdoor_scrape',
+    'linkedin_profile_scrape',
 ]);
 
 // Per-tool timeout limits (milliseconds)
@@ -895,8 +952,10 @@ const TOOL_TIMEOUTS = {
     tiktok_scrape: 180000,
     tiktok_download: 120000,
     linkedin_posts_search: 180000,
+    linkedin_profile_scrape: 180000,
     indeed_job_search: 180000,
     google_maps_leads: 300000,  // 5 minutes - lead enrichment takes time
+    glassdoor_scrape: 180000,
 };
 const DEFAULT_TOOL_TIMEOUT = 30000;
 
@@ -1326,6 +1385,12 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const voicePath = path.join(WORKSPACE_PATH, `voice_${Date.now()}.ogg`);
                 await fs.writeFile(voicePath, buffer);
                 return { success: true, path: voicePath, send_voice: true, message: 'Voice message generated' };
+            }
+
+            case 'send_slack_message': {
+                const { sendSlackMessage } = await import('./slack.js');
+                const result = await sendSlackMessage(input.channel, input.message, input.thread_ts);
+                return result;
             }
 
             case 'get_recent_uploads': {
@@ -1892,6 +1957,131 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     };
                 } catch (err) {
                     return { success: false, error: `Google Maps lead search failed: ${err.message}` };
+                }
+            }
+
+            case 'glassdoor_scrape': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                const actorInput = {
+                    scrapeReviews: input.scrapeReviews !== false,
+                    scrapeInterviews: input.scrapeInterviews !== false,
+                    scrapeSalaries: input.scrapeSalaries !== false,
+                    scrapeBenefits: input.scrapeBenefits !== false,
+                };
+
+                if (input.startUrls?.length) {
+                    actorInput.startUrls = input.startUrls.map(url => ({ url }));
+                }
+                if (input.searchQuery) {
+                    actorInput.searchQuery = input.searchQuery;
+                }
+
+                try {
+                    const results = await apifyRunActor('memo23~glassdoor-scraper-ppe', actorInput, apiKey, 180000);
+
+                    if (!Array.isArray(results) || results.length === 0) {
+                        return { success: true, message: 'No results found.', data: [] };
+                    }
+
+                    const maxItems = Math.min(input.maxItems || 50, 100);
+                    const formatted = results.slice(0, maxItems).map((r, i) => ({
+                        index: i + 1,
+                        company: r.companyName || r.name || 'Unknown',
+                        rating: r.overallRating || r.rating || null,
+                        reviewsCount: r.numberOfReviews || 0,
+                        salaryCount: r.numberOfSalaries || 0,
+                        interviewsCount: r.numberOfInterviews || 0,
+                        recommendToFriend: r.recommendToFriend || null,
+                        ceoApproval: r.ceoApproval || null,
+                        reviews: (r.reviews || []).slice(0, 3).map(rev => ({
+                            title: rev.title || rev.headline || '',
+                            rating: rev.rating || rev.overallRating || null,
+                            pros: (rev.pros || '').substring(0, 200),
+                            cons: (rev.cons || '').substring(0, 200),
+                            role: rev.jobTitle || rev.role || '',
+                        })),
+                        salaries: (r.salaries || []).slice(0, 5).map(sal => ({
+                            jobTitle: sal.jobTitle || sal.title || '',
+                            salary: sal.salary || sal.basePay || sal.totalPay || '',
+                            currency: sal.currency || '',
+                        })),
+                        interviews: (r.interviews || []).slice(0, 3).map(int => ({
+                            jobTitle: int.jobTitle || int.title || '',
+                            difficulty: int.difficulty || '',
+                            experience: int.experience || '',
+                            offer: int.offer || int.gotOffer || '',
+                        })),
+                    }));
+
+                    return {
+                        success: true,
+                        message: `Scraped ${results.length} Glassdoor entries.`,
+                        count: results.length,
+                        data: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `Glassdoor scrape failed: ${err.message}` };
+                }
+            }
+
+            case 'linkedin_profile_scrape': {
+                const apiKey = config?.apify_api_key;
+                if (!apiKey) return { success: false, error: 'Apify API key not configured.' };
+
+                // Normalize profile inputs to URLs
+                const profileUrls = input.profiles.map(p => {
+                    if (p.startsWith('http')) return p;
+                    return `https://www.linkedin.com/in/${p.replace(/^@/, '')}`;
+                });
+
+                const actorInput = {
+                    profileUrls,
+                    searchForEmail: input.searchForEmail !== false,
+                };
+
+                try {
+                    const profiles = await apifyRunActor('GOvL4O4RwFqsdIqXF', actorInput, apiKey, 180000);
+
+                    if (!Array.isArray(profiles) || profiles.length === 0) {
+                        return { success: true, message: 'No profiles found.', profiles: [] };
+                    }
+
+                    const formatted = profiles.slice(0, 50).map((p, i) => ({
+                        index: i + 1,
+                        name: p.fullName || p.name || 'Unknown',
+                        headline: p.headline || '',
+                        location: p.location || p.geoLocation || '',
+                        profileUrl: p.profileUrl || p.url || '',
+                        email: p.email || p.emails?.[0] || '',
+                        phone: p.phone || '',
+                        currentCompany: p.currentCompany || p.experience?.[0]?.company || '',
+                        currentTitle: p.currentTitle || p.experience?.[0]?.title || '',
+                        summary: (p.summary || p.about || '').substring(0, 300),
+                        experience: (p.experience || []).slice(0, 3).map(e => ({
+                            title: e.title || '',
+                            company: e.company || e.companyName || '',
+                            duration: e.duration || '',
+                        })),
+                        education: (p.education || []).slice(0, 2).map(e => ({
+                            school: e.school || e.schoolName || '',
+                            degree: e.degree || '',
+                            field: e.field || e.fieldOfStudy || '',
+                        })),
+                        certifications: (p.certifications || []).slice(0, 3).map(c => c.name || c),
+                    }));
+
+                    const emailCount = formatted.filter(p => p.email).length;
+                    return {
+                        success: true,
+                        message: `Scraped ${profiles.length} LinkedIn profiles. Found ${emailCount} email addresses.`,
+                        count: profiles.length,
+                        emailsFound: emailCount,
+                        profiles: formatted,
+                    };
+                } catch (err) {
+                    return { success: false, error: `LinkedIn profile scrape failed: ${err.message}` };
                 }
             }
 

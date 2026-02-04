@@ -32,6 +32,34 @@ function downloadFile(url) {
     });
 }
 
+// Extract text from PDF and save for RAG indexing (async, fire-and-forget)
+async function extractPdfForRag(pdfPath) {
+    try {
+        // Extract text using pdftotext
+        const { stdout } = await execAsync(`pdftotext -layout "${pdfPath}" -`, {
+            timeout: 30000,
+            maxBuffer: 10 * 1024 * 1024
+        });
+
+        if (stdout.trim().length < 50) {
+            console.log('[PDF] Skipping RAG indexing - extracted text too short');
+            return;
+        }
+
+        // Save extracted text alongside PDF
+        const txtPath = pdfPath.replace(/\.pdf$/i, '.txt');
+        await writeFile(txtPath, stdout);
+        console.log(`[PDF] Text extracted to ${txtPath} (${stdout.length} chars)`);
+
+        // Trigger RAG re-index (debounced via indexRAG if available)
+        if (typeof indexRAG === 'function') {
+            indexRAG().catch(err => console.error('[PDF] RAG re-index failed:', err.message));
+        }
+    } catch (err) {
+        console.error('[PDF] Text extraction failed:', err.message);
+    }
+}
+
 import { WORKSPACE_PATH, loadConfig } from './config.js';
 import { appendFile, mkdir, readFile, writeFile, unlink } from 'fs/promises';
 import { createWriteStream } from 'fs';
@@ -53,8 +81,12 @@ async function sendMarkdown(chatId, text, extra = {}) {
     try {
         await bot.sendMessage(chatId, text, { ...extra, parse_mode: 'Markdown' });
     } catch (err) {
-        if (err?.response?.body?.error_code === 400) {
+        // Handle Markdown parse errors (400 Bad Request: can't parse entities)
+        const is400 = err?.response?.body?.error_code === 400 || err?.response?.statusCode === 400;
+        const isParseError = err?.message?.includes("can't parse entities") || err?.response?.body?.description?.includes("can't parse entities");
+        if (is400 || isParseError) {
             // Markdown parse failed — send as plain text
+            console.log('[TELEGRAM] Markdown parse failed, sending as plain text');
             await bot.sendMessage(chatId, text, extra);
         } else {
             throw err;
@@ -72,6 +104,7 @@ let anthropic = null;
 let openaiClient = null;
 let deepseekClient = null;
 let kimiClient = null;
+let openrouterClient = null;
 let memory = null;
 let skills = null;
 let scheduledTasks = new Map();
@@ -85,6 +118,17 @@ const modelOverrides = new Map(); // Track per-chat model locks
 const awaitingModelSelect = new Set(); // Chats waiting for model selection reply
 const recentUploads = new Map(); // chatId → [{ path, filename, timestamp }]
 let lastOwnerMessageTime = Date.now(); // Track owner activity for idle starters
+
+// KEMET Automotive authorized users (Lee, Nissi, Chopstix)
+const KEMET_AUTHORIZED_USERS = new Set([
+    '6920669447',   // Lee (owner)
+    // Add Nissi's Telegram ID when known
+    // Add Chopstix's Telegram ID when known
+]);
+
+function isKemetAuthorized(userId) {
+    return KEMET_AUTHORIZED_USERS.has(String(userId));
+}
 
 // In-memory dashboard state (mirrors dash:data in Redis)
 const dashState = {
@@ -334,6 +378,7 @@ I'm ALEX, an autonomous AI economist running 24/7 on a Raspberry Pi. I research 
 /indeed — Indeed job search
 /leads — Google Maps lead scraper
 /scrapers — View all Apify scrapers
+/kemet — KEMET Automotive project (restricted)
 /status — System health and uptime
 /duties — All duties and schedules
 /models — Switch AI model
@@ -1348,7 +1393,7 @@ Just message me naturally for anything else.`;
 
             const parts = smartSplit(response, 4000);
             for (const part of parts) {
-                await bot.sendMessage(chatId, part, { parse_mode: 'Markdown' });
+                await sendMarkdown(chatId, part);
             }
 
             // Send any queued files
@@ -1897,6 +1942,124 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         });
         text += `\n_${trackedTasks.length} tracked. Use CAPITAL keywords (TASK, APPOINTMENT, BOOKING, etc.) to track items._`;
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    });
+
+    // ========================================================================
+    // PERFORMANCE SCORECARD — Weekly employee metrics
+    // ========================================================================
+
+    bot.onText(/\/performance/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+
+        try {
+            const logsDir = path.join(WORKSPACE_PATH, 'logs');
+            const auditDir = path.join(logsDir, 'audit');
+            const tokensDir = path.join(logsDir, 'tokens');
+
+            // Get last 7 days of data
+            const now = new Date();
+            const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+
+            let totalResponses = 0;
+            let totalToolCalls = 0;
+            let totalErrors = 0;
+            let totalTokensIn = 0;
+            let totalTokensOut = 0;
+            let scheduledTasks = 0;
+            let userMessages = 0;
+            const modelUsage = {};
+
+            // Process last 7 days of logs
+            for (let d = 0; d < 7; d++) {
+                const date = new Date(now - d * 24 * 60 * 60 * 1000);
+                const dateStr = date.toISOString().split('T')[0];
+
+                // Audit logs
+                const auditFile = path.join(auditDir, `audit_${dateStr}.jsonl`);
+                try {
+                    const auditData = await readFile(auditFile, 'utf-8');
+                    for (const line of auditData.split('\n').filter(Boolean)) {
+                        try {
+                            const entry = JSON.parse(line);
+                            if (entry.type === 'alex_response') totalResponses++;
+                            if (entry.type === 'tool_execution') {
+                                totalToolCalls++;
+                                if (!entry.success) totalErrors++;
+                            }
+                            if (entry.type === 'user_message') userMessages++;
+                            if (entry.type === 'scheduled_task') scheduledTasks++;
+                        } catch {}
+                    }
+                } catch {}
+
+                // Token logs
+                const tokenFile = path.join(tokensDir, `tokens_${dateStr}.jsonl`);
+                try {
+                    const tokenData = await readFile(tokenFile, 'utf-8');
+                    for (const line of tokenData.split('\n').filter(Boolean)) {
+                        try {
+                            const entry = JSON.parse(line);
+                            totalTokensIn += entry.input_tokens || 0;
+                            totalTokensOut += entry.output_tokens || 0;
+                            const model = entry.model || 'unknown';
+                            modelUsage[model] = (modelUsage[model] || 0) + 1;
+                        } catch {}
+                    }
+                } catch {}
+            }
+
+            // Calculate costs (approximate)
+            const GBP = 0.79;
+            let costUsd = 0;
+            // Rough estimate: assume mix of Haiku ($0.80/$4) and Sonnet ($3/$15) per 1M tokens
+            costUsd += (totalTokensIn / 1e6) * 1.5; // avg input cost
+            costUsd += (totalTokensOut / 1e6) * 8;  // avg output cost
+            const costGbp = costUsd * GBP;
+
+            // Process uptime
+            const processUpSec = Math.floor(process.uptime());
+            const pDays = Math.floor(processUpSec / 86400);
+            const pHours = Math.floor((processUpSec % 86400) / 3600);
+            const pMins = Math.floor((processUpSec % 3600) / 60);
+            const uptimeStr = pDays > 0 ? `${pDays}d ${pHours}h` : `${pHours}h ${pMins}m`;
+
+            // Success rate
+            const successRate = totalToolCalls > 0 ? ((totalToolCalls - totalErrors) / totalToolCalls * 100).toFixed(1) : '100';
+
+            // Top model
+            const topModel = Object.entries(modelUsage).sort((a, b) => b[1] - a[1])[0];
+
+            const scorecard = `*ALEX — Weekly Performance Scorecard*
+_${weekAgo.toLocaleDateString('en-GB')} → ${now.toLocaleDateString('en-GB')}_
+
+*Availability*
+• Current uptime: ${uptimeStr}
+• Status: Online
+
+*Workload*
+• User messages handled: ${userMessages.toLocaleString()}
+• Responses sent: ${totalResponses.toLocaleString()}
+• Tool executions: ${totalToolCalls.toLocaleString()}
+• Scheduled tasks: ${scheduledTasks.toLocaleString()}
+
+*Quality*
+• Tool success rate: ${successRate}%
+• Errors: ${totalErrors}
+
+*Resources*
+• Tokens (in): ${(totalTokensIn / 1000).toFixed(1)}K
+• Tokens (out): ${(totalTokensOut / 1000).toFixed(1)}K
+• Est. cost: £${costGbp.toFixed(2)}
+• Primary model: ${topModel ? topModel[0].split('-').slice(0, 2).join('-') : 'N/A'}
+
+_Raw logs: ~/.alex/logs/audit/ & tokens/_`;
+
+            await bot.sendMessage(chatId, scorecard, { parse_mode: 'Markdown' });
+        } catch (err) {
+            console.error('[PERFORMANCE] Error:', err.message);
+            await bot.sendMessage(chatId, `Error generating performance data: ${err.message}`);
+        }
     });
 
     // ========================================================================
@@ -2506,6 +2669,359 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
     });
 
     // ========================================================================
+    // GLASSDOOR SCRAPER COMMAND
+    // ========================================================================
+
+    bot.onText(/\/glassdoor(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "Glassdoor scraping is owner-only (API costs ~$5/1000 results).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*Glassdoor Scraper*\n\n` +
+                `Usage:\n` +
+                `/glassdoor Google\n` +
+                `/glassdoor Microsoft --salaries\n` +
+                `/glassdoor "Meta" --reviews --limit 30\n` +
+                `/glassdoor https://glassdoor.com/Overview/...\n\n` +
+                `Options:\n` +
+                `--reviews: Reviews only\n` +
+                `--salaries: Salaries only\n` +
+                `--interviews: Interviews only\n` +
+                `--limit N: Max results (default 50)\n\n` +
+                `Returns: Company rating, reviews, salaries, interviews, benefits\n\n` +
+                `Cost: ~$5 per 1,000 results`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse options
+        let query = arg;
+        let scrapeReviews = true, scrapeSalaries = true, scrapeInterviews = true, scrapeBenefits = true;
+        let limit = 50;
+
+        // Check for filter flags (mutually exclusive)
+        if (arg.includes('--reviews')) {
+            scrapeSalaries = false; scrapeInterviews = false; scrapeBenefits = false;
+            query = query.replace(/--reviews/g, '').trim();
+        }
+        if (arg.includes('--salaries')) {
+            scrapeReviews = false; scrapeInterviews = false; scrapeBenefits = false;
+            query = query.replace(/--salaries/g, '').trim();
+        }
+        if (arg.includes('--interviews')) {
+            scrapeReviews = false; scrapeSalaries = false; scrapeBenefits = false;
+            query = query.replace(/--interviews/g, '').trim();
+        }
+
+        // Extract --limit option
+        const limitMatch = arg.match(/--limit\s+(\d+)/i);
+        if (limitMatch) {
+            limit = Math.min(parseInt(limitMatch[1]), 100);
+            query = query.replace(limitMatch[0], '').trim();
+        }
+
+        // Clean up query (remove quotes)
+        query = query.replace(/^["']|["']$/g, '').trim();
+
+        if (!query) {
+            await bot.sendMessage(chatId, 'Please provide a company name or Glassdoor URL.');
+            return;
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `Scraping Glassdoor for "${query}"...`);
+
+        try {
+            const actorInput = { scrapeReviews, scrapeSalaries, scrapeInterviews, scrapeBenefits };
+
+            if (query.includes('glassdoor.com')) {
+                actorInput.startUrls = [{ url: query }];
+            } else {
+                actorInput.searchQuery = query;
+            }
+
+            const url = `https://api.apify.com/v2/acts/memo23~glassdoor-scraper-ppe/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+                signal: AbortSignal.timeout(180000),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error ${res.status}: ${errText.substring(0, 100)}`);
+            }
+            const results = await res.json();
+
+            if (!results?.length) {
+                await bot.editMessageText('No results found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            // Format output
+            let text = `*Glassdoor: ${query}*\n\n`;
+
+            for (const r of results.slice(0, 3)) {
+                const company = r.companyName || r.name || 'Company';
+                text += `*${company}*\n`;
+                if (r.overallRating) text += `Rating: ${r.overallRating}/5\n`;
+                if (r.numberOfReviews) text += `Reviews: ${r.numberOfReviews.toLocaleString()}\n`;
+                if (r.recommendToFriend) text += `Recommend: ${r.recommendToFriend}%\n`;
+                if (r.ceoApproval) text += `CEO Approval: ${r.ceoApproval}%\n`;
+
+                // Show salaries if available
+                if (r.salaries?.length && scrapeSalaries) {
+                    text += `\n_Top Salaries:_\n`;
+                    for (const s of r.salaries.slice(0, 3)) {
+                        const title = s.jobTitle || s.title || 'Unknown';
+                        const pay = s.salary || s.basePay || s.totalPay || 'N/A';
+                        text += `  ${title}: ${pay}\n`;
+                    }
+                }
+
+                // Show reviews if available
+                if (r.reviews?.length && scrapeReviews) {
+                    text += `\n_Recent Reviews:_\n`;
+                    for (const rev of r.reviews.slice(0, 2)) {
+                        const title = rev.title || rev.headline || '';
+                        const rating = rev.rating || rev.overallRating || '';
+                        if (title) text += `  ${rating ? `(${rating}/5) ` : ''}${title.substring(0, 60)}\n`;
+                    }
+                }
+
+                text += '\n';
+            }
+
+            text += `_${results.length} results scraped_`;
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+
+            // Track on dashboard
+            postDashboard('update_apify', { actor: 'memo23~glassdoor-scraper-ppe', results: results.length });
+
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
+    // LINKEDIN PROFILE SCRAPER COMMAND
+    // ========================================================================
+
+    bot.onText(/\/linkedinprofiles(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) {
+            await bot.sendMessage(chatId, "Authorized users only.");
+            return;
+        }
+        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "LinkedIn profile scraping is owner-only (API costs ~$5/1000 profiles).");
+            return;
+        }
+        if (!config.apify_api_key) {
+            await bot.sendMessage(chatId, 'Apify API key not configured.');
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+        if (!arg) {
+            const help = `*LinkedIn Profile Scraper*\n\n` +
+                `Usage:\n` +
+                `/linkedinprofiles billgates\n` +
+                `/linkedinprofiles satyanadella billgates\n` +
+                `/linkedinprofiles billgates --email\n` +
+                `/linkedinprofiles https://linkedin.com/in/johndoe\n\n` +
+                `Options:\n` +
+                `--email, -e: Force email search (on by default)\n` +
+                `--no-email: Disable email search\n\n` +
+                `Returns: Name, headline, location, work history, education, certifications, and email addresses\n\n` +
+                `Cost: ~$5 per 1,000 profiles`;
+            await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Parse options
+        const parts = arg.split(/\s+/);
+        const searchForEmail = !parts.includes('--no-email');
+        const profiles = parts.filter(p => !p.startsWith('-'));
+
+        if (profiles.length === 0) {
+            await bot.sendMessage(chatId, 'Please provide at least one LinkedIn username or profile URL.');
+            return;
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `Scraping ${profiles.length} LinkedIn profile(s)...`);
+
+        try {
+            // Normalize profile inputs to URLs
+            const profileUrls = profiles.map(p => {
+                if (p.startsWith('http')) return p;
+                return `https://www.linkedin.com/in/${p.replace(/^@/, '')}`;
+            });
+
+            const actorInput = {
+                profileUrls,
+                searchForEmail,
+            };
+
+            const url = `https://api.apify.com/v2/acts/GOvL4O4RwFqsdIqXF/run-sync-get-dataset-items?token=${config.apify_api_key}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(actorInput),
+                signal: AbortSignal.timeout(180000),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error ${res.status}: ${errText.substring(0, 100)}`);
+            }
+            const results = await res.json();
+
+            if (!results?.length) {
+                await bot.editMessageText('No profiles found.', { chat_id: chatId, message_id: statusMsg.message_id });
+                return;
+            }
+
+            // Format output
+            let text = `*LinkedIn Profiles* (${results.length} result${results.length !== 1 ? 's' : ''})\n\n`;
+
+            for (const p of results.slice(0, 5)) {
+                const name = p.fullName || p.name || 'Unknown';
+                const headline = p.headline || '';
+                const location = p.location || p.geoLocation || '';
+                const email = p.email || p.emails?.[0] || '';
+                const currentCompany = p.currentCompany || p.experience?.[0]?.company || '';
+                const currentTitle = p.currentTitle || p.experience?.[0]?.title || '';
+
+                text += `*${name}*\n`;
+                if (headline) text += `${headline.substring(0, 60)}\n`;
+                if (location) text += `${location}\n`;
+                if (currentTitle && currentCompany) text += `${currentTitle} at ${currentCompany}\n`;
+                else if (currentCompany) text += `${currentCompany}\n`;
+                if (email) text += `Email: ${email}\n`;
+                text += `\n`;
+            }
+
+            const emailCount = results.filter(p => p.email || p.emails?.[0]).length;
+            if (results.length > 5) {
+                text += `_... and ${results.length - 5} more profiles_\n`;
+            }
+            text += `\n*Emails found: ${emailCount}/${results.length}*`;
+
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+            });
+
+            // Track on dashboard
+            postDashboard('update_apify', { actor: 'GOvL4O4RwFqsdIqXF', results: results.length });
+
+        } catch (err) {
+            await bot.editMessageText(`Failed: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+    });
+
+    // ========================================================================
+    // KEMET AUTOMOTIVE PROJECT COMMAND
+    // ========================================================================
+
+    bot.onText(/\/kemet(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+
+        // Access control - KEMET data is confidential
+        if (!isKemetAuthorized(userId)) {
+            await bot.sendMessage(chatId, "Access denied. KEMET project data is restricted to authorized team members.");
+            return;
+        }
+
+        const arg = match?.[1]?.trim();
+
+        // No argument: show project dashboard
+        if (!arg) {
+            const dashboard = `*KEMET Automotive - R&D Software Lab*
+
+*Client:* Nissi Ogulu (Co-CEO)
+*Budget:* £116,280
+*Stage:* Not Approved
+*Timeline:* April 2026 - March 2027
+
+*Team:*
+- Lee Akpareva - AI Lead (80% utilisation)
+- Malcolm - Design Director (40% utilisation)
+
+*Location:* Cotonou, Benin
+
+*Product:* GEZO Electric Tricycle
+- Target: 20 vehicles/month
+- First vehicle within 3 months
+
+*Commands:*
+/kemet budget - Cost breakdown
+/kemet timeline - Project milestones
+/kemet team - Team & roles
+/kemet [question] - Ask anything about the project`;
+
+            await bot.sendMessage(chatId, dashboard, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Process KEMET query with Opus model
+        try {
+            const statusMsg = await bot.sendMessage(chatId, 'Analyzing KEMET project data...');
+
+            // Start typing indicator
+            const typingInterval = setInterval(() => {
+                bot.sendChatAction(chatId, 'typing').catch(() => {});
+            }, 4000);
+
+            try {
+                const response = await chatSystem.chat(
+                    `kemet-${chatId}`,
+                    `[KEMET PROJECT QUERY - USE OPUS FOR ACCURACY]\n\nUser query: ${arg}\n\nContext: This is about KEMET Automotive R&D project. Use the KEMET project knowledge to answer accurately. If charts/graphs requested, use generate_chart or generate_diagram tools.`,
+                    msg.from,
+                    { modelOverride: 'claude-opus-4-5-20251101' },
+                    { chatId, source: 'telegram-kemet' }
+                );
+
+                clearInterval(typingInterval);
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+
+                const parts = smartSplit(response, 4000);
+                for (const part of parts) {
+                    await sendMarkdown(chatId, part);
+                }
+            } catch (chatErr) {
+                clearInterval(typingInterval);
+                throw chatErr;
+            }
+        } catch (err) {
+            console.error('[KEMET] Error:', err.message);
+            await bot.sendMessage(chatId, `Error: ${err.message}`);
+        }
+    });
+
+    // ========================================================================
     // EMAIL INBOX COMMANDS
     // ========================================================================
 
@@ -3095,6 +3611,12 @@ Built by NAVADA. Running 24/7 on a Raspberry Pi 5.
         { key: 'kimi-thinking', label: 'Kimi K2 Thinking', model: 'kimi-k2-thinking', desc: 'Reasoning mode. 256K context', price: '$1.00/$4.00 per 1M' },
         // Other
         { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research and analysis. Text only', price: '$0.14/$0.28 per 1M' },
+        // OpenRouter models
+        { key: 'gemini-pro', label: 'Gemini 2.5 Pro', model: 'google/gemini-2.5-pro', desc: 'Google flagship. 1M context. Tool support', price: '$1.25/$10.00 per 1M' },
+        { key: 'gemini-flash', label: 'Gemini 2.5 Flash', model: 'google/gemini-2.5-flash', desc: 'Fast Google model. Tool support', price: '$0.15/$0.60 per 1M' },
+        { key: 'llama', label: 'Llama 3.3 70B', model: 'meta-llama/llama-3.3-70b-instruct', desc: 'Meta open-weight. Fast and capable', price: '$0.40/$0.40 per 1M' },
+        { key: 'mistral', label: 'Mistral Large', model: 'mistralai/mistral-large-2411', desc: 'Mistral flagship. Tool support', price: '$2.00/$6.00 per 1M' },
+        { key: 'qwen', label: 'Qwen 2.5 72B', model: 'qwen/qwen-2.5-72b-instruct', desc: 'Alibaba flagship. Text only', price: '$0.35/$0.40 per 1M' },
     ];
 
     function buildModelMenu(chatId) {
@@ -3307,7 +3829,20 @@ Call the send_email tool now with exactly these parameters.`;
                             { type: 'text', text: caption }
                         ];
                     } else if (ext === '.pdf') {
-                        // PDF — send as document to Claude
+                        // PDF — save to disk for RAG indexing, then send to Claude
+                        const pdfDir = path.join(WORKSPACE_PATH, 'files', 'pdfs');
+                        await mkdir(pdfDir, { recursive: true });
+                        const pdfFilename = `${Date.now()}_${fileName}`;
+                        const pdfPath = path.join(pdfDir, pdfFilename);
+                        await writeFile(pdfPath, fileBuffer);
+                        console.log(`[PDF] Saved to ${pdfPath}`);
+
+                        // Extract text for RAG indexing (async, don't block)
+                        extractPdfForRag(pdfPath).catch(err =>
+                            console.error('[PDF] RAG indexing failed:', err.message)
+                        );
+
+                        // Send as document to Claude
                         const base64 = fileBuffer.toString('base64');
                         contentBlocks = [
                             { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
@@ -3653,12 +4188,14 @@ Rules for Python Mode:
         { command: 'errors', description: 'Today\'s errors from audit log' },
         { command: 'exit', description: 'Turn off all active modes' },
         { command: 'fixes', description: 'Recent changelog and improvements' },
+        { command: 'glassdoor', description: 'Glassdoor company reviews & salaries' },
+        { command: 'googlecalendar', description: 'Connect Google Calendar' },
         { command: 'health', description: 'Quick system health overview' },
         { command: 'help', description: 'Full guide with tips' },
         { command: 'id', description: 'Your Telegram user and chat ID' },
         { command: 'indeed', description: 'Indeed job search' },
-        { command: 'googlecalendar', description: 'Connect Google Calendar' },
         { command: 'inbox', description: 'Email queue (not_started by default)' },
+        { command: 'kemet', description: 'KEMET Automotive project (restricted)' },
         { command: 'kill', description: 'Stop all current activities instantly' },
         { command: 'leads', description: 'Google Maps lead scraper' },
         { command: 'learn', description: 'Educational mode (What/How/Why)' },
@@ -3668,8 +4205,9 @@ Rules for Python Mode:
         { command: 'mathematician', description: 'Quantitative and computational' },
         { command: 'memory', description: 'Browse memory banks' },
         { command: 'mode', description: 'Show active modes' },
-        { command: 'models', description: 'Switch AI model' },
+        { command: 'models', description: 'Switch AI model (Claude, GPT, Gemini, Llama, Mistral, Qwen)' },
         { command: 'news', description: 'Latest gathered news' },
+        { command: 'performance', description: 'Weekly performance scorecard' },
         { command: 'profile', description: 'ALEX personal details' },
         { command: 'projection', description: 'Monthly cost projection' },
         { command: 'python', description: 'Python data analysis mode' },
@@ -4207,6 +4745,20 @@ async function init() {
         console.log('[KIMI] No API key configured, Kimi K2 disabled');
     }
 
+    if (config.openrouter_api_key) {
+        openrouterClient = new OpenAI({
+            apiKey: config.openrouter_api_key,
+            baseURL: 'https://openrouter.ai/api/v1',
+            defaultHeaders: {
+                'HTTP-Referer': 'https://navada.space',
+                'X-Title': 'ALEX'
+            }
+        });
+        console.log('[OPENROUTER] Client initialized');
+    } else {
+        console.log('[OPENROUTER] No API key configured, external models disabled');
+    }
+
     // Initialize Upstash Redis for dashboard
     if (config.upstash_redis_url && config.upstash_redis_token) {
         redis = new Redis({ url: config.upstash_redis_url, token: config.upstash_redis_token });
@@ -4249,6 +4801,7 @@ async function init() {
         openaiClient,
         deepseekClient,
         kimiClient,
+        openrouterClient,
         memory,
         skills,
         executeTool: execToolWithDeps,

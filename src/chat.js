@@ -56,6 +56,12 @@ const MODEL_PRICING = {
     'gpt-5.2': { input: 1.75, output: 14.00 },
     'kimi-k2': { input: 0.50, output: 2.00 },
     'kimi-k2-thinking': { input: 1.00, output: 4.00 },
+    // OpenRouter models
+    'google/gemini-2.5-pro': { input: 1.25, output: 10.00 },
+    'google/gemini-2.5-flash': { input: 0.15, output: 0.60 },
+    'meta-llama/llama-3.3-70b-instruct': { input: 0.40, output: 0.40 },
+    'mistralai/mistral-large-2411': { input: 2.00, output: 6.00 },
+    'qwen/qwen-2.5-72b-instruct': { input: 0.35, output: 0.40 },
 };
 const USD_TO_GBP = 0.79;
 
@@ -65,13 +71,17 @@ function getModelPricing(model) {
     if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
     if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
     if (model.startsWith('kimi')) return MODEL_PRICING['kimi-k2'];
-    if (MODEL_PRICING[model]) return MODEL_PRICING[model];
     if (model.includes('gpt-4.1-nano')) return MODEL_PRICING['gpt-4.1-nano'];
     if (model.includes('gpt-4.1-mini')) return MODEL_PRICING['gpt-4.1-mini'];
     if (model.includes('gpt-4.1')) return MODEL_PRICING['gpt-4.1'];
     if (model.includes('gpt-4o')) return MODEL_PRICING['gpt-4o'];
     if (model === 'o3') return MODEL_PRICING['o3'];
     if (model === 'o4-mini') return MODEL_PRICING['o4-mini'];
+    // OpenRouter models (google/, meta-llama/, etc.)
+    if (model.includes('gemini')) return MODEL_PRICING['google/gemini-2.5-pro'];
+    if (model.includes('llama')) return MODEL_PRICING['meta-llama/llama-3.3-70b-instruct'];
+    if (model.includes('mistral')) return MODEL_PRICING['mistralai/mistral-large-2411'];
+    if (model.includes('qwen')) return MODEL_PRICING['qwen/qwen-2.5-72b-instruct'];
     // Default to Haiku pricing for unknown models
     return MODEL_PRICING['claude-3-5-haiku-20241022'];
 }
@@ -98,6 +108,12 @@ function getModelLabel(model) {
     if (model === 'gpt-4.1-mini') return 'GPT-4.1 Mini';
     if (model === 'gpt-4.1') return 'GPT-4.1';
     if (model.includes('gpt')) return 'GPT-4o';
+    // OpenRouter models
+    if (model.includes('gemini-2.5-pro')) return 'Gemini Pro';
+    if (model.includes('gemini-2.5-flash')) return 'Gemini Flash';
+    if (model.includes('llama-3.3')) return 'Llama 3.3';
+    if (model.includes('mistral-large')) return 'Mistral Large';
+    if (model.includes('qwen')) return 'Qwen 2.5';
     return model;
 }
 
@@ -287,7 +303,20 @@ const TOOL_ENABLED_MODELS = new Set([
     'claude-3-5-haiku-20241022',
     'claude-opus-4-5-20251101',
     'kimi-k2',
-    'kimi-k2-thinking'
+    'kimi-k2-thinking',
+    // OpenRouter models with tool support
+    'google/gemini-2.5-pro',
+    'google/gemini-2.5-flash',
+    'mistralai/mistral-large-2411',
+]);
+
+// OpenRouter model identifiers (routed via openrouter.ai)
+const OPENROUTER_MODELS = new Set([
+    'google/gemini-2.5-pro',
+    'google/gemini-2.5-flash',
+    'meta-llama/llama-3.3-70b-instruct',
+    'mistralai/mistral-large-2411',
+    'qwen/qwen-2.5-72b-instruct',
 ]);
 
 // Check if a model supports tool calling
@@ -322,6 +351,13 @@ const EXPLICIT_OVERRIDES = [
     { pattern: /\buse (claude|sonnet)\b/i, model: 'claude-sonnet-4-20250514', label: 'claude-sonnet-4 (explicit)' },
     { pattern: /\buse haiku\b/i, model: 'claude-3-5-haiku-20241022', label: 'claude-3.5-haiku (explicit)' },
     { pattern: /\buse opus\b/i, model: 'claude-opus-4-5-20251101', label: 'claude-opus-4.5 (explicit)' },
+    // OpenRouter models
+    { pattern: /\buse gemini[- ]?pro\b/i, model: 'google/gemini-2.5-pro', label: 'gemini-2.5-pro (explicit)' },
+    { pattern: /\buse gemini[- ]?flash\b/i, model: 'google/gemini-2.5-flash', label: 'gemini-2.5-flash (explicit)' },
+    { pattern: /\buse gemini\b/i, model: 'google/gemini-2.5-pro', label: 'gemini-2.5-pro (explicit)' },
+    { pattern: /\buse llama\b/i, model: 'meta-llama/llama-3.3-70b-instruct', label: 'llama-3.3-70b (explicit)' },
+    { pattern: /\buse mistral\b/i, model: 'mistralai/mistral-large-2411', label: 'mistral-large (explicit)' },
+    { pattern: /\buse qwen\b/i, model: 'qwen/qwen-2.5-72b-instruct', label: 'qwen-2.5-72b (explicit)' },
 ];
 
 export function selectModel(userMessage) {
@@ -335,7 +371,13 @@ export function selectModel(userMessage) {
         }
     }
 
-    // 2. DeepSeek patterns (deep research, thorough analysis, etc.)
+    // 2. KEMET project queries -> Opus for accuracy
+    if (/kemet|gezo|nissi|cotonou|benin.*automotive/i.test(msg)) {
+        console.log(`[MODEL] Selected opus for KEMET project query`);
+        return 'claude-opus-4-5-20251101';
+    }
+
+    // 3. DeepSeek patterns (deep research, thorough analysis, etc.)
     for (const pattern of DEEPSEEK_PATTERNS) {
         if (pattern.test(msg)) {
             console.log(`[MODEL] Selected deepseek-chat for: "${msg.substring(0, 50)}"`);
@@ -420,12 +462,13 @@ export class CircuitBreaker {
 // CHAT SYSTEM FACTORY
 // ============================================================================
 
-export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, memory, skills, executeTool, TOOLS }) {
+export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, openrouterClient, memory, skills, executeTool, TOOLS }) {
     const requestQueue = new RequestQueue();
     const circuitBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'anthropic');
     const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'deepseek');
     const openaiBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'openai');
     const kimiBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'kimi');
+    const openrouterBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'openrouter');
     let killed = false;
 
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
@@ -788,6 +831,108 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
         return finalText;
     }
 
+    /**
+     * Call OpenRouter with OpenAI function-calling tool support
+     */
+    async function callOpenRouter(apiMessages, systemPrompt, model, tools, context = {}) {
+        if (openrouterBreaker.isOpen()) {
+            throw new Error('OpenRouter is temporarily unavailable. Try "use claude" or "use kimi" instead.');
+        }
+
+        const openaiTools = anthropicToolsToOpenAI(tools);
+        let openaiMessages = toOpenAIMessages(apiMessages, systemPrompt);
+        let finalText = '';
+        let continueLoop = true;
+        let iterations = 0;
+        const maxIterations = 15;
+
+        while (continueLoop && iterations < maxIterations) {
+            if (killed) {
+                finalText += '\n\n[Stopped by /kill]';
+                break;
+            }
+            continueLoop = false;
+            iterations++;
+
+            console.log(`[OPENROUTER] Calling ${model}...`);
+            let orResponse;
+            try {
+                const requestParams = {
+                    model,
+                    messages: openaiMessages,
+                    max_tokens: 8192,
+                };
+                // Only include tools for models that support them
+                if (openaiTools.length > 0 && TOOL_ENABLED_MODELS.has(model)) {
+                    requestParams.tools = openaiTools;
+                }
+                orResponse = await openrouterClient.chat.completions.create(requestParams);
+                openrouterBreaker.recordSuccess();
+            } catch (err) {
+                openrouterBreaker.recordFailure();
+                throw err;
+            }
+
+            const usage = {
+                input_tokens: orResponse.usage?.prompt_tokens || 0,
+                output_tokens: orResponse.usage?.completion_tokens || 0,
+            };
+            logTokenUsage(model, usage, context);
+
+            const choice = orResponse.choices?.[0];
+            if (!choice) break;
+
+            const message = choice.message;
+            if (message.content) {
+                finalText += message.content;
+            }
+
+            // Handle tool calls
+            if (choice.finish_reason === 'tool_calls' && message.tool_calls?.length > 0) {
+                // Add assistant message with tool calls to conversation
+                openaiMessages.push(message);
+
+                for (const toolCall of message.tool_calls) {
+                    const toolName = toolCall.function.name;
+                    let toolArgs;
+                    try {
+                        toolArgs = JSON.parse(toolCall.function.arguments);
+                    } catch {
+                        toolArgs = {};
+                    }
+
+                    console.log(`[OPENROUTER] Tool call: ${toolName}`);
+                    let toolResult = await executeTool(toolName, toolArgs);
+
+                    // Truncate large outputs
+                    const TOOL_OUTPUT_LIMITS = { bash: 15000, read_file: 20000, fetch_url: 15000, grep: 10000 };
+                    const outputLimit = TOOL_OUTPUT_LIMITS[toolName] || 8000;
+                    const resultStr = JSON.stringify(toolResult);
+                    if (resultStr.length > outputLimit) {
+                        toolResult = { ...toolResult, _truncated: true, _note: `[truncated from ${resultStr.length} to ${outputLimit} chars]` };
+                        for (const key of Object.keys(toolResult)) {
+                            if (typeof toolResult[key] === 'string' && toolResult[key].length > outputLimit) {
+                                toolResult[key] = toolResult[key].substring(0, outputLimit) + `\n[truncated]`;
+                            }
+                        }
+                    }
+
+                    openaiMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: JSON.stringify(toolResult),
+                    });
+                }
+
+                continueLoop = true;
+            }
+
+            console.log(`[OPENROUTER] ${model} response received`);
+        }
+
+        return finalText || '[No response from OpenRouter]';
+    }
+
     async function buildSystemPrompt(userQuery = null, context = {}) {
         const identity = await memory.getIdentity();
         const userMemory = await memory.getUserMemory();
@@ -1047,6 +1192,24 @@ ${contextBlock}`;
             allMessages.push({ role: 'assistant', content: [{ type: 'text', text: text || '(empty response)' }] });
             await memory.saveConversation(chatId, allMessages, summary);
             return text;
+        }
+
+        // OpenRouter routing — Gemini, Llama, Mistral, Command R+, Qwen via openrouter.ai
+        if (OPENROUTER_MODELS.has(model) && openrouterClient) {
+            console.log(`[OPENROUTER] Using ${model}`);
+            try {
+                let text = await callOpenRouter(apiMessages, systemPrompt, model, TOOLS, callContext);
+                // Warn if user seems to want tools but model doesn't support them
+                if (!hasToolSupport(model) && TOOL_REQUEST_PATTERNS.test(userText)) {
+                    text += `\n\n_Note: ${model.split('/').pop()} is text-only. For file/email/chart tools, say "use claude" or "use gemini-pro"._`;
+                }
+                allMessages.push({ role: 'assistant', content: [{ type: 'text', text: text || '(empty response)' }] });
+                await memory.saveConversation(chatId, allMessages, summary);
+                return text;
+            } catch (err) {
+                console.error('[OPENROUTER] Error:', err.message);
+                throw err;
+            }
         }
 
         // OpenAI model routing — text-only, no tool loop

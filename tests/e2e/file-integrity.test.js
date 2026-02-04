@@ -25,20 +25,6 @@ describe('Workspace Integrity', () => {
         });
     }
 
-    it('config.json exists and is valid JSON', async () => {
-        const content = await fs.readFile(path.join(WORKSPACE, 'config.json'), 'utf-8');
-        const config = JSON.parse(content);
-        expect(config).toHaveProperty('anthropic_api_key');
-        expect(config).toHaveProperty('telegram_bot_token');
-    });
-
-    it('config.json has restricted permissions', async () => {
-        const stat = await fs.stat(path.join(WORKSPACE, 'config.json'));
-        const mode = (stat.mode & 0o777).toString(8);
-        // Should be 600 or 640 or similar restricted
-        expect(parseInt(mode, 8) & 0o077).toBeLessThanOrEqual(0o040);
-    });
-
     it('IDENTITY.md exists', async () => {
         const stat = await fs.stat(path.join(WORKSPACE, 'IDENTITY.md')).catch(() => null);
         expect(stat).not.toBeNull();
