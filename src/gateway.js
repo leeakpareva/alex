@@ -4238,6 +4238,7 @@ Rules for Python Mode:
 function setupControlAPI() {
     const CONTROL_PORT = 9090;
     const controlChatId = 'control-api';
+    const terminalChatId = 'terminal-chat';
 
     // Rate limiter: max 30 requests per 60 seconds per IP
     const rateLimiter = new Map(); // ip → { count, resetAt }
@@ -4299,10 +4300,10 @@ function setupControlAPI() {
             const authHeader = req.headers['authorization'] || '';
             const providedToken = authHeader.replace(/^Bearer\s+/i, '');
             const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
-            const isTrigger = req.url === '/api/trigger';
+            const isLocalBypass = req.url === '/api/trigger' || req.url === '/api/command' || req.url === '/api/terminal-messages' || req.url === '/api/health';
 
-            // Allow unauthenticated /api/trigger from localhost (cron jobs)
-            if (!(isLocalhost && isTrigger) && providedToken !== apiToken) {
+            // Allow unauthenticated local requests from localhost (cron jobs + terminal)
+            if (!(isLocalhost && isLocalBypass) && providedToken !== apiToken) {
                 console.log(`[CONTROL] Auth rejected from ${clientIp} for ${req.url}`);
                 res.writeHead(401, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Unauthorized. Provide Authorization: Bearer <token> header.' }));
@@ -4370,8 +4371,11 @@ Call the send_email tool now with exactly these parameters.`;
                     }
 
                     // Process through chat system (control API is trusted — grant owner permissions)
+                    const isTerminal = req.headers['x-terminal'] === 'true';
+                    const chatId = isTerminal ? terminalChatId : controlChatId;
+                    const userName = isTerminal ? 'Terminal' : 'Claude Code';
                     currentCallerUserId = config.telegram_owner_id || null;
-                    const response = await chatSystem.chat(controlChatId, userMessage, { first_name: 'Claude Code', username: 'claude_code' }, {}, { source: 'api' });
+                    const response = await chatSystem.chat(chatId, userMessage, { first_name: userName, username: isTerminal ? 'terminal' : 'claude_code' }, {}, { source: 'api' });
                     currentCallerUserId = null;
 
                     // Send queued files
@@ -4606,9 +4610,23 @@ Call the send_email tool now with exactly these parameters.`;
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(health));
 
+        } else if (req.method === 'GET' && req.url === '/api/terminal-messages') {
+            // Return and clear queued messages for the ALEX Terminal
+            const queuePath = path.join(os.homedir(), '.alex', 'terminal-queue.json');
+            try {
+                const data = await readFile(queuePath, 'utf8');
+                const messages = JSON.parse(data);
+                await writeFile(queuePath, '[]');
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ messages }));
+            } catch {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ messages: [] }));
+            }
+
         } else {
             res.writeHead(404);
-            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger, GET /api/health' }));
+            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger, GET /api/health, GET /api/terminal-messages' }));
         }
     });
 

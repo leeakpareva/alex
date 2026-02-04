@@ -5,6 +5,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { WORKSPACE_PATH } from './config.js';
 import { archiveOldDone } from './email-filing.js';
 
@@ -146,6 +147,22 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
                 // HTML parse failed — send as plain text
                 await bot.sendMessage(config.telegram_owner_id, `${taskTitle}\n\n${finalText.substring(0, 3500)}`);
             }
+        }
+
+        // Queue message for ALEX Terminal if it's active
+        if (finalText.trim()) {
+            const markerPath = path.join(os.homedir(), '.alex', 'terminal-active');
+            const queuePath = path.join(os.homedir(), '.alex', 'terminal-queue.json');
+            try {
+                await fs.access(markerPath);
+                const taskTitle = task.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                let queue = [];
+                try {
+                    queue = JSON.parse(await fs.readFile(queuePath, 'utf8'));
+                } catch {}
+                queue.push({ title: taskTitle, body: finalText.substring(0, 3500), time: new Date().toISOString() });
+                await fs.writeFile(queuePath, JSON.stringify(queue));
+            } catch {}
         }
     } catch (error) {
         console.error(`[CRON] Task '${task.name}' failed:`, error.message);
