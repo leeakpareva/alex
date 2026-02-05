@@ -524,7 +524,7 @@
         <div class="tab" onclick="showTab('py')">Python</div>
         <div class="tab" onclick="showTab('curl')">cURL</div>
       </div>
-      <pre class="code-block" id="tab-js">const res = await fetch('https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {
+      <pre class="code-block" id="tab-js">const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {
   headers: { 'X-API-Key': 'nav_your_key_here' }
 });
 const data = await res.json();
@@ -532,13 +532,14 @@ console.log(data);</pre>
       <pre class="code-block hidden" id="tab-py">import requests
 
 res = requests.get(
-    'https://alexnavada.xyz/api/v1/stock-quote',
+    'https://www.alexnavada.xyz/api/v1/stock-quote',
     params={'symbol': 'AAPL'},
     headers={'X-API-Key': 'nav_your_key_here'}
 )
 print(res.json())</pre>
       <pre class="code-block hidden" id="tab-curl">curl -H "X-API-Key: nav_your_key_here" \
-  "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</pre>
+  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</pre>
+      <p style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem;">Windows PowerShell: use <code style="background:#1a1a26;padding:0.15rem 0.4rem;border-radius:3px;">curl.exe</code> instead of <code style="background:#1a1a26;padding:0.15rem 0.4rem;border-radius:3px;">curl</code></p>
     </div>
 
     <!-- ALEX Skills Library -->
@@ -697,9 +698,9 @@ print(res.json())</pre>
         // Show quick start
         const qs = document.getElementById('quick-start');
         qs.style.display = 'block';
-        document.getElementById('qs-js').textContent = `const res = await fetch('https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
-        document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
-        document.getElementById('qs-curl').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
+        document.getElementById('qs-js').textContent = `const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
+        document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://www.alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
+        document.getElementById('qs-curl').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
       } catch (e) {
         errEl.textContent = 'Network error. Please try again.';
       } finally {
@@ -798,7 +799,7 @@ print(res.json())</pre>
         if (input.value.trim()) params[input.dataset.param] = input.value.trim();
       });
       var qs = new URLSearchParams(params).toString();
-      var url = 'https://alexnavada.xyz/api/v1/' + endpoint + (qs ? '?' + qs : '');
+      var url = 'https://www.alexnavada.xyz/api/v1/' + endpoint + (qs ? '?' + qs : '');
       var curl = 'curl -H "X-API-Key: ' + apiKey + '" "' + url + '"';
       navigator.clipboard.writeText(curl).then(function() {
         btn.textContent = 'Copied!';

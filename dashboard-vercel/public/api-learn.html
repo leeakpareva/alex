@@ -820,7 +820,7 @@
 
 async function getStockPrice(symbol) {
   const res = await fetch(
-    `https://alexnavada.xyz/api/v1/stock-quote?symbol=${symbol}`,
+    `https://www.alexnavada.xyz/api/v1/stock-quote?symbol=${symbol}`,
     { headers: { 'X-API-Key': API_KEY } }
   );
 
@@ -842,7 +842,7 @@ API_KEY = "nav_your_key_here"
 HEADERS = {"X-API-Key": API_KEY}
 
 def get_stock_price(symbol):
-    url = f"https://alexnavada.xyz/api/v1/stock-quote?symbol={symbol}"
+    url = f"https://www.alexnavada.xyz/api/v1/stock-quote?symbol={symbol}"
     res = requests.get(url, headers=HEADERS)
     data = res.json()
 
@@ -855,8 +855,9 @@ def get_stock_price(symbol):
     print(f"Change: {d['change']} ({d['change_percent']})")
 
 get_stock_price("AAPL")</div>
-      <div class="tab-content" id="ex1-curl">curl -s "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" \
+      <div class="tab-content" id="ex1-curl">curl -s "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" \
   -H "X-API-Key: nav_your_key_here" | python3 -m json.tool</div>
+      <p style="font-size:0.7rem;color:var(--muted-foreground,#9585b5);margin-top:0.5rem;">💡 Windows PowerShell: use <code>curl.exe</code> instead of <code>curl</code></p>
     </div>
 
     <!-- Example 2: Weather Widget -->
@@ -896,7 +897,7 @@ get_stock_price("AAPL")</div>
     async function go() {
       const city = document.getElementById('inp').value;
       const res = await fetch(
-        `https://alexnavada.xyz/api/v1/weather?city=${city}`,
+        `https://www.alexnavada.xyz/api/v1/weather?city=${city}`,
         { headers: { 'X-API-Key': KEY } }
       );
       const json = await res.json();
@@ -921,7 +922,7 @@ get_stock_price("AAPL")</div>
 
 async function runQuiz(topic) {
   const res = await fetch(
-    `https://alexnavada.xyz/api/v1/quiz-generator?topic=${topic}&count=5`,
+    `https://www.alexnavada.xyz/api/v1/quiz-generator?topic=${topic}&count=5`,
     { headers: { 'X-API-Key': API_KEY } }
   );
   const { data } = await res.json();
@@ -946,7 +947,7 @@ runQuiz('space exploration');</div>
 API_KEY = "nav_your_key_here"
 
 def run_quiz(topic):
-    url = f"https://alexnavada.xyz/api/v1/quiz-generator?topic={topic}&count=5"
+    url = f"https://www.alexnavada.xyz/api/v1/quiz-generator?topic={topic}&count=5"
     res = requests.get(url, headers={"X-API-Key": API_KEY})
     data = res.json()["data"]
 
@@ -974,7 +975,7 @@ run_quiz("space exploration")</div>
         <button class="tab-btn active" onclick="switchTab('ex4','js')">JavaScript</button>
       </div>
       <div class="tab-content active" id="ex4-js">const API_KEY = 'nav_your_key_here';
-const BASE = 'https://alexnavada.xyz/api/v1';
+const BASE = 'https://www.alexnavada.xyz/api/v1';
 const headers = { 'X-API-Key': API_KEY };
 
 async function buildDashboard() {
