@@ -91,7 +91,7 @@ const server = http.createServer(async (req, rawRes) => {
     // Page rewrites
     const rewrites = {
       '/': '/public/home.html',
-      '/dashboard': '/public/index.html',
+      '/dashboard': '/public/dashboard.html',
       '/api-library': '/public/api-library.html',
       '/chat': '/public/chat.html',
       '/experiment': '/public/experiment.html',
