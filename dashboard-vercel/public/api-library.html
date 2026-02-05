@@ -147,7 +147,7 @@
   <div class="container">
     <div class="hero">
       <h1>ALEX API Library</h1>
-      <p>Free Educational APIs — No registration required</p>
+      <p>Free Educational APIs — Register with your name &amp; email to get a 7-day token</p>
       <a href="#get-key" class="btn">Get Your API Key</a>
       <a href="/api-learn" class="btn" style="background:transparent;border:1px solid var(--blue);margin-left:0.5rem;">Learn How APIs Work</a>
     </div>
@@ -183,29 +183,41 @@
     <!-- Key Generation -->
     <div class="keygen" id="get-key">
       <h2>Get Your API Key</h2>
-      <label for="kg-name">Label (required)</label>
-      <input type="text" id="kg-name" placeholder="e.g. My School Project" maxlength="100" />
-      <label for="kg-email">Email (optional)</label>
+      <label for="kg-name">Name (required)</label>
+      <input type="text" id="kg-name" placeholder="e.g. Alex Smith" maxlength="100" />
+      <label for="kg-email">Email (required)</label>
       <input type="email" id="kg-email" placeholder="you@example.com" maxlength="200" />
       <button class="btn" id="kg-btn" onclick="generateKey()">Generate API Key</button>
       <div class="error" id="kg-error"></div>
       <div class="key-result" id="kg-result">
-        <strong>Your API Key:</strong>
+        <strong id="kg-result-title">Your API Key:</strong>
         <code id="kg-key"></code>
         <button class="copy-btn" onclick="copyKey()">Copy to clipboard</button>
-        <div class="warn">Save this key! It won't be shown again.</div>
+        <div id="kg-expiry" style="font-size:0.8rem;color:var(--blue);margin-top:0.5rem;"></div>
+        <div class="warn">Save this key! It won't be shown again. Expires in 7 days.</div>
       </div>
+
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border);">
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">Already registered? Renew your token:</p>
+        <input type="email" id="kg-renew-email" placeholder="Enter your registered email" maxlength="200" />
+        <button class="btn" id="kg-renew-btn" onclick="renewKey()" style="margin-top:0.5rem;width:100%;background:#1d4ed8;">Renew My Token</button>
+      </div>
+
       <div class="quick-start" id="quick-start" style="display:none">
         <h3>Quick Start — Your key is ready!</h3>
         <p>Copy any of these to start using the API right now:</p>
         <div class="quick-start-tabs">
           <button onclick="showQSTab('qs-js')" class="qs-tab active">JavaScript</button>
           <button onclick="showQSTab('qs-py')" class="qs-tab">Python</button>
-          <button onclick="showQSTab('qs-curl')" class="qs-tab">cURL</button>
+          <button onclick="showQSTab('qs-curl-mac')" class="qs-tab">cURL (Mac)</button>
+          <button onclick="showQSTab('qs-curl-win')" class="qs-tab">cURL (Windows)</button>
+          <button onclick="showQSTab('qs-ps')" class="qs-tab">PowerShell</button>
         </div>
         <pre class="quick-start-code" id="qs-js"></pre>
         <pre class="quick-start-code hidden" id="qs-py"></pre>
-        <pre class="quick-start-code hidden" id="qs-curl"></pre>
+        <pre class="quick-start-code hidden" id="qs-curl-mac"></pre>
+        <pre class="quick-start-code hidden" id="qs-curl-win"></pre>
+        <pre class="quick-start-code hidden" id="qs-ps"></pre>
       </div>
     </div>
 
@@ -217,7 +229,7 @@
           <div class="step-num">1</div>
           <div class="step-content">
             <strong>Get Your Free Pass</strong>
-            <p>Click Generate below. You'll get a unique key starting with <code>nav_</code> — it's your free pass to all 30 endpoints.</p>
+            <p>Click Generate below. You'll get a unique key starting with <code>nav_</code> — it's your free pass to all 60 endpoints.</p>
           </div>
         </div>
         <div class="step">
@@ -254,7 +266,7 @@
         <table class="error-table">
           <thead><tr><th>Status</th><th>Meaning</th><th>What to Do</th></tr></thead>
           <tbody>
-            <tr><td><code>401</code></td><td>Invalid API key</td><td>Check your key is correct and starts with <code>nav_</code></td></tr>
+            <tr><td><code>401</code></td><td>Invalid or expired key</td><td>Check your key is correct and starts with <code>nav_</code>. If expired, renew it above.</td></tr>
             <tr><td><code>403</code></td><td>Key revoked</td><td>Your key has been deactivated. Generate a new one.</td></tr>
             <tr><td><code>429</code></td><td>Rate limit exceeded</td><td>You've used all 100 daily requests. Resets at midnight UTC.</td></tr>
             <tr><td><code>404</code></td><td>Endpoint not found</td><td>Check the endpoint name matches one listed below.</td></tr>
@@ -516,13 +528,260 @@
       </div>
     </div>
 
+    <!-- AI Economy (2036) -->
+    <div class="category">
+      <h2>AI Economy — Future Data from 2036</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="ai-gdp-contribution" data-params='{"country":"USA","sector":"healthcare"}'>
+          <h3>ai-gdp-contribution <span class="method">GET</span></h3>
+          <div class="desc">AI's share of GDP by country and sector (2036 projection)</div>
+          <code class="endpoint">/api/v1/ai-gdp-contribution?country=USA</code>
+          <div class="response">{"ai_gdp_share_pct":38.2,"ai_gdp_value_usd":"$9.8T"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="automation-velocity-index" data-params='{"industry":"finance"}'>
+          <h3>automation-velocity-index <span class="method">GET</span></h3>
+          <div class="desc">Rate of job automation per industry — tasks per quarter</div>
+          <code class="endpoint">/api/v1/automation-velocity-index?industry=finance</code>
+          <div class="response">{"automation_velocity_score":7.8,"saturation_timeline":"2039"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="ai-labor-displacement-rate" data-params='{"country":"UK"}'>
+          <h3>ai-labor-displacement-rate <span class="method">GET</span></h3>
+          <div class="desc">Net jobs lost vs created by AI, reskilling rates</div>
+          <code class="endpoint">/api/v1/ai-labor-displacement-rate?country=UK</code>
+          <div class="response">{"net_jobs_displaced":1200000,"reskilling_rate_pct":34}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="model-market-index" data-params='{}'>
+          <h3>model-market-index <span class="method">GET</span></h3>
+          <div class="desc">Bloomberg-style index for AI model valuations and compute costs</div>
+          <code class="endpoint">/api/v1/model-market-index</code>
+          <div class="response">{"overall_index_value":4280,"market_cap_total_usd":"$18T"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="ai-dependency-score" data-params='{"entity":"Germany","type":"country"}'>
+          <h3>ai-dependency-score <span class="method">GET</span></h3>
+          <div class="desc">Systemic AI dependency risk — what if AI systems failed?</div>
+          <code class="endpoint">/api/v1/ai-dependency-score?entity=Germany</code>
+          <div class="response">{"dependency_score":72,"risk_level":"high"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="compute-purchasing-power" data-params='{"country":"India"}'>
+          <h3>compute-purchasing-power <span class="method">GET</span></h3>
+          <div class="desc">GPU-hours per median wage — the Big Mac Index for AI</div>
+          <code class="endpoint">/api/v1/compute-purchasing-power?country=India</code>
+          <div class="response">{"gpu_hours_per_median_monthly_wage":42,"compute_gini":0.61}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Human Capital (2036) -->
+    <div class="category">
+      <h2>Human Capital — Future Data from 2036</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="skill-half-life" data-params='{"skill":"data analysis"}'>
+          <h3>skill-half-life <span class="method">GET</span></h3>
+          <div class="desc">Months until a skill loses 50% of its market value</div>
+          <code class="endpoint">/api/v1/skill-half-life?skill=data+analysis</code>
+          <div class="response">{"skill":"Data Analysis","half_life_months":18}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="cognitive-augmentation-index" data-params='{"profession":"doctor"}'>
+          <h3>cognitive-augmentation-index <span class="method">GET</span></h3>
+          <div class="desc">Productivity multiplier from human-AI collaboration tools</div>
+          <code class="endpoint">/api/v1/cognitive-augmentation-index?profession=doctor</code>
+          <div class="response">{"productivity_multiplier":3.4,"adoption_rate_pct":78}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="human-premium-index" data-params='{"category":"art"}'>
+          <h3>human-premium-index <span class="method">GET</span></h3>
+          <div class="desc">Price premium for verified human-made goods vs AI</div>
+          <code class="endpoint">/api/v1/human-premium-index?category=art</code>
+          <div class="response">{"human_premium_pct":340,"market_share_human_pct":28}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="reskilling-roi" data-params='{"from_career":"accountant","to_career":"AI trainer"}'>
+          <h3>reskilling-roi <span class="method">GET</span></h3>
+          <div class="desc">Cost, time, and NPV of switching careers in the AI economy</div>
+          <code class="endpoint">/api/v1/reskilling-roi?from_career=accountant&amp;to_career=AI+trainer</code>
+          <div class="response">{"roi_pct":245,"breakeven_months":14}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="workforce-composition" data-params='{"industry":"healthcare"}'>
+          <h3>workforce-composition <span class="method">GET</span></h3>
+          <div class="desc">% breakdown: human, AI-assisted, supervised AI, autonomous AI</div>
+          <code class="endpoint">/api/v1/workforce-composition?industry=healthcare</code>
+          <div class="response">{"fully_human_pct":22,"autonomous_ai_pct":18}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="talent-migration-flow" data-params='{"origin":"Nigeria"}'>
+          <h3>talent-migration-flow <span class="method">GET</span></h3>
+          <div class="desc">Where skilled workers move in response to AI disruption</div>
+          <code class="endpoint">/api/v1/talent-migration-flow?origin=Nigeria</code>
+          <div class="response">{"net_migration":-45000,"top_destinations":[...]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Digital Society (2036) -->
+    <div class="category">
+      <h2>Digital Society — Future Data from 2036</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="synthetic-media-index" data-params='{"domain":"news"}'>
+          <h3>synthetic-media-index <span class="method">GET</span></h3>
+          <div class="desc">% of content that's AI-generated, detection accuracy</div>
+          <code class="endpoint">/api/v1/synthetic-media-index?domain=news</code>
+          <div class="response">{"synthetic_content_pct":41,"detection_accuracy_pct":73}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="digital-identity-index" data-params='{"country":"Estonia"}'>
+          <h3>digital-identity-index <span class="method">GET</span></h3>
+          <div class="desc">Sovereign digital ID adoption and data sovereignty scores</div>
+          <code class="endpoint">/api/v1/digital-identity-index?country=Estonia</code>
+          <div class="response">{"sovereign_id_adoption_pct":98,"privacy_score":92}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="algorithmic-governance-score" data-params='{"country":"Singapore"}'>
+          <h3>algorithmic-governance-score <span class="method">GET</span></h3>
+          <div class="desc">Transparency and fairness of AI in government decisions</div>
+          <code class="endpoint">/api/v1/algorithmic-governance-score?country=Singapore</code>
+          <div class="response">{"overall_score":84,"transparency_score":91}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="attention-economy-price" data-params='{}'>
+          <h3>attention-economy-price <span class="method">GET</span></h3>
+          <div class="desc">Price per verified human attention-minute, scarcity index</div>
+          <code class="endpoint">/api/v1/attention-economy-price</code>
+          <div class="response">{"price_per_verified_attention_minute_usd":0.034}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="digital-commons-health" data-params='{"domain":"open_source"}'>
+          <h3>digital-commons-health <span class="method">GET</span></h3>
+          <div class="desc">Health of open source, open data, and open knowledge</div>
+          <code class="endpoint">/api/v1/digital-commons-health?domain=open_source</code>
+          <div class="response">{"overall_health_score":67,"ai_contribution_pct":52}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="trust-infrastructure-index" data-params='{"country":"Japan"}'>
+          <h3>trust-infrastructure-index <span class="method">GET</span></h3>
+          <div class="desc">Digital trust systems — ZKP adoption, credential fraud rates</div>
+          <code class="endpoint">/api/v1/trust-infrastructure-index?country=Japan</code>
+          <div class="response">{"trust_index_score":88,"zkp_usage_pct":34}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Climate Finance (2036) -->
+    <div class="category">
+      <h2>Climate Finance — Future Data from 2036</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="carbon-credit-market" data-params='{}'>
+          <h3>carbon-credit-market <span class="method">GET</span></h3>
+          <div class="desc">Carbon credit spot prices, volume, and market cap by type</div>
+          <code class="endpoint">/api/v1/carbon-credit-market</code>
+          <div class="response">{"spot_price_usd_per_ton":187,"market_cap_usd":"$8.2T"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="planetary-boundary-index" data-params='{}'>
+          <h3>planetary-boundary-index <span class="method">GET</span></h3>
+          <div class="desc">Status of 9 planetary boundaries — distance to tipping points</div>
+          <code class="endpoint">/api/v1/planetary-boundary-index</code>
+          <div class="response">{"boundaries_breached":6,"overall_earth_system_score":42}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="ecosystem-service-valuation" data-params='{"region":"Amazon Basin"}'>
+          <h3>ecosystem-service-valuation <span class="method">GET</span></h3>
+          <div class="desc">Dollar value of ecosystem services — preservation vs replacement</div>
+          <code class="endpoint">/api/v1/ecosystem-service-valuation?region=Amazon+Basin</code>
+          <div class="response">{"total_annual_value_usd":"$2.4T","roi_of_preservation":18}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="climate-adaptation-bond" data-params='{}'>
+          <h3>climate-adaptation-bond <span class="method">GET</span></h3>
+          <div class="desc">Resilience bond market — yields, default rates, avoided damage</div>
+          <code class="endpoint">/api/v1/climate-adaptation-bond</code>
+          <div class="response">{"market_size_usd":"$1.8T","avg_yield_pct":4.2}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="energy-transition-tracker" data-params='{"country":"Germany"}'>
+          <h3>energy-transition-tracker <span class="method">GET</span></h3>
+          <div class="desc">Renewable %, fossil phaseout date, AI grid management</div>
+          <code class="endpoint">/api/v1/energy-transition-tracker?country=Germany</code>
+          <div class="response">{"renewable_pct":82,"fossil_phaseout_target_year":2038}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="stranded-asset-risk" data-params='{"sector":"oil and gas"}'>
+          <h3>stranded-asset-risk <span class="method">GET</span></h3>
+          <div class="desc">Fossil fuel asset devaluation risk and write-down timelines</div>
+          <code class="endpoint">/api/v1/stranded-asset-risk?sector=oil+and+gas</code>
+          <div class="response">{"total_at_risk_usd":"$4.1T","risk_score":84}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Post-Scarcity (2036) -->
+    <div class="category">
+      <h2>Post-Scarcity Indicators — Future Data from 2036</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="ubi-effectiveness-index" data-params='{"country":"Finland"}'>
+          <h3>ubi-effectiveness-index <span class="method">GET</span></h3>
+          <div class="desc">UBI/UBC programme metrics — poverty reduction, entrepreneurship</div>
+          <code class="endpoint">/api/v1/ubi-effectiveness-index?country=Finland</code>
+          <div class="response">{"poverty_reduction_pct":62,"entrepreneurship_change_pct":28}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="abundance-index" data-params='{"country":"Sweden"}'>
+          <h3>abundance-index <span class="method">GET</span></h3>
+          <div class="desc">How close to post-scarcity across 6 basic needs</div>
+          <code class="endpoint">/api/v1/abundance-index?country=Sweden</code>
+          <div class="response">{"overall_abundance_score":84,"biggest_gap":"housing"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="prosperity-beyond-gdp" data-params='{"country":"Denmark"}'>
+          <h3>prosperity-beyond-gdp <span class="method">GET</span></h3>
+          <div class="desc">Post-GDP prosperity index — 8 components including time sovereignty</div>
+          <code class="endpoint">/api/v1/prosperity-beyond-gdp?country=Denmark</code>
+          <div class="response">{"prosperity_index":91,"global_rank":3}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="creative-economy-index" data-params='{}'>
+          <h3>creative-economy-index <span class="method">GET</span></h3>
+          <div class="desc">Human creative economy — market size, human vs AI share</div>
+          <code class="endpoint">/api/v1/creative-economy-index</code>
+          <div class="response">{"market_size_usd":"$4.7T","human_share_pct":38}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="time-sovereignty-index" data-params='{"country":"France"}'>
+          <h3>time-sovereignty-index <span class="method">GET</span></h3>
+          <div class="desc">Discretionary time per day, AI delegation hours</div>
+          <code class="endpoint">/api/v1/time-sovereignty-index?country=France</code>
+          <div class="response">{"discretionary_hours_per_day":7.2,"ai_delegation_hours":3.1}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="inequality-adjusted-ai-dividend" data-params='{"country":"Brazil"}'>
+          <h3>inequality-adjusted-ai-dividend <span class="method">GET</span></h3>
+          <div class="desc">How equitably AI gains are distributed — Gini changes</div>
+          <code class="endpoint">/api/v1/inequality-adjusted-ai-dividend?country=Brazil</code>
+          <div class="response">{"ai_dividend_index":48,"gini_change_since_2025":-0.04}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Code Examples -->
     <div class="examples">
       <h2>Code Examples</h2>
       <div class="tab-bar">
         <div class="tab active" onclick="showTab('js')">JavaScript</div>
         <div class="tab" onclick="showTab('py')">Python</div>
-        <div class="tab" onclick="showTab('curl')">cURL</div>
+        <div class="tab" onclick="showTab('curl-mac')">cURL (Mac)</div>
+        <div class="tab" onclick="showTab('curl-win')">cURL (Windows)</div>
+        <div class="tab" onclick="showTab('ps')">PowerShell</div>
       </div>
       <pre class="code-block" id="tab-js">const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {
   headers: { 'X-API-Key': 'nav_your_key_here' }
@@ -537,9 +796,19 @@ res = requests.get(
     headers={'X-API-Key': 'nav_your_key_here'}
 )
 print(res.json())</pre>
-      <pre class="code-block hidden" id="tab-curl">curl -H "X-API-Key: nav_your_key_here" \
+      <pre class="code-block hidden" id="tab-curl-mac"># Mac / Linux Terminal:
+curl -H "X-API-Key: nav_your_key_here" \
   "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</pre>
-      <p style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem;">Windows PowerShell: use <code style="background:#1a1a26;padding:0.15rem 0.4rem;border-radius:3px;">curl.exe</code> instead of <code style="background:#1a1a26;padding:0.15rem 0.4rem;border-radius:3px;">curl</code></p>
+      <pre class="code-block hidden" id="tab-curl-win"># Windows Command Prompt or Git Bash:
+curl.exe -H "X-API-Key: nav_your_key_here" ^
+  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</pre>
+      <pre class="code-block hidden" id="tab-ps"># Paste this into PowerShell to test the API:
+
+$response = Invoke-WebRequest `
+  -Uri "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" `
+  -Headers @{"X-API-Key"="nav_your_key_here"}
+
+$response.Content | ConvertFrom-Json | Format-List</pre>
     </div>
 
     <!-- ALEX Skills Library -->
@@ -659,6 +928,30 @@ print(res.json())</pre>
       event.target.classList.add('active');
     }
 
+    function validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function showKeyResult(data) {
+      const resultEl = document.getElementById('kg-result');
+      const titleEl = document.getElementById('kg-result-title');
+      document.getElementById('kg-key').textContent = data.key;
+      document.getElementById('kg-expiry').textContent = 'Expires: ' + new Date(data.expires).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      titleEl.textContent = data.is_renewal ? 'Token Renewed!' : 'Your API Key:';
+      resultEl.classList.add('show');
+
+      localStorage.setItem('navada_api_key', data.key);
+
+      // Show quick start
+      const qs = document.getElementById('quick-start');
+      qs.style.display = 'block';
+      document.getElementById('qs-js').textContent = `const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
+      document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://www.alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
+      document.getElementById('qs-curl-mac').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
+      document.getElementById('qs-curl-win').textContent = `curl.exe -H "X-API-Key: ${data.key}" ^\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
+      document.getElementById('qs-ps').textContent = `(Invoke-WebRequest -Uri "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" -Headers @{"X-API-Key"="${data.key}"}).Content | ConvertFrom-Json | Format-List`;
+    }
+
     async function generateKey() {
       const name = document.getElementById('kg-name').value.trim();
       const email = document.getElementById('kg-email').value.trim();
@@ -670,7 +963,11 @@ print(res.json())</pre>
       resultEl.classList.remove('show');
 
       if (!name || name.length < 2) {
-        errEl.textContent = 'Please enter a label (at least 2 characters).';
+        errEl.textContent = 'Please enter your name (at least 2 characters).';
+        return;
+      }
+      if (!email || !validateEmail(email)) {
+        errEl.textContent = 'Please enter a valid email address.';
         return;
       }
 
@@ -681,7 +978,7 @@ print(res.json())</pre>
         const res = await fetch('/api/keys/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email: email || undefined }),
+          body: JSON.stringify({ name, email }),
         });
         const data = await res.json();
 
@@ -690,22 +987,51 @@ print(res.json())</pre>
           return;
         }
 
-        document.getElementById('kg-key').textContent = data.key;
-        resultEl.classList.add('show');
-
-        localStorage.setItem('navada_api_key', data.key);
-
-        // Show quick start
-        const qs = document.getElementById('quick-start');
-        qs.style.display = 'block';
-        document.getElementById('qs-js').textContent = `const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
-        document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://www.alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
-        document.getElementById('qs-curl').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
+        showKeyResult(data);
       } catch (e) {
         errEl.textContent = 'Network error. Please try again.';
       } finally {
         btn.disabled = false;
         btn.textContent = 'Generate API Key';
+      }
+    }
+
+    async function renewKey() {
+      const email = document.getElementById('kg-renew-email').value.trim();
+      const errEl = document.getElementById('kg-error');
+      const resultEl = document.getElementById('kg-result');
+      const btn = document.getElementById('kg-renew-btn');
+
+      errEl.textContent = '';
+      resultEl.classList.remove('show');
+
+      if (!email || !validateEmail(email)) {
+        errEl.textContent = 'Please enter a valid email address.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Renewing...';
+
+      try {
+        const res = await fetch('/api/keys/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Failed to renew key. Make sure you have registered before.';
+          return;
+        }
+
+        showKeyResult(data);
+      } catch (e) {
+        errEl.textContent = 'Network error. Please try again.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Renew My Token';
       }
     }
 
@@ -800,7 +1126,10 @@ print(res.json())</pre>
       });
       var qs = new URLSearchParams(params).toString();
       var url = 'https://www.alexnavada.xyz/api/v1/' + endpoint + (qs ? '?' + qs : '');
-      var curl = 'curl -H "X-API-Key: ' + apiKey + '" "' + url + '"';
+      var isWin = /Win/.test(navigator.userAgent);
+      var curl = isWin
+        ? 'curl.exe -H "X-API-Key: ' + apiKey + '" "' + url + '"'
+        : 'curl -H "X-API-Key: ' + apiKey + '" "' + url + '"';
       navigator.clipboard.writeText(curl).then(function() {
         btn.textContent = 'Copied!';
         setTimeout(function() { btn.textContent = 'Copy as cURL'; }, 2000);

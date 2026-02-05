@@ -10,6 +10,11 @@ const dataReference = require('./data-reference');
 const scienceMath = require('./science-math');
 const webDev = require('./web-dev');
 const education = require('./education');
+const aiEconomy = require('./ai-economy');
+const humanCapital = require('./human-capital');
+const digitalSociety = require('./digital-society');
+const climateFinance = require('./climate-finance');
+const postScarcity = require('./post-scarcity');
 
 /**
  * Dispatch map: endpoint name → handler function.
@@ -58,6 +63,46 @@ const handlers = {
   'word-definition': education.wordDefinition,
   'book-summary': education.bookSummary,
   'study-plan': education.studyPlan,
+
+  // AI Economy — Future indices from 2036 (Tier 4)
+  'ai-gdp-contribution': aiEconomy.aiGdpContribution,
+  'automation-velocity-index': aiEconomy.automationVelocityIndex,
+  'ai-labor-displacement-rate': aiEconomy.aiLaborDisplacementRate,
+  'model-market-index': aiEconomy.modelMarketIndex,
+  'ai-dependency-score': aiEconomy.aiDependencyScore,
+  'compute-purchasing-power': aiEconomy.computePurchasingPower,
+
+  // Human Capital — Future workforce indices from 2036 (Tier 4)
+  'skill-half-life': humanCapital.skillHalfLife,
+  'cognitive-augmentation-index': humanCapital.cognitiveAugmentationIndex,
+  'human-premium-index': humanCapital.humanPremiumIndex,
+  'reskilling-roi': humanCapital.reskillingRoi,
+  'workforce-composition': humanCapital.workforceComposition,
+  'talent-migration-flow': humanCapital.talentMigrationFlow,
+
+  // Digital Society — Future digital infrastructure from 2036 (Tier 4)
+  'synthetic-media-index': digitalSociety.syntheticMediaIndex,
+  'digital-identity-index': digitalSociety.digitalIdentityIndex,
+  'algorithmic-governance-score': digitalSociety.algorithmicGovernanceScore,
+  'attention-economy-price': digitalSociety.attentionEconomyPrice,
+  'digital-commons-health': digitalSociety.digitalCommonsHealth,
+  'trust-infrastructure-index': digitalSociety.trustInfrastructureIndex,
+
+  // Climate Finance — Future environmental indices from 2036 (Tier 4)
+  'carbon-credit-market': climateFinance.carbonCreditMarket,
+  'planetary-boundary-index': climateFinance.planetaryBoundaryIndex,
+  'ecosystem-service-valuation': climateFinance.ecosystemServiceValuation,
+  'climate-adaptation-bond': climateFinance.climateAdaptationBond,
+  'energy-transition-tracker': climateFinance.energyTransitionTracker,
+  'stranded-asset-risk': climateFinance.strandedAssetRisk,
+
+  // Post-Scarcity — Future prosperity indices from 2036 (Tier 4)
+  'ubi-effectiveness-index': postScarcity.ubiEffectivenessIndex,
+  'abundance-index': postScarcity.abundanceIndex,
+  'prosperity-beyond-gdp': postScarcity.prosperityBeyondGdp,
+  'creative-economy-index': postScarcity.creativeEconomyIndex,
+  'time-sovereignty-index': postScarcity.timeSovereigntyIndex,
+  'inequality-adjusted-ai-dividend': postScarcity.inequalityAdjustedAiDividend,
 };
 
 /**

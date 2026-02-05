@@ -72,6 +72,7 @@ import { setupInbox, startInboxPolling, setInboxChatSystem } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
+import { processUploadedFile } from './document-processor.js';
 
 // ============================================================================
 // TELEGRAM MARKDOWN SAFE SEND — tries Markdown, falls back to plain text
@@ -4571,6 +4572,17 @@ Call the send_email tool now with exactly these parameters.`;
                         res.end(JSON.stringify({ success: true, task: taskName }));
                         return;
                     }
+                    if (taskName === 'file-received') {
+                        const parsed = JSON.parse(body);
+                        if (parsed.file) {
+                            processUploadedFile(parsed.file).catch(err =>
+                                console.error('[UPLOAD] Processing failed:', err.message)
+                            );
+                        }
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: true, message: 'File processing started' }));
+                        return;
+                    }
 
                     // Look up task definition: built-in first, then user tasks on disk
                     let taskDef = BUILTIN_TASKS.get(taskName);
@@ -4653,6 +4665,37 @@ Call the send_email tool now with exactly these parameters.`;
     server.listen(CONTROL_PORT, '127.0.0.1', () => {
         console.log(`[CONTROL] API listening on http://127.0.0.1:${CONTROL_PORT}`);
     });
+
+    // ── Web chat poller — checks Upstash Redis for incoming web chat messages ──
+    if (redis) {
+        const webChatInterval = setInterval(async () => {
+            try {
+                const raw = await redis.lpop('web:chat:in');
+                if (!raw) return;
+                const { text, sessionId } = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (!text || !sessionId) return;
+                const webChatId = `web-${sessionId}`;
+
+                const webMessage = `[WEB CONTEXT: User is chatting via the alexnavada.xyz website. Rules for this channel:
+1. Be concise — web users expect quick, focused answers
+2. You CANNOT send files, images, charts, or diagrams — text only
+3. Do NOT use bash, write_file, or other system tools — this is a public-facing chat
+4. You CAN use web_search, web_lookup, stock_quote, crypto_rate, and other read-only tools
+5. Keep responses under 500 words unless asked for detail]\n\n${text}`;
+
+                currentCallerUserId = null; // Web users have no owner permissions
+                const response = await chatSystem.chat(webChatId, webMessage, { first_name: 'Web User', username: 'web' }, {}, { source: 'web' });
+                currentCallerUserId = null;
+
+                await redis.set(`web:chat:out:${sessionId}`, JSON.stringify({
+                    response, timestamp: Date.now()
+                }), { ex: 3600 });
+            } catch (e) {
+                // Silent fail — non-critical
+            }
+        }, 1000);
+        console.log('[WEB-CHAT] Poller started (1s interval)');
+    }
 }
 
 // ============================================================================

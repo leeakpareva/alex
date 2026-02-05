@@ -42,36 +42,46 @@ module.exports = async function handler(req, res) {
 
   try {
     const r = getRedis();
-    const keyIds = await r.smembers('apikeys:index');
-    if (!keyIds || !keyIds.length) return res.status(200).json({ keys: [] });
+    const emails = await r.smembers('contacts:index');
+    if (!emails || !emails.length) return res.status(200).json({ contacts: [], total: 0 });
 
-    const keys = [];
-    for (const keyId of keyIds) {
-      const data = await r.hgetall(`apikey:${keyId}`);
-      if (data && data.key) {
-        const today = new Date().toISOString().split('T')[0];
-        const rateCount = await r.get(`apikey:rate:${keyId}:${today}`) || 0;
-        const isExpired = data.status === 'expired' ||
-          !data.expires || new Date(data.expires) < new Date();
-        keys.push({
-          key_masked: data.key.slice(0, 8) + '...' + data.key.slice(-4),
-          key_full: data.key,
-          name: data.name,
-          email: data.email,
-          created: data.created,
-          expires: data.expires || '',
-          is_expired: isExpired,
-          status: data.status,
-          requests_today: Number(rateCount),
-          last_used: data.last_used || '',
-        });
+    const contacts = [];
+    for (const email of emails) {
+      const contact = await r.hgetall(`contact:${email}`);
+      if (!contact || !contact.email) continue;
+
+      // Get current key data for status/expiry/last_used
+      let keyStatus = 'unknown';
+      let keyExpires = '';
+      let lastUsed = '';
+      if (contact.current_key) {
+        const keyData = await r.hgetall(`apikey:${contact.current_key}`);
+        if (keyData && keyData.key) {
+          keyStatus = keyData.status || 'unknown';
+          keyExpires = keyData.expires || '';
+          lastUsed = keyData.last_used || '';
+          // Check if expired by date
+          if (keyStatus === 'active' && (!keyExpires || new Date(keyExpires) < new Date())) {
+            keyStatus = 'expired';
+          }
+        }
       }
+
+      contacts.push({
+        name: contact.name || '',
+        email: contact.email,
+        first_registered: contact.first_registered || '',
+        last_renewed: contact.last_renewed || '',
+        token_status: keyStatus,
+        token_expires: keyExpires,
+        last_active: lastUsed,
+      });
     }
 
-    keys.sort((a, b) => new Date(b.created) - new Date(a.created));
-    return res.status(200).json({ keys, total: keys.length });
+    contacts.sort((a, b) => new Date(b.last_renewed || 0) - new Date(a.last_renewed || 0));
+    return res.status(200).json({ contacts, total: contacts.length });
   } catch (e) {
-    console.error('Key list error:', e);
-    return res.status(500).json({ error: 'Failed to list keys' });
+    console.error('Admin contacts error:', e);
+    return res.status(500).json({ error: 'Failed to get contacts' });
   }
 };

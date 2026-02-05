@@ -28,7 +28,15 @@ module.exports = async function handler(req, res) {
     if (data.status !== 'active') {
       return res.status(403).json({ valid: false, error: 'Key has been revoked' });
     }
-    return res.status(200).json({ valid: true, name: data.name, created: data.created });
+    if (!data.expires || new Date(data.expires) < new Date()) {
+      await getRedis().hset(`apikey:${key}`, { status: 'expired' });
+      return res.status(401).json({
+        valid: false,
+        error: 'Token expired. Generate a new one at alexnavada.xyz/api-library',
+        expired: true,
+      });
+    }
+    return res.status(200).json({ valid: true, name: data.name, created: data.created, expires: data.expires });
   } catch (e) {
     console.error('Key validation error:', e);
     return res.status(500).json({ error: 'Validation failed' });

@@ -738,6 +738,63 @@
       .container { padding: 0.3rem; }
       .stats-bar { gap: 0.25rem; }
     }
+
+    /* ---- API Keys Management Panel ---- */
+    .keys-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .keys-panel h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    .keys-panel table {
+      min-width: 700px;
+    }
+    .key-status-badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .key-status-active {
+      background: rgba(34,197,94,0.12);
+      color: var(--green);
+    }
+    .key-status-revoked {
+      background: rgba(239,68,68,0.12);
+      color: var(--red);
+    }
+    .key-row-revoked td {
+      opacity: 0.45;
+    }
+    .revoke-btn {
+      padding: 0.2rem 0.5rem;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 4px;
+      color: var(--red);
+      font-size: 0.65rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .revoke-btn:hover {
+      background: rgba(239,68,68,0.2);
+    }
+    .revoke-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -792,6 +849,29 @@
         <div class="section-label">Key Groups</div>
         <div class="groups-grid" id="groups-grid">
           <div class="loading-full"><span class="loading-spinner"></span> Loading groups...</div>
+        </div>
+      </div>
+
+      <!-- API Keys Management Panel -->
+      <div class="keys-panel" id="keys-panel" style="display:none;">
+        <h3>API Keys Management</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Key</th>
+                <th>Status</th>
+                <th>Requests Today</th>
+                <th>Last Used</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="api-keys-tbody">
+              <tr><td colspan="7" class="empty-row"><span class="loading-spinner"></span> Loading keys...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -948,6 +1028,7 @@
     function showViewer() {
       document.getElementById('login-view').style.display = 'none';
       document.getElementById('viewer-view').style.display = 'block';
+      loadApiKeys();
       startAutoRefresh();
     }
 
@@ -1015,6 +1096,7 @@
         }
         const data = await res.json();
         processData(data);
+        loadApiKeys();
       } catch (e) {
         console.error('Failed to load keys:', e);
         document.getElementById('keys-tbody').innerHTML =
@@ -1025,57 +1107,37 @@
     }
 
     function processData(data) {
-      // The API can return data in different shapes.
-      // Expected: { keys: [...], groups: { prefix: [...] } }
-      // or: { keys: [{ key, type, ttl }] }
+      // The API returns: { total_keys, groups: { prefix: { count, keys: [{key,type,ttl,ttl_seconds}] } }, scanned_at }
+      allKeys = [];
+      groups = {};
+
       if (data.groups && typeof data.groups === 'object') {
-        groups = data.groups;
-        // Flatten all keys from groups if keys array not provided
-        if (!data.keys || !Array.isArray(data.keys)) {
-          allKeys = [];
-          for (const prefix in data.groups) {
-            const items = data.groups[prefix];
-            if (Array.isArray(items)) {
-              items.forEach(item => {
-                if (typeof item === 'string') {
-                  allKeys.push({ key: item, type: 'unknown', ttl: -1 });
-                } else {
-                  allKeys.push(item);
-                }
-              });
-            }
-          }
-        } else {
-          allKeys = data.keys;
+        for (const prefix in data.groups) {
+          const group = data.groups[prefix];
+          // Handle { count, keys: [...] } format from the API
+          const items = Array.isArray(group) ? group : (group.keys || []);
+          const normalized = items.map(item => {
+            if (typeof item === 'string') return { key: item, type: 'unknown', ttl: -1 };
+            return {
+              key: item.key || '',
+              type: item.type || 'unknown',
+              ttl: item.ttl_seconds !== undefined ? item.ttl_seconds : (typeof item.ttl === 'number' ? item.ttl : -1),
+            };
+          });
+          groups[prefix + ':*'] = normalized;
+          allKeys.push(...normalized);
         }
       } else if (data.keys && Array.isArray(data.keys)) {
-        allKeys = data.keys;
-        // Build groups from keys
-        groups = {};
-        allKeys.forEach(k => {
-          const keyName = typeof k === 'string' ? k : k.key;
-          const prefix = getPrefix(keyName);
-          if (!groups[prefix]) groups[prefix] = [];
-          groups[prefix].push(k);
+        allKeys = data.keys.map(k => {
+          if (typeof k === 'string') return { key: k, type: 'unknown', ttl: -1 };
+          return { key: k.key || '', type: k.type || 'unknown', ttl: k.ttl_seconds !== undefined ? k.ttl_seconds : -1 };
         });
-      } else if (Array.isArray(data)) {
-        allKeys = data.map(k => typeof k === 'string' ? { key: k, type: 'unknown', ttl: -1 } : k);
-        groups = {};
         allKeys.forEach(k => {
           const prefix = getPrefix(k.key);
           if (!groups[prefix]) groups[prefix] = [];
           groups[prefix].push(k);
         });
-      } else {
-        allKeys = [];
-        groups = {};
       }
-
-      // Normalize keys to objects
-      allKeys = allKeys.map(k => {
-        if (typeof k === 'string') return { key: k, type: 'unknown', ttl: -1 };
-        return { key: k.key || k.name || '', type: k.type || 'unknown', ttl: k.ttl !== undefined ? k.ttl : -1 };
-      });
 
       renderStats();
       renderGroups();
@@ -1086,7 +1148,7 @@
     // ---- Render Stats Bar ----
     function renderStats() {
       const statsBar = document.getElementById('stats-bar');
-      let html = `<div class="stat-badge total"><span>Total Keys:</span> <span class="stat-count">${allKeys.length}</span></div>`;
+      let html = `<div class="stat-badge total"><span>Total Keys:</span> <span class="stat-count" id="stat-total">${allKeys.length}</span></div>`;
 
       const prefixCounts = {};
       for (const prefix in groups) {
@@ -1100,7 +1162,6 @@
       });
 
       statsBar.innerHTML = html;
-      document.getElementById('stat-total').textContent = allKeys.length;
     }
 
     // ---- Render Groups ----
@@ -1438,6 +1499,73 @@
         stopAutoRefresh();
       }
     });
+
+    // ---- API Keys Management ----
+    async function loadApiKeys() {
+      try {
+        const res = await fetch('/api/keys/list', { credentials: 'include' });
+        if (res.status === 401) return;
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.keys && data.keys.length > 0) {
+          document.getElementById('keys-panel').style.display = 'block';
+          renderApiKeys(data.keys);
+        }
+      } catch (e) {
+        console.error('Failed to load API keys:', e);
+      }
+    }
+
+    function renderApiKeys(keys) {
+      const tbody = document.getElementById('api-keys-tbody');
+      if (!keys.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No API keys found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = keys.map(k => {
+        const isRevoked = k.status === 'revoked';
+        const statusClass = isRevoked ? 'key-status-revoked' : 'key-status-active';
+        const statusLabel = isRevoked ? 'revoked' : 'active';
+        const rowClass = isRevoked ? 'key-row-revoked' : '';
+        const lastUsed = k.last_used ? new Date(k.last_used).toLocaleDateString('en-GB') : '--';
+        const created = k.created ? new Date(k.created).toLocaleDateString('en-GB') : '--';
+        return `<tr class="${rowClass}">
+          <td>${esc(k.name || '--')}</td>
+          <td class="key-cell" style="cursor:default;">${esc(k.key_masked)}</td>
+          <td><span class="key-status-badge ${statusClass}">${statusLabel}</span></td>
+          <td>${k.requests_today || 0}</td>
+          <td>${lastUsed}</td>
+          <td>${created}</td>
+          <td>${isRevoked ? '<span style="color:var(--muted);font-size:0.65rem;">--</span>' : `<button class="revoke-btn" onclick="revokeApiKey('${esc(k.key_full)}', this)">Revoke</button>`}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function revokeApiKey(key, btn) {
+      if (!confirm('Are you sure you want to revoke this API key? This cannot be undone.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Revoking...';
+      try {
+        const res = await fetch('/api/keys/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key }),
+        });
+        if (res.ok) {
+          loadApiKeys();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert(data.error || 'Failed to revoke key');
+          btn.disabled = false;
+          btn.textContent = 'Revoke';
+        }
+      } catch (e) {
+        alert('Connection error');
+        btn.disabled = false;
+        btn.textContent = 'Revoke';
+      }
+    }
 
     // ---- Init ----
     checkAuth();

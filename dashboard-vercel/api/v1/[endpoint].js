@@ -31,6 +31,31 @@ const VALID_ENDPOINTS = new Set([
   'math-solve', 'periodic-table', 'space-facts', 'statistics-calc', 'carbon-footprint',
   'qr-generate', 'color-palette', 'lorem-ipsum',
   'word-definition', 'book-summary', 'study-plan',
+  // Future Economy — ALEX from 2036
+  'ai-gdp-contribution', 'automation-velocity-index', 'ai-labor-displacement-rate',
+  'model-market-index', 'ai-dependency-score', 'compute-purchasing-power',
+  'skill-half-life', 'cognitive-augmentation-index', 'human-premium-index',
+  'reskilling-roi', 'workforce-composition', 'talent-migration-flow',
+  'synthetic-media-index', 'digital-identity-index', 'algorithmic-governance-score',
+  'attention-economy-price', 'digital-commons-health', 'trust-infrastructure-index',
+  'carbon-credit-market', 'planetary-boundary-index', 'ecosystem-service-valuation',
+  'climate-adaptation-bond', 'energy-transition-tracker', 'stranded-asset-risk',
+  'ubi-effectiveness-index', 'abundance-index', 'prosperity-beyond-gdp',
+  'creative-economy-index', 'time-sovereignty-index', 'inequality-adjusted-ai-dividend',
+]);
+
+/** Futuristic endpoints get 7-day cache (604800s) instead of 24hr */
+const LONG_CACHE_ENDPOINTS = new Set([
+  'ai-gdp-contribution', 'automation-velocity-index', 'ai-labor-displacement-rate',
+  'model-market-index', 'ai-dependency-score', 'compute-purchasing-power',
+  'skill-half-life', 'cognitive-augmentation-index', 'human-premium-index',
+  'reskilling-roi', 'workforce-composition', 'talent-migration-flow',
+  'synthetic-media-index', 'digital-identity-index', 'algorithmic-governance-score',
+  'attention-economy-price', 'digital-commons-health', 'trust-infrastructure-index',
+  'carbon-credit-market', 'planetary-boundary-index', 'ecosystem-service-valuation',
+  'climate-adaptation-bond', 'energy-transition-tracker', 'stranded-asset-risk',
+  'ubi-effectiveness-index', 'abundance-index', 'prosperity-beyond-gdp',
+  'creative-economy-index', 'time-sovereignty-index', 'inequality-adjusted-ai-dividend',
 ]);
 
 const DAILY_LIMIT = 100;
@@ -62,6 +87,15 @@ module.exports = async function handler(req, res) {
     }
     if (keyData.status !== 'active') {
       return res.status(403).json({ error: 'API key has been revoked' });
+    }
+
+    // Expiry check (also handles legacy keys without expires field)
+    if (!keyData.expires || new Date(keyData.expires) < new Date()) {
+      await r.hset(`apikey:${apiKey}`, { status: 'expired' });
+      return res.status(401).json({
+        error: 'Token expired. Generate a new one at alexnavada.xyz/api-library',
+        expired: true,
+      });
     }
 
     // Rate limiting
@@ -109,8 +143,9 @@ module.exports = async function handler(req, res) {
     const result = await dispatch(endpoint, params);
     result._cached_at = new Date().toISOString();
 
-    // Cache for 24 hours
-    await r.set(cacheKey, JSON.stringify(result), { ex: 86400 });
+    // Cache: 7 days for futuristic endpoints, 24 hours for others
+    const cacheTTL = LONG_CACHE_ENDPOINTS.has(endpoint) ? 604800 : 86400;
+    await r.set(cacheKey, JSON.stringify(result), { ex: cacheTTL });
 
     return res.status(200).json({
       endpoint,

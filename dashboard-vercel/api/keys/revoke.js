@@ -13,9 +13,14 @@ function getRedis() {
 }
 
 function verifyAdmin(req) {
+  // Try cookie first, then Authorization header
+  let token = '';
   const cookie = (req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith('admin_token='));
-  if (!cookie) return false;
-  const token = cookie.split('=')[1];
+  if (cookie) token = cookie.substring(cookie.indexOf('=') + 1);
+  if (!token) {
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) token = auth.slice(7);
+  }
   if (!token) return false;
   try {
     const [payload, sig] = token.split('.');

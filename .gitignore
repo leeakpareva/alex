@@ -37,6 +37,12 @@ Thumbs.db
 # Coverage
 coverage/
 
+# Uploaded files (personal documents)
+uploads/
+
+# Test reports
+test-report.html
+
 # Temp files
 *.tmp
 *.temp

@@ -8,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import { WORKSPACE_PATH } from './config.js';
 import { archiveOldDone } from './email-filing.js';
+import { cacheFacts, cleanExpired as cleanCache } from './content-cache.js';
 
 // dashPost is set by gateway.js via setDashPost()
 let dashPost = () => {};
@@ -93,6 +94,23 @@ If no alerts are configured, skip silently.`
 
 Be proactive but not noisy — only message if there's something actionable.`
     }],
+    ['api-data-refresh', {
+        name: 'api-data-refresh',
+        task_description: `Refresh API data for the alexnavada.xyz API Library. This provides educational API data to users.
+
+For each category below, use your available tools (web_search, stock_quote, crypto_rate, etc.) to fetch fresh data, then save a JSON summary for each endpoint to Redis.
+
+Categories to refresh:
+1. Finance: stock-quote (AAPL, MSFT, GOOGL), crypto-rate (BTC, ETH), forex-rate (USD/GBP, EUR/USD), market-news, commodity-price (gold, oil)
+2. News: news-headlines (top 5 world headlines)
+3. Space: space-facts (random interesting fact)
+
+For each endpoint, use memory_save to store the data with category "api-data" so it persists.
+Then use bash to push the data to Redis via curl:
+curl -s -X POST "https://alexnavada.xyz/api/push" -H "Authorization: Bearer $PUSH_SECRET" -H "Content-Type: application/json" -d '{"api_data": {"endpoint_name": data}}'
+
+Focus on the financial endpoints first as those are most time-sensitive. Static endpoints (periodic-table, country-info, unit-convert, time-zones, lorem-ipsum) only need refreshing weekly.`
+    }],
     ['weekly-self-review', {
         name: 'weekly-self-review',
         task_description: `Weekly self-improvement review. Analyse your own performance this week:
@@ -112,22 +130,55 @@ This is your chance to evolve and get better each week.`
 /**
  * Handle a scheduled task by calling the AI and optionally notifying via Telegram
  */
+// Tasks that need Sonnet's reasoning — complex research, multi-step analysis, strategic thinking
+const SONNET_TASKS = new Set(['morning-briefing', 'midday-research', 'evening-summary', 'weekly-self-review']);
+
 export async function handleScheduledTask(task, { callAnthropicQueued, processResponse, buildSystemPrompt, config, bot, TOOLS }) {
     try {
         const systemPrompt = await buildSystemPrompt();
 
+        // Route to Haiku for simple tasks (stock checks, inbox review, followups) — 4x cheaper
+        const useSonnet = SONNET_TASKS.has(task.name);
+        const model = useSonnet ? 'claude-sonnet-4-20250514' : 'claude-3-5-haiku-20241022';
+        const maxTokens = useSonnet ? 16384 : 8192;
+
+        // Add cache_control to last tool for prompt caching
+        const cachedTools = TOOLS.map((tool, i) =>
+            i === TOOLS.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' } } : tool
+        );
+
         const response = await callAnthropicQueued({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 16384,
+            model,
+            max_tokens: maxTokens,
             system: systemPrompt,
-            tools: TOOLS,
+            tools: cachedTools,
             messages: [{
                 role: 'user',
                 content: `[SCHEDULED TASK: ${task.name}]\n\n${task.task_description}\n\nExecute this task now and report results.`
             }]
         }, 1, { source: 'scheduled', taskName: task.name });
 
-        const finalText = await processResponse(response, null, true, systemPrompt, 'claude-sonnet-4-20250514');
+        const finalText = await processResponse(response, null, true, systemPrompt, model);
+
+        // Extract and cache key facts from the output (fire-and-forget)
+        if (finalText.length > 200) {
+            try {
+                const factResult = await callAnthropicQueued({
+                    model: 'claude-3-5-haiku-20241022',
+                    max_tokens: 500,
+                    messages: [{ role: 'user', content: `Extract the key data points from this AI agent output as a JSON array. Each item should have: topic (what it's about), value (the number/data), detail (brief context). Only include concrete facts with numbers or specific data. Return ONLY the JSON array, no explanation.\n\nOutput:\n${finalText.substring(0, 3000)}` }]
+                }, 0, { source: 'fact-extraction-cache' });
+                const factText = factResult?.content?.[0]?.text || '';
+                const jsonMatch = factText.match(/\[[\s\S]*\]/) || [null];
+                if (jsonMatch[0]) {
+                    const facts = JSON.parse(jsonMatch[0]);
+                    if (Array.isArray(facts) && facts.length > 0) {
+                        const ttl = task.name.includes('stock') ? 6 : 24;
+                        await cacheFacts(task.name, facts, ttl);
+                    }
+                }
+            } catch {}
+        }
 
         // Update dashboard with task result
         dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'completed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
@@ -296,6 +347,24 @@ export async function runCleanup(memory) {
         await pruneOldKnowledge(memory);
     } catch (err) {
         console.error('[CLEANUP] Knowledge prune failed:', err.message);
+    }
+    // Clean expired content cache entries
+    try {
+        const cleaned = await cleanCache();
+        if (cleaned > 0) console.log(`[CLEANUP] Cleaned ${cleaned} expired cache entries`);
+    } catch (err) {
+        console.error('[CLEANUP] Cache cleanup failed:', err.message);
+    }
+    // Clean expired RAG entries (TTL-based document chunks)
+    try {
+        const { execFile: execFileCb } = await import('child_process');
+        const scriptPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'scripts', 'rag_manager.py');
+        execFileCb('python3', [scriptPath, 'cleanup'], { timeout: 30000 }, (err, stdout) => {
+            if (stdout?.trim()) console.log(`[CLEANUP] RAG: ${stdout.trim()}`);
+            if (err) console.error('[CLEANUP] RAG cleanup failed:', err.message);
+        });
+    } catch (err) {
+        console.error('[CLEANUP] RAG cleanup failed:', err.message);
     }
 }
 

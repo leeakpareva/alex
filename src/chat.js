@@ -471,6 +471,13 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
     const openrouterBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'openrouter');
     let killed = false;
 
+    // Prompt-cached TOOLS array — marks the last tool with cache_control so Anthropic
+    // caches the entire tool schema block (~4,000-5,000 tokens) across calls within 5 min.
+    // Subsequent calls pay only 10% for these tokens instead of full price.
+    const TOOLS_CACHED = TOOLS.map((tool, i) =>
+        i === TOOLS.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' } } : tool
+    );
+
     async function callAnthropicWithRetry(params, maxRetries = 5, context = {}) {
         if (circuitBreaker.isOpen()) {
             throw new Error(circuitBreaker.getFriendlyError());
@@ -1123,7 +1130,7 @@ ${contextBlock}`;
                         model,
                         max_tokens: model.includes('haiku') ? 8192 : 16384,
                         system: systemPrompt,
-                        tools: TOOLS,
+                        tools: TOOLS_CACHED,
                         messages: apiMessages
                     }, priority);
 
@@ -1266,7 +1273,7 @@ ${contextBlock}`;
             max_tokens: model.includes('haiku') ? 8192 : 16384,
             system: systemPrompt,
             tools: [
-                ...TOOLS,
+                ...TOOLS_CACHED,
                 { type: 'web_search_20250305', name: 'web_search' }
             ],
             messages: apiMessages

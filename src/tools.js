@@ -35,7 +35,8 @@ export async function indexRAG() {
     if (!ragAvailable || ragIndexing) return;
     ragIndexing = true;
     try {
-        const scriptPath = path.join(WORKSPACE_PATH, 'scripts/rag_manager.py');
+        const __toolsDir = path.dirname(new URL(import.meta.url).pathname);
+        const scriptPath = path.join(__toolsDir, '..', 'scripts', 'rag_manager.py');
         const { stdout } = await new Promise((resolve, reject) => {
             execFile('python3', [scriptPath, 'index'], { timeout: 30000 }, (err, stdout, stderr) => {
                 if (err) reject(err);
@@ -61,7 +62,8 @@ export async function queryRAG(text) {
     // Attempt ChromaDB query with 2 retries
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
-            const scriptPath = path.join(WORKSPACE_PATH, 'scripts/rag_manager.py');
+            const __toolsDir = path.dirname(new URL(import.meta.url).pathname);
+            const scriptPath = path.join(__toolsDir, '..', 'scripts', 'rag_manager.py');
             const { stdout } = await new Promise((resolve, reject) => {
                 execFile('python3', [scriptPath, 'query', text], { timeout: 10000 }, (err, stdout, stderr) => {
                     if (err) reject(err);
