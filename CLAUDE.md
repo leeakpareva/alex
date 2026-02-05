@@ -53,6 +53,9 @@ Telegram message → gateway.js:271 setupTelegram() (dedup + auth)
 | **slack.js** | 326 | Slack Web API polling (3s), threaded replies | `setupSlack` + `startSlackPolling` |
 | **inbox.js** | 543 | Gmail inbox monitoring, AI replies | Email filing integration |
 | **email-filing.js** | 412 | Email filing/categorisation system | — |
+| **content-cache.js** | ~80 | Content cache for extracted facts from heartbeat outputs | 3-day TTL, 50-entry cap, `cacheFacts`, `cleanExpired` |
+| **document-processor.js** | ~200 | Tailscale upload → RAG pipeline: OCR, text extraction, LESLIE marker splitting, ChromaDB indexing | `processFile`, `splitAtLeslieMarker` |
+| **scripts/rag_manager.py** | ~200 | Python bridge Node.js ↔ ChromaDB: index-text, query, cleanup, stats commands | CLI: `index-text`, `query`, `cleanup`, `stats` |
 
 ---
 
@@ -197,6 +200,45 @@ Splits long responses (> 4000 chars) for Telegram delivery:
 
 ---
 
+## Caching & RAG Pipeline
+
+### Content Cache — `src/content-cache.js`
+
+- Stores extracted facts from ALEX's heartbeat task outputs (not raw prose)
+- 3-day TTL, 50-entry cap
+- Facts cached as JSON in `~/.alex/cache/content/`
+- Haiku extracts key facts after each heartbeat task completes
+- `cacheFacts(source, facts, ttlHours)` and `cleanExpired()` exported
+
+### RAG Document Pipeline
+
+Flow: Tailscale upload → `taildrop-watcher.sh` → POST `/api/trigger {task:"file-received"}` → `document-processor.js` → `rag_manager.py` → ChromaDB
+
+**File type support:**
+
+| Extension | Method | Fallback |
+|-----------|--------|----------|
+| `.pdf` | pdftotext | PyTesseract OCR (if <50 chars) |
+| `.docx` | python-docx | — |
+| `.xlsx` | openpyxl | — |
+| `.png/.jpg/.bmp/.tiff` | PyTesseract OCR | — |
+| `.txt/.md` | Direct read | — |
+
+**LESLIE marker splitting**: Text is split at "Leslie's Notes" / "Manager Notes" heading. Content before marker gets 5-day TTL. Content after marker is indexed permanently.
+
+**ChromaDB**: Collection `alex_knowledge` at `/home/head/.alex/chromadb`. 500-char chunks with 50-char overlap. Default embedding function (onnxruntime).
+
+**Cleanup**: `runCleanup()` in heartbeat.js calls `rag_manager.py cleanup` to remove expired TTL entries.
+
+### API Caching (Vercel)
+
+- Futuristic endpoints (30 endpoints in `LONG_CACHE_ENDPOINTS`) cached for 7 days in Redis
+- Original endpoints cached for 1 hour
+- Cache key format: `cache:v1:{endpoint}:{paramHash}`
+- Handler files use `callHaikuJSON()` with FUTURE_ECONOMIST persona
+
+---
+
 ## Cron / Heartbeat System
 
 ### Flow
@@ -221,7 +263,7 @@ User tasks: `schedule_task` tool writes JSON to `~/.alex/tasks/` + cron line to 
 |----------|---------|
 | `POST /api/command` | Run a message through the chat system |
 | `POST /api/send` | Direct message to a Telegram user |
-| `POST /api/trigger` | Trigger a scheduled task by name |
+| `POST /api/trigger` | Trigger a scheduled task by name. Special trigger: `file-received` from `taildrop-watcher.sh` processes uploaded files through `document-processor.js` (fire-and-forget) |
 | `GET /api/users` | List known Telegram users |
 | `POST /api/broadcast` | Message all known users |
 
@@ -299,6 +341,9 @@ Markmap via `npx markmap-cli` + Puppeteer screenshot. Accepts markdown outline, 
 | Latest | Allow chart/diagram/mindmap tools for all users (removed from OWNER_ONLY_TOOLS) |
 | Latest | 25 improvements: rate limiting, CORS hardening, tool timeouts, health endpoint, prompt caching, bash blocklist, tool output truncation, RECENT_WINDOW=8, keyword index, conversation archiving, auto-fact extraction, user prefs, RAG fallback, enhanced briefing, deadline follow-ups, stock alerts, idle starters, auto-reminders, circuit breakers for DeepSeek/OpenAI, graceful shutdown, test suite |
 | Latest | TikTok scraper (`tiktok_scrape` tool + `/tiktok` command) via Apify API |
+| Latest | RAG document pipeline: Tailscale upload → OCR → ChromaDB indexing with TTL |
+| Latest | Content cache for heartbeat fact extraction (3-day TTL, 50-entry cap) |
+| Latest | 30 futuristic API endpoints, 7-day cache, API key system with email + expiry |
 
 ---
 

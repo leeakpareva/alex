@@ -35,8 +35,9 @@
     .key-result.show { display: block; }
     .key-result code { display: block; background: #1a1a26; padding: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; color: var(--green); word-break: break-all; margin: 0.5rem 0; }
     .key-result .warn { color: var(--amber); font-size: 0.75rem; margin-top: 0.5rem; }
-    .copy-btn { background: var(--border); color: var(--text); border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 0.25rem; }
+    .copy-btn { background: var(--border); color: var(--text); border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 0.25rem; transition: background 0.3s, color 0.3s; }
     .copy-btn:hover { background: #2a2a3e; }
+    .copy-btn.copied { background: #16a34a; color: #fff; }
     .keygen .error { color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem; }
 
     /* Rate limit info */
@@ -206,6 +207,8 @@
       <div class="quick-start" id="quick-start" style="display:none">
         <h3>Quick Start — Your key is ready!</h3>
         <p>Copy any of these to start using the API right now:</p>
+        <label for="qs-symbol" style="font-size:0.8rem;color:var(--muted);">Stock symbol (change before copying):</label>
+        <input type="text" id="qs-symbol" value="AAPL" placeholder="e.g. MSFT, GOOGL, TSLA" maxlength="10" style="width:120px;margin-bottom:0.5rem;text-transform:uppercase;" oninput="updateQSSnippets()" />
         <div class="quick-start-tabs">
           <button onclick="showQSTab('qs-js')" class="qs-tab active">JavaScript</button>
           <button onclick="showQSTab('qs-py')" class="qs-tab">Python</button>
@@ -945,11 +948,19 @@ $response.Content | ConvertFrom-Json | Format-List</pre>
       // Show quick start
       const qs = document.getElementById('quick-start');
       qs.style.display = 'block';
-      document.getElementById('qs-js').textContent = `const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
-      document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://www.alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
-      document.getElementById('qs-curl-mac').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
-      document.getElementById('qs-curl-win').textContent = `curl.exe -H "X-API-Key: ${data.key}" ^\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
-      document.getElementById('qs-ps').textContent = `(Invoke-WebRequest -Uri "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" -Headers @{"X-API-Key"="${data.key}"}).Content | ConvertFrom-Json | Format-List`;
+      window._qsKey = data.key;
+      updateQSSnippets();
+    }
+
+    function updateQSSnippets() {
+      const key = window._qsKey;
+      if (!key) return;
+      const sym = (document.getElementById('qs-symbol').value || 'AAPL').toUpperCase().trim();
+      document.getElementById('qs-js').textContent = `const res = await fetch('https://www.alexnavada.xyz/api/v1/stock-quote?symbol=${sym}', {\n  headers: { 'X-API-Key': '${key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
+      document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://www.alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': '${sym}'},\n    headers={'X-API-Key': '${key}'}\n)\nprint(res.json())`;
+      document.getElementById('qs-curl-mac').textContent = `curl -H "X-API-Key: ${key}" \\\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=${sym}"`;
+      document.getElementById('qs-curl-win').textContent = `curl.exe -H "X-API-Key: ${key}" ^\n  "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=${sym}"`;
+      document.getElementById('qs-ps').textContent = `(Invoke-WebRequest -Uri "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=${sym}" -Headers @{"X-API-Key"="${key}"}).Content | ConvertFrom-Json | Format-List`;
     }
 
     async function generateKey() {
@@ -1037,10 +1048,28 @@ $response.Content | ConvertFrom-Json | Format-List</pre>
 
     function copyKey() {
       const key = document.getElementById('kg-key').textContent;
+      const btn = document.querySelector('.key-result .copy-btn');
       navigator.clipboard.writeText(key).then(() => {
-        const btn = event.target;
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy to clipboard', 2000);
+        btn.textContent = '\u2713 Copied to clipboard!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy to clipboard';
+          btn.classList.remove('copied');
+        }, 2500);
+      }).catch(() => {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = key;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '\u2713 Copied to clipboard!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy to clipboard';
+          btn.classList.remove('copied');
+        }, 2500);
       });
     }
 

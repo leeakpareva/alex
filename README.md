@@ -108,6 +108,8 @@ All models have independent circuit breakers — 5 consecutive failures trips th
 ├──────────────────────────────────────────────────────────────────────┤
 │  31+ Tools │ Skills System │ Memory + RAG │ Python Execution         │
 ├──────────────────────────────────────────────────────────────────────┤
+│  Document Pipeline │ Content Cache │ RAG (ChromaDB) │ API Caching         │
+├──────────────────────────────────────────────────────────────────────┤
 │                     Raspberry Pi 5 (8GB RAM)                          │
 │        24/7 systemd + cron scheduling + 3-layer auto-recovery        │
 ├──────────────────────────────────────────────────────────────────────┤
@@ -148,6 +150,9 @@ Telegram/Slack/Gmail message
 | `src/config.js` | 106 | Config loader with schema validation, path security |
 | `src/queue.js` | 100 | Priority request queue with 429 cooldown and rate limit handling |
 | `src/keyword-index.js` | 93 | Inverted keyword index with TF scoring for memory recall fallback |
+| `src/content-cache.js` | ~80 | Content fact cache — stores extracted facts from heartbeat outputs (3-day TTL, 50-entry cap) |
+| `src/document-processor.js` | ~200 | Upload pipeline — PDF/DOCX/image OCR extraction, LESLIE marker splitting, ChromaDB indexing |
+| `scripts/rag_manager.py` | ~200 | RAG bridge — Python CLI bridging Node.js to ChromaDB (index-text, query, cleanup, stats) |
 | `src/alerts.js` | 55 | Stock and service alert threshold monitoring |
 
 ---
@@ -316,6 +321,7 @@ Authenticated REST API for programmatic access:
 | `/api/users` | GET | List known Telegram users |
 | `/api/broadcast` | POST | Message all known users |
 | `/api/health` | GET | Health check endpoint |
+| `/api/trigger` (file-received) | POST | Process uploaded file through document pipeline (fire-and-forget) |
 | `/api/terminal-messages` | GET | Fetch and clear queued messages for ALEX Terminal |
 
 Localhost requests to `/api/trigger`, `/api/command`, `/api/health`, and `/api/terminal-messages` bypass authentication.
@@ -328,6 +334,31 @@ The [ALEX Terminal](https://github.com/leeakpareva/alex-terminal) connects via `
 - **Terminal-aware responses** — ALEX knows it's in a text-only terminal and avoids image/chart tools, keeps responses concise
 - **Autonomous notifications** — heartbeat task results are queued to `~/.alex/terminal-queue.json` and displayed in the terminal
 - **Voice I/O** — OpenAI TTS (onyx voice) + Whisper STT via USB mic, output through Bluetooth speaker
+
+---
+
+## Caching Architecture
+
+### Three-Layer Caching
+
+ALEX uses three independent caching layers to minimize API costs and speed up responses:
+
+**1. Content Fact Cache** (`src/content-cache.js`)
+After each heartbeat task, Haiku extracts key data points (stock prices, market moves, research findings) and caches them as structured facts in `~/.alex/cache/content/`. Facts have a 3-day TTL and 50-entry cap. When ALEX needs similar data again, cached facts are injected into the prompt instead of making fresh API calls.
+
+**2. RAG Document Pipeline** (`src/document-processor.js` → `scripts/rag_manager.py`)
+Files uploaded via Tailscale are automatically processed:
+- PDF → pdftotext (fallback: PyTesseract OCR for scanned documents)
+- DOCX → python-docx, XLSX → openpyxl, Images → PyTesseract OCR
+- Text is chunked (500 chars, 50 overlap) and indexed in ChromaDB
+- Documents with "Manager Notes" / "Leslie's Notes" markers are split: general content gets 5-day TTL, manager notes are indexed permanently
+- Expired entries cleaned automatically during daily cleanup
+
+**3. API Response Cache** (Vercel/Redis)
+The public API at alexnavada.xyz caches responses in Upstash Redis:
+- 30 futuristic AI-economy endpoints: 7-day cache (data changes slowly)
+- 30 original endpoints: 1-hour cache (more time-sensitive)
+- Cache key: `cache:v1:{endpoint}:{paramHash}`
 
 ---
 
@@ -521,6 +552,8 @@ Three layers ensure scheduled tasks never get lost:
 │   ├── mindmaps/            # Markmap mind maps
 │   ├── images/              # DALL-E generated images
 │   └── webapps/             # Generated HTML web applications
+├── cache/content/          # Extracted fact cache (3-day TTL)
+├── chromadb/               # ChromaDB vector database for RAG
 ├── logs/
 │   ├── audit/               # Tool execution and error audit logs
 │   └── tokens/              # Per-day token usage JSONL files
@@ -541,6 +574,8 @@ Three layers ensure scheduled tasks never get lost:
 - **Natural acknowledgments** — 14 varied human-sounding responses instead of robotic filler
 - **Scheduled task safety** — tighter message window (12 vs 20) to prevent token overflow during tool loops
 - **OpenAI-compatible providers** — Kimi K2 uses the same OpenAI SDK with custom baseURL, making it trivial to add more providers
+- **Three-layer caching** — content facts (3-day), RAG documents (5-day TTL / permanent), API responses (1h / 7-day)
+- **Upload auto-processing** — Tailscale → taildrop-watcher.sh → `/api/trigger` → document-processor.js → ChromaDB (fire-and-forget)
 
 ---
 

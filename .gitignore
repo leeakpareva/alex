@@ -47,3 +47,4 @@ test-report.html
 *.tmp
 *.temp
 .cache/
+.vercel
