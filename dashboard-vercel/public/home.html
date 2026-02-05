@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <meta name="description" content="ALEX — Future Economist at NAVADA. AI & Data-as-a-Service Platform. Education-First.">
+  <title>ALEX — Future Economist at NAVADA</title>
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    /* Hero Section */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 7rem 1rem 4rem;
+      text-align: center;
+      min-height: 90vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero-subtitle-top {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.25em;
+      color: var(--neon-pink);
+      margin-bottom: 1rem;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--foreground);
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-title .glow-cyan {
+      color: var(--neon-cyan);
+      animation: pulseGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes cyanGlow {
+      0%, 100% {
+        text-shadow: 0 0 5px oklch(0.7 0.2 195), 0 0 10px oklch(0.7 0.2 195);
+      }
+      50% {
+        text-shadow: 0 0 10px oklch(0.7 0.2 195), 0 0 25px oklch(0.7 0.2 195), 0 0 40px oklch(0.7 0.2 195);
+      }
+    }
+
+    .hero-title .glow-cyan {
+      animation: cyanGlow 3s ease-in-out infinite;
+    }
+
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 640px;
+      margin: 0 auto 1.75rem;
+      line-height: 1.75;
+    }
+
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .hero-supporting {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      max-width: 560px;
+      margin: 0 auto 2rem;
+      line-height: 1.6;
+    }
+
+    .hero-ctas {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .hero-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .hero-stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted-foreground);
+    }
+
+    .hero-stat-value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    /* Voice Section */
+    .voice-card {
+      max-width: 600px;
+      margin: 0 auto;
+      border-radius: 1rem;
+      border: 1px solid oklch(0.75 0.25 330 / 0.2);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .voice-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    .voice-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+    }
+
+    .voice-subtitle {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      max-width: 420px;
+      margin: 0 auto 1.5rem;
+      line-height: 1.6;
+    }
+
+    .voice-player {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .voice-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .voice-sublabel {
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+    }
+
+    .voice-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: oklch(0.7 0.2 195 / 0.1);
+      border: 1px solid oklch(0.7 0.2 195 / 0.3);
+      color: var(--neon-cyan);
+    }
+
+    .voice-cta {
+      font-size: 0.85rem;
+      color: var(--neon-cyan);
+      transition: color 0.2s;
+    }
+
+    .voice-cta:hover {
+      color: var(--foreground);
+    }
+
+    .voice-error {
+      display: none;
+      color: var(--muted-foreground);
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Beta Section */
+    .beta-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 1rem;
+      border: 1px solid oklch(0.75 0.2 50 / 0.3);
+      padding: 3rem 2rem;
+      text-align: center;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .beta-glow-1 {
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: oklch(0.75 0.2 50 / 0.08);
+      filter: blur(80px);
+      top: -100px;
+      right: -100px;
+      pointer-events: none;
+    }
+
+    .beta-glow-2 {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: oklch(0.75 0.25 330 / 0.06);
+      filter: blur(60px);
+      bottom: -80px;
+      left: -60px;
+      pointer-events: none;
+    }
+
+    .beta-content {
+      position: relative;
+      z-index: 2;
+    }
+
+    .badge-pulse {
+      animation: badgePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes badgePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .beta-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin: 1rem 0 0.75rem;
+    }
+
+    .beta-desc {
+      font-size: 0.95rem;
+      color: var(--muted-foreground);
+      max-width: 560px;
+      margin: 0 auto 2rem;
+      line-height: 1.7;
+    }
+
+    .beta-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 700px;
+      margin: 0 auto 2rem;
+    }
+
+    .beta-step {
+      padding: 1.25rem;
+      border-radius: 0.75rem;
+      background: oklch(0.14 0.02 290);
+      border: 1px solid var(--border);
+    }
+
+    .beta-step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .beta-step-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.25rem;
+    }
+
+    .beta-step-desc {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    .beta-ctas {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .beta-note {
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+    }
+
+    .beta-note a {
+      color: var(--neon-cyan);
+    }
+
+    /* Capabilities Section */
+    .capabilities-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--neon-pink);
+      text-align: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .capabilities-subtitle {
+      font-size: 0.95rem;
+      color: var(--muted-foreground);
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    .cap-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .cap-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .cap-card-desc {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    /* Agent Architecture Section */
+    .arch-badge {
+      text-align: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .arch-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--foreground);
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .arch-card {
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+
+    .arch-card-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .arch-card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+    }
+
+    .arch-card-desc {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .arch-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .arch-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.375rem;
+      background: oklch(0.15 0.03 290);
+      border: 1px solid var(--border);
+      color: var(--muted-foreground);
+    }
+
+    /* Apify highlight */
+    .apify-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 1rem;
+      border: 1px solid oklch(0.75 0.2 50 / 0.3);
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+
+    .apify-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--sunset-orange);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .apify-bullets {
+      list-style: none;
+      padding: 0;
+      margin-bottom: 1.25rem;
+    }
+
+    .apify-bullets li {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+      padding-left: 1.25rem;
+      position: relative;
+      margin-bottom: 0.4rem;
+    }
+
+    .apify-bullets li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.5em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--sunset-orange);
+    }
+
+    .apify-code {
+      background: oklch(0.1 0.02 290);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .apify-code .kw { color: var(--neon-pink); }
+    .apify-code .fn { color: var(--neon-cyan); }
+    .apify-code .str { color: var(--sunset-orange); }
+    .apify-code .cmt { color: oklch(0.5 0.05 290); }
+
+    /* Teaches grid */
+    .teaches-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .teaches-item {
+      text-align: center;
+      padding: 1.25rem 1rem;
+    }
+
+    .teaches-item-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .teaches-item-desc {
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    /* CTA card */
+    .arch-cta-card {
+      margin-top: 2rem;
+      border-radius: 1rem;
+      border: 1px solid oklch(0.75 0.25 330 / 0.2);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .arch-cta-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 1.25rem;
+    }
+
+    .arch-cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    /* Footer */
+    .site-footer {
+      position: relative;
+      padding: 4rem 1rem;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--neon-pink);
+      letter-spacing: 0.15em;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-subtitle {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      max-width: 520px;
+      margin: 0 auto 1.5rem;
+      line-height: 1.6;
+    }
+
+    .footer-tags {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .footer-link {
+      font-size: 0.85rem;
+      color: var(--neon-cyan);
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .footer-link:hover {
+      text-decoration: underline;
+    }
+
+    .footer-credit {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-designed {
+      font-size: 0.8rem;
+      color: var(--neon-cyan);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .footer-designed:hover {
+      text-decoration: underline;
+    }
+
+    .footer-nav {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-nav a {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      transition: color 0.2s;
+    }
+
+    .footer-nav a:hover {
+      color: var(--foreground);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 4rem 1rem 2.5rem;
+        min-height: auto;
+      }
+
+      .hero-title {
+        font-size: 2rem;
+      }
+
+      .hero-desc {
+        font-size: 0.95rem;
+      }
+
+      .hero-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .beta-card {
+        padding: 2rem 1.25rem;
+      }
+
+      .beta-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .beta-title {
+        font-size: 1.5rem;
+      }
+
+      .teaches-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .voice-card {
+        padding: 2rem 1.25rem;
+      }
+
+      .voice-title {
+        font-size: 1.25rem;
+      }
+
+      .apify-card {
+        padding: 1.5rem 1.25rem;
+      }
+
+      .apify-code {
+        font-size: 0.7rem;
+      }
+
+      .arch-cta-card {
+        padding: 2rem 1.25rem;
+      }
+
+      .footer-title {
+        font-size: 1.75rem;
+      }
+
+      .site-footer {
+        padding: 3rem 1rem;
+      }
+
+      .capabilities-title {
+        font-size: 1.5rem;
+      }
+
+      .arch-title {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hero {
+        padding: 3rem 0.75rem 2rem;
+      }
+
+      .hero-title {
+        font-size: 1.5rem;
+      }
+
+      .hero-subtitle-top {
+        font-size: 0.7rem;
+      }
+
+      .hero-desc {
+        font-size: 0.875rem;
+      }
+
+      .hero-supporting {
+        font-size: 0.8rem;
+      }
+
+      .hero-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      .hero-stat-value {
+        font-size: 0.75rem;
+      }
+
+      .hero-stat-label {
+        font-size: 0.65rem;
+      }
+
+      .hero-ctas {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .hero-ctas .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .beta-title, .capabilities-title, .arch-title {
+        font-size: 1.3rem;
+      }
+
+      .beta-ctas {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .beta-ctas .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .teaches-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .arch-cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .arch-cta-buttons .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .footer-title {
+        font-size: 1.5rem;
+      }
+
+      .footer-nav {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .footer-tags {
+        gap: 0.4rem;
+      }
+
+      .footer-tags .pill {
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-content">
+
+    <!-- ==================== HERO SECTION ==================== -->
+    <section class="hero">
+      <div class="grid-floor"></div>
+      <div class="hero-inner">
+        <!-- Hero Image -->
+        <div class="animate-fade-in-up" style="margin-bottom:2rem">
+          <img src="/images/alex-hero.png" alt="ALEX - AI Future Economist" style="max-width:900px;width:100%;border-radius:8px;margin:0 auto">
+        </div>
+
+        <!-- Subtitle -->
+        <p class="hero-subtitle-top animate-fade-in-up delay-100">10 Years From The Future</p>
+
+        <!-- Title -->
+        <h1 class="hero-title animate-fade-in-up delay-200">
+          <span class="glow-cyan">ALEX</span> — Future Economist at NAVADA
+        </h1>
+
+        <!-- Description -->
+        <p class="hero-desc animate-fade-in-up delay-300">
+          Alex is an AI Future Economist at NAVADA, designed to teach, demonstrate, and explain how modern AI agent systems work. Built education-first, Alex helps learners, developers, and organisations understand AI, APIs, and data-driven decision making.
+        </p>
+
+        <!-- Pill Badges -->
+        <div class="hero-badges animate-fade-in-up delay-300">
+          <span class="badge badge-pink">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Senior Colleague &amp; Educator
+          </span>
+          <span class="badge badge-cyan">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Available 24/7
+          </span>
+        </div>
+
+        <!-- Supporting Text -->
+        <p class="hero-supporting animate-fade-in-up delay-400">
+          Whether you are exploring AI for the first time or building production-ready agent systems, Alex provides real-time guidance, working examples, and thoughtful explanations grounded in practical experience.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="hero-ctas animate-fade-in-up delay-400">
+          <a href="https://t.me/ALEX_Navada_bot" class="btn btn-pink" target="_blank" rel="noopener">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+            Try ALEX Today
+          </a>
+          <a href="/contact" class="btn btn-cyan-outline">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Get in Touch
+          </a>
+        </div>
+
+        <!-- Stats -->
+        <div class="hero-stats animate-fade-in-up delay-500">
+          <div class="hero-stat">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <span class="hero-stat-label">Role</span>
+            <span class="hero-stat-value">Future Economist</span>
+          </div>
+          <div class="hero-stat">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </div>
+            <span class="hero-stat-label">Focus</span>
+            <span class="hero-stat-value">Education-First</span>
+          </div>
+          <div class="hero-stat">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="hero-stat-label">Availability</span>
+            <span class="hero-stat-value">24/7 Support</span>
+          </div>
+          <div class="hero-stat">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <span class="hero-stat-label">Platform</span>
+            <span class="hero-stat-value">AI &amp; Data-as-a-Service</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ALEX VOICE SECTION ==================== -->
+    <section class="section">
+      <div class="container">
+        <div class="voice-card gradient-pink-cyan animate-fade-in-up">
+          <!-- Header -->
+          <div class="voice-header">
+            <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            Alex in Action
+          </div>
+
+          <!-- Title & Subtitle -->
+          <h2 class="voice-title">Hear Alex Introduce Himself</h2>
+          <p class="voice-subtitle">Live voice powered by Claude Sonnet — your AI Future Economist ready to guide you</p>
+
+          <!-- Player -->
+          <div class="voice-player">
+            <button class="audio-btn" id="audio-play-btn" aria-label="Play audio">
+              <svg id="audio-play-icon" class="icon-lg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg id="audio-pause-icon" class="icon-lg" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <span class="voice-label">Alex's Introduction</span>
+            <span class="voice-sublabel">Tap to play</span>
+            <span class="voice-badge">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              Sonnet
+            </span>
+          </div>
+
+          <!-- Error fallback -->
+          <p class="voice-error" id="audio-error">Audio is currently unavailable. Try again later.</p>
+
+          <!-- Hidden audio element -->
+          <audio id="alex-audio" preload="none">
+            <source src="/audio/ALEX_voice.ogg" type="audio/ogg">
+          </audio>
+
+          <!-- CTA link -->
+          <a href="https://t.me/ALEX_Navada_bot" class="voice-cta" target="_blank" rel="noopener">
+            Try Alex now on Telegram &rarr;
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== JOIN BETA SECTION ==================== -->
+    <section class="section">
+      <div class="container">
+        <div class="beta-card gradient-orange-pink">
+          <div class="beta-glow-1"></div>
+          <div class="beta-glow-2"></div>
+          <div class="beta-content">
+            <!-- Badge -->
+            <div class="animate-fade-in-up">
+              <span class="badge badge-orange badge-pulse">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                ALEX is in Test Phase
+              </span>
+            </div>
+
+            <!-- Title & Description -->
+            <h2 class="beta-title animate-fade-in-up delay-100">Join the ALEX Beta Program</h2>
+            <p class="beta-desc animate-fade-in-up delay-200">
+              ALEX is currently in a closed beta phase. We are looking for early testers who want to explore AI-powered economic education, test API endpoints, and provide feedback that shapes the platform.
+            </p>
+
+            <!-- Steps -->
+            <div class="beta-steps animate-fade-in-up delay-300">
+              <div class="beta-step">
+                <div class="beta-step-num text-sunset-orange">Step 1</div>
+                <div class="beta-step-title">Get Telegram ID</div>
+                <div class="beta-step-desc">Open Telegram and find your numeric user ID through @userinfobot</div>
+              </div>
+              <div class="beta-step">
+                <div class="beta-step-num text-neon-cyan">Step 2</div>
+                <div class="beta-step-title">Email Us</div>
+                <div class="beta-step-desc">Send your Telegram ID and a short note about your interest to our team</div>
+              </div>
+              <div class="beta-step">
+                <div class="beta-step-num text-neon-pink">Step 3</div>
+                <div class="beta-step-title">Start Testing</div>
+                <div class="beta-step-desc">Once approved, message @ALEX_Navada_bot on Telegram to begin your session</div>
+              </div>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="beta-ctas animate-fade-in-up delay-400">
+              <a href="mailto:Alex.Ai.Navada@gmail.com?subject=ALEX%20Beta%20Access%20Request" class="btn btn-orange">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Request Beta Access
+              </a>
+              <a href="/terms#testing" class="btn btn-ghost">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                View Testing Guidelines
+              </a>
+            </div>
+
+            <!-- Note -->
+            <p class="beta-note animate-fade-in-up delay-500">
+              By participating, you agree to our <a href="/terms">Terms of Service</a> and beta testing guidelines.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CAPABILITIES SECTION ==================== -->
+    <section class="section-lg">
+      <div class="container">
+        <h2 class="capabilities-title neon-glow-pink animate-fade-in-up">What Alex Teaches</h2>
+        <p class="capabilities-subtitle animate-fade-in-up delay-100">
+          Alex covers a wide range of topics across AI systems, economics, APIs, and responsible technology. Each capability is designed to educate and demonstrate real-world patterns.
+        </p>
+
+        <div class="grid-3 animate-fade-in-up delay-200">
+          <!-- 1. How AI Systems Work (pink) -->
+          <div class="theme-card theme-card-pink cap-card">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22"/><path d="M12 2a4 4 0 0 0-4 4c0 1.95 1.4 3.58 3.25 3.93"/></svg>
+            </div>
+            <div class="cap-card-title">How AI Systems Work</div>
+            <div class="cap-card-desc">Understand the fundamentals of language models, token processing, and how AI generates contextual responses.</div>
+          </div>
+
+          <!-- 2. APIs & Agent Interactions (cyan) -->
+          <div class="theme-card theme-card-cyan cap-card">
+            <div class="icon-box icon-box-cyan">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div class="cap-card-title">APIs &amp; Agent Interactions</div>
+            <div class="cap-card-desc">Learn how AI agents communicate with external services through REST APIs, webhooks, and tool-use patterns.</div>
+          </div>
+
+          <!-- 3. Decision & Incentive Systems (orange) -->
+          <div class="theme-card theme-card-orange cap-card">
+            <div class="icon-box icon-box-orange">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            </div>
+            <div class="cap-card-title">Decision &amp; Incentive Systems</div>
+            <div class="cap-card-desc">Explore how agents make decisions, prioritise tasks, and balance competing objectives with economic reasoning.</div>
+          </div>
+
+          <!-- 4. Future Systems Thinking (pink) -->
+          <div class="theme-card theme-card-pink cap-card">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div class="cap-card-title">Future Systems Thinking</div>
+            <div class="cap-card-desc">Anticipate how AI, data, and automation will reshape industries, labour markets, and economic structures.</div>
+          </div>
+
+          <!-- 5. Responsible AI Building (cyan) -->
+          <div class="theme-card theme-card-cyan cap-card">
+            <div class="icon-box icon-box-cyan">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="cap-card-title">Responsible AI Building</div>
+            <div class="cap-card-desc">Learn best practices for safety, permissions, guardrails, and ethical considerations when building AI systems.</div>
+          </div>
+
+          <!-- 6. Trade-offs & Uncertainty (orange) -->
+          <div class="theme-card theme-card-orange cap-card">
+            <div class="icon-box icon-box-orange">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12h18"/><path d="M16 7l-4-4-4 4"/><path d="M8 17l4 4 4-4"/></svg>
+            </div>
+            <div class="cap-card-title">Trade-offs &amp; Uncertainty</div>
+            <div class="cap-card-desc">Understand cost-benefit analysis, risk assessment, and how to reason under uncertainty in AI-driven systems.</div>
+          </div>
+
+          <!-- 7. Educational APIs (pink) -->
+          <div class="theme-card theme-card-pink cap-card">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div class="cap-card-title">Educational APIs</div>
+            <div class="cap-card-desc">Access a free library of 30+ API endpoints designed for learning, experimenting, and building real projects.</div>
+          </div>
+
+          <!-- 8. Agent-Ready Interfaces (cyan) -->
+          <div class="theme-card theme-card-cyan cap-card">
+            <div class="icon-box icon-box-cyan">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            </div>
+            <div class="cap-card-title">Agent-Ready Interfaces</div>
+            <div class="cap-card-desc">Learn how to design APIs and interfaces that AI agents can discover, understand, and interact with effectively.</div>
+          </div>
+
+          <!-- 9. Onboarding & Support (orange) -->
+          <div class="theme-card theme-card-orange cap-card">
+            <div class="icon-box icon-box-orange">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="cap-card-title">Onboarding &amp; Support</div>
+            <div class="cap-card-desc">Step-by-step guidance for new users, with personalised support that adapts to your experience level.</div>
+          </div>
+
+          <!-- 10. Documentation & Examples (pink) -->
+          <div class="theme-card theme-card-pink cap-card">
+            <div class="icon-box icon-box-pink">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div class="cap-card-title">Documentation &amp; Examples</div>
+            <div class="cap-card-desc">Comprehensive guides, code samples, and working examples for every API and feature available on the platform.</div>
+          </div>
+
+          <!-- 11. 24/7 Availability (cyan) -->
+          <div class="theme-card theme-card-cyan cap-card">
+            <div class="icon-box icon-box-cyan">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="cap-card-title">24/7 Availability</div>
+            <div class="cap-card-desc">Alex is always online, ready to answer questions, walk through examples, and assist with learning at any hour.</div>
+          </div>
+
+          <!-- 12. Visual Learning (orange) -->
+          <div class="theme-card theme-card-orange cap-card">
+            <div class="icon-box icon-box-orange">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div class="cap-card-title">Visual Learning</div>
+            <div class="cap-card-desc">Charts, diagrams, mind maps, and visual explanations that make complex concepts intuitive and memorable.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== AGENT ARCHITECTURE SECTION ==================== -->
+    <section class="section-lg">
+      <div class="container">
+        <!-- Badge -->
+        <div class="arch-badge animate-fade-in-up">
+          <span class="badge badge-pink">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            Agent Architecture
+          </span>
+        </div>
+
+        <!-- Title -->
+        <h2 class="arch-title animate-fade-in-up delay-100">Build Agents with Brains, Personality &amp; Hands</h2>
+
+        <!-- 3-Column: Brain, Personality, Hands -->
+        <div class="grid-3 animate-fade-in-up delay-200">
+          <!-- The Brain -->
+          <div class="theme-card theme-card-pink arch-card">
+            <div class="icon-box icon-box-lg icon-box-pink" style="margin:0 auto">
+              <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22"/><path d="M12 2a4 4 0 0 0-4 4c0 1.95 1.4 3.58 3.25 3.93"/></svg>
+            </div>
+            <div class="arch-card-subtitle text-neon-pink">The Core Engine</div>
+            <div class="arch-card-title">The Brain</div>
+            <div class="arch-card-desc">The Large Language Model (LLM) processes input, reasons through problems, and generates intelligent responses. Alex uses Claude Sonnet as its primary reasoning engine.</div>
+            <div class="arch-tags">
+              <span class="arch-tag">LLM</span>
+              <span class="arch-tag">Claude Sonnet</span>
+              <span class="arch-tag">Reasoning</span>
+            </div>
+          </div>
+
+          <!-- The Personality -->
+          <div class="theme-card theme-card-cyan arch-card">
+            <div class="icon-box icon-box-lg icon-box-cyan" style="margin:0 auto">
+              <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="arch-card-subtitle text-neon-cyan">Character &amp; Context</div>
+            <div class="arch-card-title">The Personality</div>
+            <div class="arch-card-desc">System prompts and memory define who the agent is, how it communicates, and what it remembers. Alex has a persistent identity as a future economist and educator.</div>
+            <div class="arch-tags">
+              <span class="arch-tag">System Prompts</span>
+              <span class="arch-tag">Memory</span>
+              <span class="arch-tag">Identity</span>
+            </div>
+          </div>
+
+          <!-- The Hands -->
+          <div class="theme-card theme-card-orange arch-card">
+            <div class="icon-box icon-box-lg icon-box-orange" style="margin:0 auto">
+              <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+            <div class="arch-card-subtitle text-sunset-orange">Actions &amp; Execution</div>
+            <div class="arch-card-title">The Hands</div>
+            <div class="arch-card-desc">Tools and APIs give the agent the ability to act in the real world: fetching data, running code, sending messages, and generating visual content.</div>
+            <div class="arch-tags">
+              <span class="arch-tag">Tools</span>
+              <span class="arch-tag">APIs</span>
+              <span class="arch-tag">32 Actions</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Apify Highlight Card -->
+        <div class="apify-card gradient-orange-pink animate-fade-in-up delay-300">
+          <div class="apify-title">
+            <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            Web Scraping with Apify
+          </div>
+          <ul class="apify-bullets">
+            <li>Scrape TikTok profiles, posts, and metadata via Apify actors</li>
+            <li>Automated data collection with structured JSON output</li>
+            <li>Rate-limited, cost-aware execution with timeout protection</li>
+            <li>Alex teaches how web scraping APIs work and when to use them</li>
+          </ul>
+          <div class="apify-code"><span class="cmt">// Example: Apify actor call</span>
+<span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">apifyRunActor</span>(<span class="str">'clockworks~tiktok-scraper'</span>, {
+  profiles: [<span class="str">'@username'</span>],
+  resultsPerPage: <span class="str">10</span>,
+  shouldDownloadVideos: <span class="str">false</span>
+});</div>
+        </div>
+
+        <!-- What Alex Teaches - 4-col grid -->
+        <div class="teaches-grid animate-fade-in-up delay-400">
+          <div class="theme-card teaches-item">
+            <div class="icon-box icon-box-pink" style="margin:0 auto">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="teaches-item-title">Token Economics</div>
+            <div class="teaches-item-desc">Cost modelling, usage tracking, and optimisation for LLM-powered systems</div>
+          </div>
+          <div class="theme-card teaches-item">
+            <div class="icon-box icon-box-cyan" style="margin:0 auto">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div class="teaches-item-title">API Architecture</div>
+            <div class="teaches-item-desc">RESTful design, authentication, rate limiting, and error handling</div>
+          </div>
+          <div class="theme-card teaches-item">
+            <div class="icon-box icon-box-orange" style="margin:0 auto">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M20 12a8 8 0 0 0-8-8v8h8z"/></svg>
+            </div>
+            <div class="teaches-item-title">Memory Systems</div>
+            <div class="teaches-item-desc">Conversation history, summarisation, and long-term knowledge retention</div>
+          </div>
+          <div class="theme-card teaches-item">
+            <div class="icon-box icon-box-pink" style="margin:0 auto">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <div class="teaches-item-title">Web Data Access</div>
+            <div class="teaches-item-desc">Web scraping, search APIs, and real-time data collection patterns</div>
+          </div>
+        </div>
+
+        <!-- CTA Card -->
+        <div class="arch-cta-card gradient-pink-cyan animate-fade-in-up delay-500">
+          <h3 class="arch-cta-title">Ready to Learn Agent Architecture?</h3>
+          <div class="arch-cta-buttons">
+            <a href="https://t.me/ALEX_Navada_bot" class="btn btn-pink" target="_blank" rel="noopener">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+              Chat on Telegram
+            </a>
+            <a href="/contact" class="btn btn-cyan-outline">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              Get in Touch
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="site-footer grid-pattern">
+      <div class="container">
+        <!-- Title -->
+        <div class="footer-title neon-glow-pink animate-fade-in-up">ALEX</div>
+
+        <!-- Subtitle -->
+        <p class="footer-subtitle animate-fade-in-up delay-100">
+          Future Economist at NAVADA — AI &amp; Data-as-a-Service Platform (Education-First)
+        </p>
+
+        <!-- Tech Tags -->
+        <div class="footer-tags animate-fade-in-up delay-200">
+          <span class="pill">Education-First</span>
+          <span class="pill">AI &amp; DaaS</span>
+          <span class="pill">Future Systems</span>
+          <span class="pill">API Platform</span>
+          <span class="pill">24/7 Support</span>
+          <span class="pill">Telegram</span>
+        </div>
+
+        <!-- Link -->
+        <a href="https://navadarobotics.com" class="footer-link" target="_blank" rel="noopener">www.navadarobotics.com</a>
+
+        <!-- Credit -->
+        <p class="footer-credit">AI Engineering &middot; Robotics &middot; Creative Technology &middot; Education</p>
+
+        <!-- Designed by -->
+        <a href="https://www.linkedin.com/in/lee-akpareva/" class="footer-designed" target="_blank" rel="noopener">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+          Designed &amp; Developed by Lee Akpareva MBA, MA
+        </a>
+
+        <!-- Footer links -->
+        <nav class="footer-nav">
+          <a href="/articles">Articles</a>
+          <a href="/faq">AI FAQ</a>
+          <a href="/terms">Terms of Service</a>
+        </nav>
+      </div>
+    </footer>
+
+  </div><!-- .page-content -->
+
+  <!-- Audio player JavaScript -->
+  <script>
+    (function() {
+      var audio = document.getElementById('alex-audio');
+      var btn = document.getElementById('audio-play-btn');
+      var playIcon = document.getElementById('audio-play-icon');
+      var pauseIcon = document.getElementById('audio-pause-icon');
+      var sublabel = document.querySelector('.voice-sublabel');
+      var errorEl = document.getElementById('audio-error');
+      var isPlaying = false;
+
+      if (!audio || !btn) return;
+
+      btn.addEventListener('click', function() {
+        if (isPlaying) {
+          audio.pause();
+          isPlaying = false;
+          btn.classList.remove('playing');
+          playIcon.style.display = '';
+          pauseIcon.style.display = 'none';
+          sublabel.textContent = 'Tap to play';
+        } else {
+          audio.play().then(function() {
+            isPlaying = true;
+            btn.classList.add('playing');
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = '';
+            sublabel.textContent = 'Now playing';
+            errorEl.style.display = 'none';
+          }).catch(function() {
+            errorEl.style.display = 'block';
+            sublabel.textContent = 'Tap to play';
+          });
+        }
+      });
+
+      audio.addEventListener('ended', function() {
+        isPlaying = false;
+        btn.classList.remove('playing');
+        playIcon.style.display = '';
+        pauseIcon.style.display = 'none';
+        sublabel.textContent = 'Tap to play';
+      });
+
+      audio.addEventListener('error', function() {
+        errorEl.style.display = 'block';
+        btn.disabled = true;
+        sublabel.textContent = 'Unavailable';
+      });
+    })();
+  </script>
+
+  <!-- Shared components -->
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

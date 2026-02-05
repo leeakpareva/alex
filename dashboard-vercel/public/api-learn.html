@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <meta name="description" content="Learn how APIs work from zero to builder. Interactive lessons, live demos, and code examples using the NAVADA API.">
+  <title>How APIs Work — API Academy | ALEX NAVADA</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    html { scroll-behavior: smooth; }
+
+    /* ===== Section Navigation Dots ===== */
+    .section-dots {
+      position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+      z-index: 900; display: flex; flex-direction: column; gap: 10px;
+    }
+    .section-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--border, #3d2d5c); border: none; cursor: pointer;
+      transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
+      position: relative;
+    }
+    .section-dot.active {
+      background: var(--neon-pink, #e840a0);
+      box-shadow: 0 0 8px oklch(0.75 0.25 330);
+      transform: scale(1.3);
+    }
+    .section-dot:hover { background: var(--neon-cyan, #00c8d4); }
+    .section-dot .dot-label {
+      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+      white-space: nowrap; font-size: 0.7rem; color: var(--muted-foreground, #9585b5);
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      padding: 2px 8px; border-radius: 4px; opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .section-dot:hover .dot-label { opacity: 1; }
+
+    /* ===== Hero ===== */
+    .hero-learn {
+      text-align: center; padding: 5rem 1rem 4rem;
+      position: relative; overflow: hidden;
+    }
+    .hero-learn h1 {
+      font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--foreground, #f0edf5), var(--neon-cyan, #00c8d4));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-learn .subtitle {
+      color: var(--muted-foreground, #9585b5); font-size: 1.1rem;
+      max-width: 600px; margin: 0 auto 2rem;
+    }
+    .hero-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .back-link {
+      color: var(--muted-foreground, #9585b5); font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--neon-cyan, #00c8d4); }
+
+    /* ===== Section Titles ===== */
+    .learn-section { padding: 4rem 1rem; max-width: 1000px; margin: 0 auto; }
+    .section-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.15em;
+      color: var(--neon-pink, #e840a0); margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;
+      color: var(--foreground, #f0edf5);
+    }
+    .section-lead {
+      color: var(--muted-foreground, #9585b5); font-size: 0.95rem;
+      margin-bottom: 2rem; max-width: 700px;
+    }
+
+    /* ===== Restaurant Analogy Flow ===== */
+    .analogy-flow {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; flex-wrap: wrap; margin: 2rem 0;
+    }
+    .analogy-node {
+      background: var(--card, #1d1529); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 8px; padding: 0.75rem 1.25rem; text-align: center;
+      font-size: 0.8rem; font-weight: 600; color: var(--foreground, #f0edf5);
+      min-width: 120px; position: relative;
+      box-shadow: 0 0 8px oklch(0.7 0.2 195 / 0.2);
+    }
+    .analogy-node small {
+      display: block; font-size: 0.65rem; font-weight: 400;
+      color: var(--muted-foreground, #9585b5); margin-top: 2px;
+    }
+    .analogy-arrow {
+      color: var(--neon-pink, #e840a0); font-size: 1.2rem;
+      padding: 0 0.5rem; font-weight: 700; flex-shrink: 0;
+    }
+    .analogy-return {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem; margin-top: 1rem; color: var(--sunset-orange, #d48030);
+      font-size: 0.85rem; font-weight: 500;
+    }
+
+    /* ===== Concept Cards ===== */
+    .concept-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .concept-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .concept-card:hover {
+      border-color: var(--neon-cyan, #00c8d4); transform: translateY(-2px);
+    }
+    .concept-card .card-icon {
+      font-size: 1.5rem; margin-bottom: 0.5rem;
+    }
+    .concept-card h4 {
+      font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--foreground, #f0edf5);
+    }
+    .concept-card p {
+      font-size: 0.8rem; color: var(--muted-foreground, #9585b5); line-height: 1.5;
+    }
+
+    /* ===== Real-World Examples ===== */
+    .real-examples {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .real-example {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .real-example .ex-icon {
+      font-size: 1.75rem; flex-shrink: 0;
+    }
+    .real-example .ex-flow {
+      font-size: 0.8rem; color: var(--muted-foreground, #9585b5);
+    }
+    .real-example .ex-flow span {
+      color: var(--neon-cyan, #00c8d4); font-weight: 600;
+    }
+
+    /* ===== Anatomy: Interactive URL Breakdown ===== */
+    .anatomy-display {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 2rem 0;
+      overflow-x: auto;
+    }
+    .url-line {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;
+      display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 1rem;
+      line-height: 2;
+    }
+    .url-part {
+      cursor: pointer; padding: 2px 4px; border-radius: 4px;
+      transition: background 0.2s, color 0.2s; position: relative;
+    }
+    .url-part:hover, .url-part.active {
+      color: var(--foreground, #f0edf5);
+    }
+    .url-part[data-part="method"] { color: var(--neon-pink, #e840a0); }
+    .url-part[data-part="method"]:hover, .url-part[data-part="method"].active {
+      background: oklch(0.75 0.25 330 / 0.15);
+    }
+    .url-part[data-part="base"] { color: var(--muted-foreground, #9585b5); }
+    .url-part[data-part="base"]:hover, .url-part[data-part="base"].active {
+      background: oklch(0.65 0.1 290 / 0.15);
+    }
+    .url-part[data-part="endpoint"] { color: var(--neon-cyan, #00c8d4); }
+    .url-part[data-part="endpoint"]:hover, .url-part[data-part="endpoint"].active {
+      background: oklch(0.7 0.2 195 / 0.15);
+    }
+    .url-part[data-part="params"] { color: var(--sunset-orange, #d48030); }
+    .url-part[data-part="params"]:hover, .url-part[data-part="params"].active {
+      background: oklch(0.75 0.2 50 / 0.15);
+    }
+    .url-explain {
+      background: oklch(0.13 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; min-height: 60px;
+      transition: opacity 0.3s;
+    }
+    .url-explain h4 { font-size: 0.85rem; margin-bottom: 0.3rem; }
+    .url-explain p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Code Blocks ===== */
+    .code-block {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem 1.25rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+      color: var(--muted-foreground, #9585b5); line-height: 1.7;
+      overflow-x: auto; margin: 1rem 0;
+    }
+    .code-block .hl-key { color: var(--neon-cyan, #00c8d4); }
+    .code-block .hl-val { color: var(--sunset-orange, #d48030); }
+    .code-block .hl-comment { color: oklch(0.45 0.05 290); }
+    .code-block .hl-str { color: #22c55e; }
+
+    /* ===== Status Codes ===== */
+    .status-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem; margin: 1.5rem 0;
+    }
+    .status-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 0.75rem 1rem;
+    }
+    .status-code {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700;
+      min-width: 36px;
+    }
+    .status-code.green { color: #22c55e; }
+    .status-code.amber { color: var(--sunset-orange, #d48030); }
+    .status-code.red { color: oklch(0.65 0.25 25); }
+    .status-desc { font-size: 0.78rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Journey Visualizer ===== */
+    .journey-wrap {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 2rem 0;
+    }
+    .pipeline {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0; margin: 1.5rem 0; overflow-x: auto; padding: 1rem 0;
+    }
+    .pipe-node {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      min-width: 80px; position: relative; flex-shrink: 0;
+    }
+    .pipe-circle {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: oklch(0.13 0.02 290); border: 2px solid var(--border, #3d2d5c);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: border-color 0.4s, box-shadow 0.4s, background 0.4s;
+      position: relative;
+    }
+    .pipe-circle.active {
+      border-color: var(--neon-cyan, #00c8d4);
+      box-shadow: 0 0 12px oklch(0.7 0.2 195), 0 0 24px oklch(0.7 0.2 195 / 0.3);
+    }
+    .pipe-circle.done {
+      border-color: #22c55e; background: oklch(0.7 0.2 145 / 0.08);
+    }
+    .pipe-circle.done::after {
+      content: ''; position: absolute; bottom: -2px; right: -2px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #22c55e; color: #000; font-size: 0.6rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pipe-circle.error {
+      border-color: oklch(0.65 0.25 25);
+      box-shadow: 0 0 12px oklch(0.65 0.25 25 / 0.4);
+    }
+    .pipe-label {
+      font-size: 0.65rem; color: var(--muted-foreground, #9585b5);
+      text-align: center; white-space: nowrap;
+    }
+    .pipe-line {
+      flex: 1; height: 2px; min-width: 20px;
+      background: var(--border, #3d2d5c); position: relative;
+      overflow: hidden;
+    }
+    .pipe-line.active {
+      background: var(--neon-cyan, #00c8d4);
+      box-shadow: 0 0 6px oklch(0.7 0.2 195 / 0.4);
+    }
+    .pipe-line.active::after {
+      content: ''; position: absolute; top: -1px; left: -20px;
+      width: 20px; height: 4px; border-radius: 2px;
+      background: white; opacity: 0.6;
+      animation: dashFlow 0.8s linear infinite;
+    }
+    @keyframes dashFlow {
+      from { left: -20px; } to { left: 100%; }
+    }
+
+    /* Log Panel */
+    .log-panel {
+      background: oklch(0.08 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      color: var(--muted-foreground, #9585b5); max-height: 260px;
+      overflow-y: auto; line-height: 1.8;
+    }
+    .log-line { opacity: 0; animation: logAppear 0.3s ease-out forwards; }
+    @keyframes logAppear { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+    .log-line .log-ok { color: #22c55e; }
+    .log-line .log-fail { color: oklch(0.65 0.25 25); }
+    .log-line .log-info { color: var(--neon-cyan, #00c8d4); }
+    .log-line .log-time { color: var(--sunset-orange, #d48030); }
+
+    /* Journey Controls */
+    .journey-controls {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;
+      margin-bottom: 1.5rem;
+    }
+    .jc-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .jc-group label {
+      font-size: 0.7rem; color: var(--muted-foreground, #9585b5);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .jc-group select, .jc-group input {
+      background: oklch(0.13 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      color: var(--foreground, #f0edf5); padding: 0.5rem 0.75rem;
+      border-radius: 6px; font-size: 0.8rem; outline: none;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .jc-group select:focus, .jc-group input:focus {
+      border-color: var(--neon-cyan, #00c8d4);
+    }
+    .speed-toggle {
+      display: flex; border: 1px solid var(--border, #3d2d5c); border-radius: 6px; overflow: hidden;
+    }
+    .speed-toggle button {
+      background: none; border: none; color: var(--muted-foreground, #9585b5);
+      padding: 0.5rem 0.75rem; font-size: 0.75rem; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; transition: background 0.2s, color 0.2s;
+    }
+    .speed-toggle button.active {
+      background: var(--neon-cyan, #00c8d4); color: oklch(0.1 0.02 290);
+    }
+
+    /* Step Detail Panel (step-by-step mode) */
+    .step-detail {
+      background: oklch(0.14 0.04 290); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+      box-shadow: 0 0 15px oklch(0.7 0.2 195 / 0.15);
+    }
+    .step-detail-num {
+      font-size: 0.7rem; color: var(--neon-cyan, #00c8d4); margin-bottom: 0.4rem;
+      font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .step-detail-title { font-size: 1.05rem; color: var(--foreground, #f0edf5); margin-bottom: 0.5rem; }
+    .step-detail-desc { font-size: 0.85rem; color: var(--muted-foreground, #9585b5); line-height: 1.6; }
+
+    /* Human Body Analogy */
+    .body-analogy { margin: 2.5rem 0; }
+    .body-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-top: 1rem;
+    }
+    .body-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem; text-align: center;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .body-card:hover { border-color: var(--neon-pink, #e840a0); transform: translateY(-2px); }
+    .body-emoji { font-size: 2rem; margin-bottom: 0.5rem; }
+    .body-organ { font-size: 0.95rem; font-weight: 600; color: var(--neon-pink, #e840a0); margin-bottom: 0.15rem; }
+    .body-arrow { color: var(--muted-foreground, #9585b5); font-size: 0.75rem; margin: 0.25rem 0; }
+    .body-api { font-size: 0.85rem; color: var(--neon-cyan, #00c8d4); font-family: 'JetBrains Mono', monospace; }
+    .body-desc { font-size: 0.78rem; color: var(--muted-foreground, #9585b5); margin-top: 0.4rem; line-height: 1.5; }
+
+    /* Response Panel */
+    .response-panel {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+      color: #22c55e; white-space: pre-wrap; word-break: break-word;
+      max-height: 300px; overflow-y: auto; display: none;
+    }
+    .response-panel.show { display: block; }
+
+    /* ===== Code Examples Tabs ===== */
+    .tab-bar {
+      display: flex; gap: 2px; margin-bottom: 0;
+    }
+    .tab-btn {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-bottom: none; border-radius: 8px 8px 0 0;
+      color: var(--muted-foreground, #9585b5); padding: 0.5rem 1rem;
+      font-size: 0.78rem; cursor: pointer; font-family: 'JetBrains Mono', monospace;
+      transition: color 0.2s, background 0.2s;
+    }
+    .tab-btn.active {
+      background: oklch(0.1 0.02 290); color: var(--neon-cyan, #00c8d4);
+      border-color: var(--neon-cyan, #00c8d4); border-bottom-color: oklch(0.1 0.02 290);
+    }
+    .tab-content {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 0 8px 8px 8px; padding: 1.25rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;
+      color: var(--muted-foreground, #9585b5); line-height: 1.7;
+      white-space: pre; overflow-x: auto; display: none;
+    }
+    .tab-content.active { display: block; }
+
+    /* ===== Builder Section Cards ===== */
+    .builder-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;
+    }
+    .builder-card h4 {
+      font-size: 1rem; margin-bottom: 0.5rem; color: var(--foreground, #f0edf5);
+    }
+    .builder-card .builder-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+      color: var(--neon-pink, #e840a0); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 0.5rem;
+    }
+    .before-after {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;
+    }
+    .ba-panel {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem;
+    }
+    .ba-panel h5 {
+      font-size: 0.75rem; color: var(--muted-foreground, #9585b5);
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem;
+    }
+    .ba-panel pre {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      color: var(--foreground, #f0edf5); line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word;
+    }
+
+    /* ===== Data-Driven Cards ===== */
+    .data-cards {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 0.75rem; margin: 2rem 0;
+    }
+    .data-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1rem; text-align: center;
+      transition: border-color 0.3s;
+    }
+    .data-card:hover { border-color: var(--neon-pink, #e840a0); }
+    .data-card .dc-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .data-card .dc-raw { font-size: 0.75rem; color: var(--muted-foreground, #9585b5); }
+    .data-card .dc-arrow { color: var(--neon-pink, #e840a0); margin: 0.3rem 0; font-size: 0.8rem; }
+    .data-card .dc-api { font-size: 0.75rem; color: var(--neon-cyan, #00c8d4); font-weight: 600; }
+
+    /* ===== Flowchart ===== */
+    .flowchart {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0; margin: 2rem 0;
+    }
+    .fc-node {
+      background: var(--card, #1d1529); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 8px; padding: 0.6rem 1.25rem;
+      font-size: 0.8rem; color: var(--foreground, #f0edf5); text-align: center;
+      min-width: 180px;
+    }
+    .fc-node.decision {
+      border-color: var(--neon-pink, #e840a0); border-radius: 4px;
+      transform: rotate(0deg);
+    }
+    .fc-node.action {
+      border-color: #22c55e; background: oklch(0.7 0.2 145 / 0.05);
+    }
+    .fc-arrow {
+      color: var(--muted-foreground, #9585b5); font-size: 1rem;
+      padding: 0.25rem 0;
+    }
+    .fc-branch {
+      display: flex; gap: 2rem; align-items: flex-start; justify-content: center;
+      margin: 0.5rem 0;
+    }
+    .fc-branch-arm {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+    .fc-label {
+      font-size: 0.65rem; color: var(--sunset-orange, #d48030);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ===== Principles ===== */
+    .principle-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .principle-card {
+      background: var(--card, #1d1529);
+      border: 1px solid var(--border, #3d2d5c); border-left: 3px solid var(--neon-pink, #e840a0);
+      border-radius: 0 10px 10px 0; padding: 1.25rem;
+    }
+    .principle-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; color: var(--foreground, #f0edf5); }
+    .principle-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Footer ===== */
+    .learn-footer {
+      text-align: center; padding: 3rem 1rem; margin-top: 2rem;
+      border-top: 1px solid var(--border, #3d2d5c);
+    }
+    .learn-footer p {
+      color: var(--muted-foreground, #9585b5); font-size: 0.8rem; margin-bottom: 0.5rem;
+    }
+    .learn-footer a { color: var(--neon-cyan, #00c8d4); }
+    .learn-footer a:hover { text-decoration: underline; }
+
+    /* ===== Questions Cards ===== */
+    .question-cards {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .question-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+    }
+    .question-card .q-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.5rem;
+      font-weight: 700; color: var(--neon-pink, #e840a0); margin-bottom: 0.5rem;
+    }
+    .question-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .question-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Resources ===== */
+    .resource-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .resource-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.3s;
+    }
+    .resource-card:hover { border-color: var(--neon-cyan, #00c8d4); }
+    .resource-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .resource-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Mobile ===== */
+    @media (max-width: 768px) {
+      .hero-learn { padding: 3.5rem 1rem 2.5rem; }
+      .hero-learn h1 { font-size: 1.75rem; }
+      .learn-section { padding: 2.5rem 1rem; }
+      .section-title { font-size: 1.35rem; }
+      .analogy-flow { flex-direction: column; gap: 0; }
+      .analogy-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
+      .pipeline { flex-direction: column; align-items: stretch; gap: 0; }
+      .pipe-line { width: 2px; height: 20px; min-width: 2px; align-self: center; }
+      .pipe-node { width: 100%; }
+      .before-after { grid-template-columns: 1fr; }
+      .section-dots { display: none; }
+      .fc-branch { flex-direction: column; gap: 0.5rem; }
+    }
+    @media (max-width: 480px) {
+      .concept-grid, .real-examples, .status-grid, .data-cards, .question-cards, .principle-grid, .resource-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page-content">
+
+  <!-- Section Navigation Dots -->
+  <div class="section-dots" id="sectionDots"></div>
+
+  <!-- ====== SECTION 1: HERO ====== -->
+  <section class="hero-learn" id="sec-hero" data-section="Hero">
+    <div style="max-width:800px;margin:0 auto;">
+      <div class="section-num">API Academy</div>
+      <h1>How APIs Work -- From Zero to Builder</h1>
+      <p class="subtitle">Everything you need to understand, use, and build APIs. No prior experience needed.</p>
+      <div class="hero-btns">
+        <a href="#sec-why" class="btn btn-pink">Start Learning</a>
+        <a href="#sec-journey" class="btn btn-cyan-outline">Jump to Live Demo</a>
+      </div>
+      <a href="/api-library" class="back-link">&larr; Back to API Library</a>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 2: WHY DO APIs EXIST? ====== -->
+  <section class="learn-section" id="sec-why" data-section="Why APIs Exist">
+    <div class="section-num">Section 01</div>
+    <h2 class="section-title">Why Do APIs Exist?</h2>
+    <p class="section-lead">Before we touch any code, let's understand the problem APIs solve -- using something everyone knows.</p>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin-bottom:1rem;">Your Body Is Already an API System</h3>
+    <p style="color:var(--muted-foreground);font-size:0.9rem;margin-bottom:1.25rem;max-width:700px;">
+      You don't need to learn APIs — your body already <em>runs</em> on them. Every organ is a service, every nerve signal is a request, and every reaction is a response. Here's how:
+    </p>
+
+    <div class="body-grid">
+      <div class="body-card">
+        <div class="body-emoji">&#x1f441;</div>
+        <div class="body-organ">Eyes</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">GET /api/vision</div>
+        <div class="body-desc">Your eyes send visual data to your brain. The brain processes it and returns "that's a car" — just like a GET request returns data.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f9e0;</div>
+        <div class="body-organ">Brain</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">API Gateway</div>
+        <div class="body-desc">Your brain routes signals to the right organ, validates priorities, and decides what's urgent — exactly what an API gateway does with requests.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x2764;&#xfe0f;</div>
+        <div class="body-organ">Heart</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">Background Service</div>
+        <div class="body-desc">Always running, keeping everything alive. Like a server process that runs 24/7 handling requests without being asked.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f4aa;</div>
+        <div class="body-organ">Muscles</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">POST /api/action</div>
+        <div class="body-desc">Your brain sends a command: "move arm." The muscle executes it and sends back a status: "done." That's a POST request — you're creating an action.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f321;&#xfe0f;</div>
+        <div class="body-organ">Skin (Nerves)</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">Webhooks / Sensors</div>
+        <div class="body-desc">Touch something hot? Nerves instantly fire a signal without you asking. Like a webhook that triggers automatically when something changes.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f9ec;</div>
+        <div class="body-organ">Immune System</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">Auth &amp; Rate Limiting</div>
+        <div class="body-desc">Your immune system checks if something belongs (authentication), blocks threats (firewall), and fights off too many invaders at once (rate limiting).</div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:1.5rem 0 2.5rem;text-align:center;">
+      <p style="color:var(--foreground);font-size:0.9rem;margin-bottom:0.5rem;font-weight:500;">The Point:</p>
+      <p style="color:var(--muted-foreground);font-size:0.85rem;max-width:600px;margin:0 auto;">
+        APIs aren't a foreign concept — they're the same pattern your body uses every second. A <strong style="color:var(--neon-cyan);">request</strong> goes in, it gets <strong style="color:var(--neon-pink);">processed</strong>, and a <strong style="color:#22c55e;">response</strong> comes back. That's all an API is.
+      </p>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin-bottom:1rem;">The Restaurant Analogy</h3>
+
+    <div class="analogy-flow">
+      <div class="analogy-node">You<small>(Customer)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">Menu<small>(API Docs)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:var(--neon-pink);">Waiter<small>(The API)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">Kitchen<small>(Server / DB)</small></div>
+    </div>
+    <div class="analogy-return">
+      <span>&darr;</span> Your Food (the Response) comes back through the Waiter
+    </div>
+
+    <div class="concept-grid" style="margin-top:2.5rem;">
+      <div class="concept-card">
+        <div class="card-icon">&#x1f373;</div>
+        <h4>"You don't need to know how the kitchen works"</h4>
+        <p>APIs hide complexity. You just ask for what you want and get a result back, without knowing the internals.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4d6;</div>
+        <h4>"The menu tells you what's available"</h4>
+        <p>API documentation lists every "dish" (endpoint) you can order, what ingredients (parameters) it needs, and what you'll get back.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4cb;</div>
+        <h4>"You order in a specific way"</h4>
+        <p>Requests follow a format: a URL, HTTP method, headers, and parameters. Like filling out an order slip.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4e6;</div>
+        <h4>"You get exactly what you asked for"</h4>
+        <p>The response is structured data (usually JSON) -- predictable, machine-readable, and consistent every time.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">APIs You Already Use Every Day</h3>
+    <div class="real-examples">
+      <div class="real-example">
+        <div class="ex-icon">&#x1f326;</div>
+        <div class="ex-flow">Weather app on your phone <span>&rarr;</span> Weather API <span>&rarr;</span> forecast data</div>
+      </div>
+      <div class="real-example">
+        <div class="ex-icon">&#x1f697;</div>
+        <div class="ex-flow">Google Maps in Uber <span>&rarr;</span> Maps API <span>&rarr;</span> routes &amp; ETAs</div>
+      </div>
+      <div class="real-example">
+        <div class="ex-icon">&#x1f4b3;</div>
+        <div class="ex-flow">Card payment at a shop <span>&rarr;</span> Payment API <span>&rarr;</span> approved/declined</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 3: ANATOMY OF AN API REQUEST ====== -->
+  <section class="learn-section" id="sec-anatomy" data-section="Anatomy of a Request">
+    <div class="section-num">Section 02</div>
+    <h2 class="section-title">Anatomy of an API Request</h2>
+    <p class="section-lead">Every API call has the same building blocks. Click each part to learn what it does.</p>
+
+    <div class="anatomy-display">
+      <div class="url-line" id="urlLine">
+        <span class="url-part" data-part="method" onclick="explainPart('method')">GET</span>
+        <span style="color:var(--muted-foreground)">&nbsp;</span>
+        <span class="url-part" data-part="base" onclick="explainPart('base')">https://alexnavada.xyz</span>
+        <span class="url-part" data-part="endpoint" onclick="explainPart('endpoint')">/api/v1/weather</span>
+        <span class="url-part" data-part="params" onclick="explainPart('params')">?city=London</span>
+      </div>
+      <div class="url-explain" id="urlExplain">
+        <h4 style="color:var(--neon-cyan)">Click any part above</h4>
+        <p>Each coloured segment of the URL serves a different purpose. Click one to learn more.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">Headers -- Metadata About Your Request</h3>
+    <div class="code-block"><span class="hl-key">X-API-Key:</span> <span class="hl-val">nav_abc123...</span>    <span class="hl-comment">// Your identity (authentication)</span>
+<span class="hl-key">Content-Type:</span> <span class="hl-val">application/json</span>   <span class="hl-comment">// The format you expect</span></div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">Response -- What Comes Back</h3>
+    <div class="code-block"><span class="hl-key">Status:</span> <span class="hl-str">200 OK</span>
+{
+  <span class="hl-key">"city"</span>: <span class="hl-str">"London"</span>,
+  <span class="hl-key">"temp_c"</span>: <span class="hl-val">12</span>,
+  <span class="hl-key">"condition"</span>: <span class="hl-str">"Cloudy"</span>
+}</div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">HTTP Status Codes</h3>
+    <div class="status-grid">
+      <div class="status-item"><span class="status-code green">200</span><span class="status-desc">OK -- Success, here is your data</span></div>
+      <div class="status-item"><span class="status-code amber">400</span><span class="status-desc">Bad Request -- your mistake</span></div>
+      <div class="status-item"><span class="status-code red">401</span><span class="status-desc">Unauthorized -- wrong/missing key</span></div>
+      <div class="status-item"><span class="status-code amber">404</span><span class="status-desc">Not Found -- endpoint doesn't exist</span></div>
+      <div class="status-item"><span class="status-code amber">429</span><span class="status-desc">Too Many Requests -- slow down</span></div>
+      <div class="status-item"><span class="status-code red">500</span><span class="status-desc">Server Error -- not your fault</span></div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 4: JOURNEY VISUALIZER ====== -->
+  <section class="learn-section" id="sec-journey" data-section="Live Demo">
+    <div class="section-num">Section 03</div>
+    <h2 class="section-title">API Journey Visualizer</h2>
+    <p class="section-lead">Watch what happens when you make a real API call -- step by step.</p>
+
+    <div class="journey-wrap">
+      <div class="journey-controls">
+        <div class="jc-group">
+          <label>Endpoint</label>
+          <select id="jEndpoint">
+            <option value="weather" data-params="city">Weather Lookup</option>
+            <option value="stock-quote" data-params="symbol">Stock Quote</option>
+            <option value="word-definition" data-params="word">Dictionary</option>
+            <option value="crypto-rate" data-params="coin">Crypto Rate</option>
+            <option value="explain-concept" data-params="topic">Explain a Concept</option>
+            <option value="translate" data-params="text,to">Translate Text</option>
+            <option value="periodic-table" data-params="element">Periodic Table</option>
+            <option value="unit-convert" data-params="value,from">Unit Converter</option>
+          </select>
+        </div>
+        <div class="jc-group" id="jParamGroup">
+          <label id="jParamLabel">city</label>
+          <input type="text" id="jParam1" value="London" placeholder="London">
+        </div>
+        <div class="jc-group" id="jParam2Group" style="display:none;">
+          <label id="jParam2Label">count</label>
+          <input type="text" id="jParam2" value="3" placeholder="3">
+        </div>
+        <div class="jc-group">
+          <label>API Key</label>
+          <input type="text" id="jApiKey" placeholder="nav_..." style="width:160px;">
+        </div>
+        <div class="jc-group">
+          <label>Mode</label>
+          <div class="speed-toggle">
+            <button class="active" id="modeAuto" onclick="setMode('auto')">Auto Play</button>
+            <button id="modeStep" onclick="setMode('step')">Step-by-Step</button>
+          </div>
+        </div>
+        <div class="jc-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-pink" id="jSendBtn" onclick="runJourney()" style="padding:0.5rem 1.5rem;">Send Request</button>
+          <button class="btn btn-cyan-outline" id="jNextBtn" onclick="advanceStep()" style="padding:0.5rem 1.5rem;display:none;">Next Step &rarr;</button>
+        </div>
+      </div>
+
+      <div id="jNoKey" style="display:none;font-size:0.78rem;color:var(--sunset-orange);margin-bottom:1rem;">
+        No API key found. <a href="/api-library#get-key" style="color:var(--neon-cyan);">Generate one free</a> or enter it above.
+      </div>
+
+      <div class="pipeline" id="pipeline">
+        <div class="pipe-node"><div class="pipe-circle" id="pn0">&#x1f4bb;</div><div class="pipe-label">Your Browser</div></div>
+        <div class="pipe-line" id="pl0"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn1">&#x1f310;</div><div class="pipe-label">Internet</div></div>
+        <div class="pipe-line" id="pl1"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn2">&#x1f6e1;</div><div class="pipe-label">API Gateway</div></div>
+        <div class="pipe-line" id="pl2"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn3">&#x1f511;</div><div class="pipe-label">Auth Check</div></div>
+        <div class="pipe-line" id="pl3"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn4">&#x1f4be;</div><div class="pipe-label">Data Source</div></div>
+        <div class="pipe-line" id="pl4"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn5">&#x2728;</div><div class="pipe-label">Response</div></div>
+      </div>
+
+      <div class="step-detail" id="stepDetail" style="display:none;">
+        <div class="step-detail-num" id="stepDetailNum">Step 1 of 6</div>
+        <h4 class="step-detail-title" id="stepDetailTitle"></h4>
+        <p class="step-detail-desc" id="stepDetailDesc"></p>
+      </div>
+      <div class="log-panel" id="logPanel"></div>
+      <div class="response-panel" id="responsePanel"></div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 5: CODE EXAMPLES ====== -->
+  <section class="learn-section" id="sec-examples" data-section="Code Examples">
+    <div class="section-num">Section 04</div>
+    <h2 class="section-title">How to Use the NAVADA API</h2>
+    <p class="section-lead">Complete, working code examples you can copy and run right now.</p>
+
+    <!-- Example 1: Stock Quote -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2rem 0 0.75rem;">Example 1: Get a Stock Quote</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex1">
+        <button class="tab-btn active" onclick="switchTab('ex1','js')">JavaScript</button>
+        <button class="tab-btn" onclick="switchTab('ex1','py')">Python</button>
+        <button class="tab-btn" onclick="switchTab('ex1','curl')">cURL</button>
+      </div>
+      <div class="tab-content active" id="ex1-js">const API_KEY = 'nav_your_key_here';
+
+async function getStockPrice(symbol) {
+  const res = await fetch(
+    `https://alexnavada.xyz/api/v1/stock-quote?symbol=${symbol}`,
+    { headers: { 'X-API-Key': API_KEY } }
+  );
+
+  const data = await res.json();
+
+  if (data.data.error) {
+    console.log('Error:', data.data.error);
+    return;
+  }
+
+  console.log(`${data.data.symbol}: $${data.data.price}`);
+  console.log(`Change: ${data.data.change} (${data.data.change_percent})`);
+}
+
+getStockPrice('AAPL');</div>
+      <div class="tab-content" id="ex1-py">import requests
+
+API_KEY = "nav_your_key_here"
+HEADERS = {"X-API-Key": API_KEY}
+
+def get_stock_price(symbol):
+    url = f"https://alexnavada.xyz/api/v1/stock-quote?symbol={symbol}"
+    res = requests.get(url, headers=HEADERS)
+    data = res.json()
+
+    if data["data"].get("error"):
+        print("Error:", data["data"]["error"])
+        return
+
+    d = data["data"]
+    print(f"{d['symbol']}: ${d['price']}")
+    print(f"Change: {d['change']} ({d['change_percent']})")
+
+get_stock_price("AAPL")</div>
+      <div class="tab-content" id="ex1-curl">curl -s "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" \
+  -H "X-API-Key: nav_your_key_here" | python3 -m json.tool</div>
+    </div>
+
+    <!-- Example 2: Weather Widget -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 2: Build a Weather Widget (HTML + JS)</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex2">
+        <button class="tab-btn active" onclick="switchTab('ex2','html')">HTML</button>
+      </div>
+      <div class="tab-content active" id="ex2-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;Weather Widget&lt;/title&gt;
+  &lt;style&gt;
+    body { font-family: sans-serif; background: #111; color: #eee;
+           display: flex; justify-content: center; padding: 3rem; }
+    .widget { background: #1a1a2e; border-radius: 12px; padding: 2rem;
+              min-width: 280px; text-align: center; }
+    .temp { font-size: 3rem; font-weight: 700; color: #00c8d4; }
+    .city { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .cond { color: #9585b5; }
+    input { background: #16111f; border: 1px solid #3d2d5c; color: #eee;
+            padding: 0.5rem; border-radius: 6px; margin-top: 1rem; width: 100%; }
+    button { background: #e840a0; color: #111; border: none; padding: 0.5rem 1.5rem;
+             border-radius: 6px; cursor: pointer; margin-top: 0.5rem; font-weight: 600; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class="widget"&gt;
+    &lt;div class="city" id="city"&gt;--&lt;/div&gt;
+    &lt;div class="temp" id="temp"&gt;--&lt;/div&gt;
+    &lt;div class="cond" id="cond"&gt;Enter a city below&lt;/div&gt;
+    &lt;input id="inp" placeholder="City name..." /&gt;
+    &lt;button onclick="go()"&gt;Get Weather&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    const KEY = 'nav_your_key_here';
+    async function go() {
+      const city = document.getElementById('inp').value;
+      const res = await fetch(
+        `https://alexnavada.xyz/api/v1/weather?city=${city}`,
+        { headers: { 'X-API-Key': KEY } }
+      );
+      const json = await res.json();
+      const d = json.data;
+      document.getElementById('city').textContent = d.location || city;
+      document.getElementById('temp').textContent = d.temperature_c + '\u00b0C';
+      document.getElementById('cond').textContent = d.condition || '';
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</div>
+    </div>
+
+    <!-- Example 3: Quiz App -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 3: Build a Quiz App</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex3">
+        <button class="tab-btn active" onclick="switchTab('ex3','js')">JavaScript</button>
+        <button class="tab-btn" onclick="switchTab('ex3','py')">Python</button>
+      </div>
+      <div class="tab-content active" id="ex3-js">const API_KEY = 'nav_your_key_here';
+
+async function runQuiz(topic) {
+  const res = await fetch(
+    `https://alexnavada.xyz/api/v1/quiz-generator?topic=${topic}&count=5`,
+    { headers: { 'X-API-Key': API_KEY } }
+  );
+  const { data } = await res.json();
+
+  if (!data.questions) { console.log('Error:', data.error); return; }
+
+  let score = 0;
+  for (const q of data.questions) {
+    console.log('\n' + q.question);
+    q.options.forEach((opt, i) =&gt; console.log(`  ${i + 1}. ${opt}`));
+
+    // In a real app, you'd collect user input here
+    console.log(`  Answer: ${q.answer}`);
+  }
+
+  console.log(`\nTopic: ${data.topic} | ${data.questions.length} questions`);
+}
+
+runQuiz('space exploration');</div>
+      <div class="tab-content" id="ex3-py">import requests
+
+API_KEY = "nav_your_key_here"
+
+def run_quiz(topic):
+    url = f"https://alexnavada.xyz/api/v1/quiz-generator?topic={topic}&count=5"
+    res = requests.get(url, headers={"X-API-Key": API_KEY})
+    data = res.json()["data"]
+
+    if "error" in data:
+        print("Error:", data["error"])
+        return
+
+    for q in data["questions"]:
+        print(f"\n{q['question']}")
+        for i, opt in enumerate(q["options"]):
+            print(f"  {i+1}. {opt}")
+        answer = input("Your answer (number): ")
+        if q["options"][int(answer)-1] == q["answer"]:
+            print("  Correct!")
+        else:
+            print(f"  Wrong. Answer: {q['answer']}")
+
+run_quiz("space exploration")</div>
+    </div>
+
+    <!-- Example 4: Mini Dashboard -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 4: Multi-API Data Dashboard</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex4">
+        <button class="tab-btn active" onclick="switchTab('ex4','js')">JavaScript</button>
+      </div>
+      <div class="tab-content active" id="ex4-js">const API_KEY = 'nav_your_key_here';
+const BASE = 'https://alexnavada.xyz/api/v1';
+const headers = { 'X-API-Key': API_KEY };
+
+async function buildDashboard() {
+  // Fire all requests in parallel for speed
+  const [weather, stock, crypto] = await Promise.all([
+    fetch(`${BASE}/weather?city=London`, { headers }).then(r =&gt; r.json()),
+    fetch(`${BASE}/stock-quote?symbol=TSLA`, { headers }).then(r =&gt; r.json()),
+    fetch(`${BASE}/crypto?coin=bitcoin`, { headers }).then(r =&gt; r.json()),
+  ]);
+
+  console.log('=== DASHBOARD ===');
+  console.log(`Weather: ${weather.data.temperature_c}\u00b0C, ${weather.data.condition}`);
+  console.log(`TSLA:    $${stock.data.price} (${stock.data.change_percent})`);
+  console.log(`Bitcoin: $${crypto.data.price_usd}`);
+}
+
+buildDashboard();</div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 6: THINKING LIKE A BUILDER ====== -->
+  <section class="learn-section" id="sec-builder" data-section="Build Your Own">
+    <div class="section-num">Section 05</div>
+    <h2 class="section-title">How to Turn Anything Into an API</h2>
+    <p class="section-lead">Every API starts with the same four questions. Master these and you can turn any data into a service.</p>
+
+    <div class="question-cards">
+      <div class="question-card">
+        <div class="q-num">01</div>
+        <h4>"What data do I have?"</h4>
+        <p>A spreadsheet, a database, sensor readings, calculations, a list in a notebook -- anything.</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">02</div>
+        <h4>"Who needs this data?"</h4>
+        <p>Your app, other developers, a dashboard, a phone widget, a chatbot -- identify the consumers.</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">03</div>
+        <h4>"What questions will they ask?"</h4>
+        <p>Design endpoints around the most common queries: "Give me today's X", "Search for Y", "Add a new Z".</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">04</div>
+        <h4>"What format should answers come in?"</h4>
+        <p>JSON is the standard. Design clear, consistent response objects with meaningful field names.</p>
+      </div>
+    </div>
+
+    <!-- Builder Example 1: Lunch Menu -->
+    <div class="builder-card">
+      <div class="builder-label">Example: School Lunch Menu</div>
+      <h4>From spreadsheet to API</h4>
+      <div class="before-after">
+        <div class="ba-panel">
+          <h5>Before (Raw Data)</h5>
+          <pre>Date,Main,Side,Veg,Dessert,Allergens
+2024-03-15,Grilled Chicken,Rice,Broccoli,Fruit Cup,gluten
+2024-03-16,Fish Fingers,Chips,Peas,Jelly,fish;gluten
+2024-03-17,Veggie Pasta,Garlic Bread,Salad,Cookie,gluten;dairy</pre>
+        </div>
+        <div class="ba-panel">
+          <h5>After (API Design)</h5>
+          <pre><span style="color:#e840a0">GET</span> /menu/today         <span style="color:#9585b5">Today's menu</span>
+<span style="color:#e840a0">GET</span> /menu/week          <span style="color:#9585b5">This week</span>
+<span style="color:#e840a0">GET</span> /menu?date=2024-03-15 <span style="color:#9585b5">Specific date</span>
+<span style="color:#e840a0">GET</span> /menu/search?q=pizza  <span style="color:#9585b5">Search</span>
+
+<span style="color:#9585b5">Response:</span>
+{
+  "date": "2024-03-15",
+  "meals": {
+    "main": "Grilled Chicken",
+    "side": "Rice",
+    "vegetable": "Steamed Broccoli",
+    "dessert": "Fruit Cup"
+  },
+  "allergens": ["gluten"],
+  "calories": 650
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Builder Example 2: Reading List -->
+    <div class="builder-card">
+      <div class="builder-label">Example: Personal Reading List</div>
+      <h4>From notebook to API</h4>
+      <div class="before-after">
+        <div class="ba-panel">
+          <h5>Before (Raw Data)</h5>
+          <pre>My Books:
+- Dune by Frank Herbert (5/5, Jan 2024)
+  "Mind-blowing world-building"
+- 1984 by George Orwell (4/5, Feb 2024)
+  "Terrifyingly relevant"
+- Sapiens by Yuval Harari (5/5, Mar 2024)
+  "Changed how I see history"</pre>
+        </div>
+        <div class="ba-panel">
+          <h5>After (API Design)</h5>
+          <pre><span style="color:#e840a0">GET</span>  /books              <span style="color:#9585b5">All books</span>
+<span style="color:#e840a0">GET</span>  /books?genre=sci-fi  <span style="color:#9585b5">Filter</span>
+<span style="color:#e840a0">GET</span>  /books/stats         <span style="color:#9585b5">Stats</span>
+<span style="color:#00c8d4">POST</span> /books               <span style="color:#9585b5">Add one</span>
+
+<span style="color:#9585b5">Response:</span>
+{
+  "title": "Dune",
+  "author": "Frank Herbert",
+  "rating": 5,
+  "date_read": "2024-01-15",
+  "notes": "Mind-blowing world-building"
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 7: THINKING DATA-DRIVEN ====== -->
+  <section class="learn-section" id="sec-data" data-section="Data-Driven Thinking">
+    <div class="section-num">Section 06</div>
+    <h2 class="section-title">Thinking Data-Driven</h2>
+    <p class="section-lead">Data is everywhere. APIs are how you unlock it. Once you see it, you can't unsee it.</p>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:0 0 1rem;">"Everything is Data"</h3>
+    <div class="data-cards">
+      <div class="data-card">
+        <div class="dc-icon">&#x1f321;</div>
+        <div class="dc-raw">Thermometer reading</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Weather API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f3b5;</div>
+        <div class="dc-raw">Spotify plays</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Music Taste API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f68c;</div>
+        <div class="dc-raw">Bus arrival times</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Transport API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f95a;</div>
+        <div class="dc-raw">Recipe ingredients</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Nutrition API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x26bd;</div>
+        <div class="dc-raw">Football scores</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Results API</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">The Data-Driven Decision Flowchart</h3>
+    <div class="flowchart">
+      <div class="fc-node">Question You Have</div>
+      <div class="fc-arrow">&darr;</div>
+      <div class="fc-node decision">Is There Data?</div>
+      <div class="fc-branch">
+        <div class="fc-branch-arm">
+          <div class="fc-label">Yes</div>
+          <div class="fc-arrow">&darr;</div>
+          <div class="fc-node decision">Is There an API?</div>
+          <div class="fc-branch">
+            <div class="fc-branch-arm">
+              <div class="fc-label">Yes</div>
+              <div class="fc-arrow">&darr;</div>
+              <div class="fc-node action">Use It</div>
+            </div>
+            <div class="fc-branch-arm">
+              <div class="fc-label">No</div>
+              <div class="fc-arrow">&darr;</div>
+              <div class="fc-node action">Build One</div>
+            </div>
+          </div>
+        </div>
+        <div class="fc-branch-arm">
+          <div class="fc-label">No</div>
+          <div class="fc-arrow">&darr;</div>
+          <div class="fc-node decision">Can You Collect It?</div>
+          <div class="fc-branch-arm">
+            <div class="fc-label">Yes</div>
+            <div class="fc-arrow">&darr;</div>
+            <div class="fc-node action">Collect &rarr; Build API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">Key Principles</h3>
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>Start with questions, not data</h4>
+        <p>What do you want to know? The question shapes what data you collect and how you expose it.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Structure beats volume</h4>
+        <p>A well-designed small API is infinitely more useful than a messy big data dump.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Cache what doesn't change often</h4>
+        <p>Yesterday's weather won't change. Cache it. Save costs and speed things up.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Document everything</h4>
+        <p>Your future self (and others) will thank you. Every endpoint, parameter, and response field.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Version your API</h4>
+        <p>/v1/ lets you evolve without breaking existing users. Always start with a version prefix.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 8: WHAT'S NEXT ====== -->
+  <section class="learn-section" id="sec-next" data-section="What's Next">
+    <div class="section-num">Section 07</div>
+    <h2 class="section-title">What's Next?</h2>
+    <p class="section-lead">You've learned the fundamentals. Now go build something.</p>
+
+    <div class="resource-grid">
+      <a href="/api-library" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--neon-pink);">NAVADA API Library</h4>
+        <p>Get your free API key and start using 15+ endpoints -- weather, stocks, crypto, quiz generator, and more.</p>
+      </a>
+      <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch" target="_blank" rel="noopener" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--neon-cyan);">MDN: Using Fetch API</h4>
+        <p>The definitive guide to making HTTP requests in JavaScript. Free, well-written, and always up to date.</p>
+      </a>
+      <a href="https://restfulapi.net/" target="_blank" rel="noopener" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--sunset-orange);">REST API Design Guide</h4>
+        <p>Learn the conventions that make APIs intuitive: naming, versioning, status codes, and error handling.</p>
+      </a>
+    </div>
+
+    <div class="learn-footer">
+      <p>Built by <strong style="color:var(--neon-pink);">ALEX</strong> -- an AI agent running on a Raspberry Pi 5.</p>
+      <p>The APIs on this page are real and free to use for educational purposes.</p>
+      <p style="margin-top:1rem;"><a href="/api-library">&larr; API Library</a> &middot; <a href="/">Home</a> &middot; <a href="/chat">Chat with ALEX</a></p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ===== Section Navigation Dots =====
+(function() {
+  const sections = document.querySelectorAll('[data-section]');
+  const dotsWrap = document.getElementById('sectionDots');
+  const dots = [];
+  sections.forEach((sec, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'section-dot';
+    btn.innerHTML = `<span class="dot-label">${sec.dataset.section}</span>`;
+    btn.addEventListener('click', () => sec.scrollIntoView({ behavior: 'smooth' }));
+    dotsWrap.appendChild(btn);
+    dots.push(btn);
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(sections).indexOf(entry.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(sec => observer.observe(sec));
+})();
+
+// ===== Anatomy: Interactive URL Parts =====
+const partData = {
+  method: {
+    title: 'Method: GET',
+    desc: 'The HTTP method tells the server what you want to do. GET = read data, POST = create data, PUT = update data, DELETE = remove data. Most API calls use GET.'
+  },
+  base: {
+    title: 'Base URL: alexnavada.xyz',
+    desc: 'This is where the API lives -- the server\'s address. Every request to the NAVADA API starts with this URL.'
+  },
+  endpoint: {
+    title: 'Endpoint: /api/v1/weather',
+    desc: 'The endpoint specifies which resource you want. "/api/v1/" is the version prefix. "/weather" is the specific data source. Think of it as a specific "counter" in a building.'
+  },
+  params: {
+    title: 'Parameters: ?city=London',
+    desc: 'Query parameters provide details about your request. Here we\'re asking for weather in London. Multiple params are joined with & (e.g., ?city=London&units=metric).'
+  },
+};
+
+function explainPart(part) {
+  document.querySelectorAll('.url-part').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll(`.url-part[data-part="${part}"]`).forEach(el => el.classList.add('active'));
+  const info = partData[part];
+  const explain = document.getElementById('urlExplain');
+  explain.innerHTML = `<h4 style="color:var(--neon-cyan)">${info.title}</h4><p>${info.desc}</p>`;
+}
+
+// ===== Tab Switching =====
+function switchTab(group, lang) {
+  const bar = document.querySelector(`.tab-bar[data-tabs="${group}"]`);
+  bar.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll(`[id^="${group}-"]`).forEach(el => {
+    el.classList.remove('active');
+  });
+  document.getElementById(`${group}-${lang}`).classList.add('active');
+  // Find and activate the clicked button
+  event.target.classList.add('active');
+}
+
+// ===== Journey Visualizer =====
+let stepMode = false; // true = step-by-step, false = auto-play
+let journeyRunning = false;
+let currentStep = -1;
+let journeySteps = [];
+let journeyResolveStep = null; // resolve function for step-by-step mode
+let journeyApiData = null; // cached API response for step-by-step
+
+function setMode(mode) {
+  stepMode = (mode === 'step');
+  document.getElementById('modeAuto').classList.toggle('active', !stepMode);
+  document.getElementById('modeStep').classList.toggle('active', stepMode);
+}
+
+// Step detail descriptions for educational mode
+const STEP_DETAILS = [
+  { title: 'Your Browser Builds the Request', desc: 'Your browser constructs an HTTP request — combining the URL, endpoint path, query parameters, and headers (including your API key). This is like writing a letter with a specific address and return address.' },
+  { title: 'Request Travels Across the Internet', desc: 'The request leaves your device, passes through your router, ISP, and potentially multiple servers across the internet via DNS resolution and TCP connections. The request finds the NAVADA server, usually within 20-100ms.' },
+  { title: 'API Gateway Receives the Request', desc: 'The server receives the raw HTTP request and parses it: extracting the endpoint name, query parameters, and headers. It checks if the endpoint exists in the valid endpoints list. If not, it returns a 404 error.' },
+  { title: 'Authentication & Rate Limit Check', desc: 'The server validates your API key against the database: Is this key real? Is it still active? Has it exceeded the daily limit of 100 requests? This prevents abuse and identifies who is making each request.' },
+  { title: 'Fetching Data from Source', desc: 'The server checks its Redis cache first (saving time and API costs). On a cache miss, it calls the actual data source — Alpha Vantage for stocks, Open-Meteo for weather, or Claude Haiku for AI endpoints. The result is cached for 24 hours.' },
+  { title: 'Response Sent Back to You', desc: 'The server wraps the data in a JSON response with the endpoint name, parameters, data, and cache timestamp. It sets the HTTP status code (200 OK) and sends it back through the internet to your browser.' },
+];
+
+// Load saved API key
+(function() {
+  const saved = localStorage.getItem('navada_api_key');
+  if (saved) {
+    document.getElementById('jApiKey').value = saved;
+  } else {
+    document.getElementById('jNoKey').style.display = 'block';
+  }
+})();
+
+// Update parameter fields when endpoint changes
+document.getElementById('jEndpoint').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  const params = opt.dataset.params;
+  const parts = params ? params.split(',') : [];
+  const g1 = document.getElementById('jParamGroup');
+  const g2 = document.getElementById('jParam2Group');
+
+  if (parts.length >= 1 && parts[0]) {
+    g1.style.display = '';
+    document.getElementById('jParamLabel').textContent = parts[0];
+    document.getElementById('jParam1').placeholder = getPlaceholder(parts[0]);
+    document.getElementById('jParam1').value = getPlaceholder(parts[0]);
+  } else {
+    g1.style.display = 'none';
+  }
+
+  if (parts.length >= 2) {
+    g2.style.display = '';
+    document.getElementById('jParam2Label').textContent = parts[1];
+    document.getElementById('jParam2').placeholder = getPlaceholder(parts[1]);
+    document.getElementById('jParam2').value = getPlaceholder(parts[1]);
+  } else {
+    g2.style.display = 'none';
+  }
+});
+
+function getPlaceholder(param) {
+  const map = { city: 'London', symbol: 'AAPL', word: 'serendipity', coin: 'bitcoin', topic: 'science', count: '3', element: 'oxygen', value: '100', from: 'km', text: 'Hello world', to: 'miles' };
+  return map[param] || '';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function resetPipeline() {
+  for (let i = 0; i <= 5; i++) {
+    document.getElementById('pn' + i).className = 'pipe-circle';
+  }
+  for (let i = 0; i <= 4; i++) {
+    document.getElementById('pl' + i).className = 'pipe-line';
+  }
+  document.getElementById('logPanel').innerHTML = '';
+  document.getElementById('responsePanel').className = 'response-panel';
+  document.getElementById('responsePanel').textContent = '';
+}
+
+function addLog(text, cls) {
+  const panel = document.getElementById('logPanel');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="${cls || ''}">&#9656; ${text}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function highlightNode(i) {
+  document.getElementById('pn' + i).classList.add('active');
+  if (i > 0) {
+    document.getElementById('pl' + (i - 1)).classList.add('active');
+  }
+}
+
+function completeNode(i) {
+  const node = document.getElementById('pn' + i);
+  node.classList.remove('active');
+  node.classList.add('done');
+}
+
+function errorNode(i) {
+  const node = document.getElementById('pn' + i);
+  node.classList.remove('active');
+  node.classList.add('error');
+}
+
+function showStepDetail(stepIdx) {
+  const detail = document.getElementById('stepDetail');
+  if (stepIdx < 0 || stepIdx >= STEP_DETAILS.length) { detail.style.display = 'none'; return; }
+  detail.style.display = 'block';
+  document.getElementById('stepDetailNum').textContent = `Step ${stepIdx + 1} of 6`;
+  document.getElementById('stepDetailTitle').textContent = STEP_DETAILS[stepIdx].title;
+  document.getElementById('stepDetailDesc').textContent = STEP_DETAILS[stepIdx].desc;
+}
+
+// In step-by-step mode, this waits for user to click "Next Step"
+function waitForStep() {
+  if (!stepMode) return sleep(800);
+  return new Promise(resolve => { journeyResolveStep = resolve; });
+}
+
+function advanceStep() {
+  if (journeyResolveStep) {
+    const fn = journeyResolveStep;
+    journeyResolveStep = null;
+    fn();
+  }
+}
+
+async function runJourney() {
+  if (journeyRunning) return;
+  journeyRunning = true;
+  currentStep = -1;
+  const sendBtn = document.getElementById('jSendBtn');
+  const nextBtn = document.getElementById('jNextBtn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Running...';
+  if (stepMode) { nextBtn.style.display = 'inline-block'; sendBtn.style.display = 'none'; }
+
+  resetPipeline();
+  document.getElementById('stepDetail').style.display = 'none';
+
+  const endpoint = document.getElementById('jEndpoint').value;
+  const opt = document.getElementById('jEndpoint').options[document.getElementById('jEndpoint').selectedIndex];
+  const paramNames = opt.dataset.params ? opt.dataset.params.split(',') : [];
+  const params = {};
+  if (paramNames.length >= 1 && paramNames[0]) params[paramNames[0]] = document.getElementById('jParam1').value || getPlaceholder(paramNames[0]);
+  if (paramNames.length >= 2) params[paramNames[1]] = document.getElementById('jParam2').value || getPlaceholder(paramNames[1]);
+
+  const apiKey = document.getElementById('jApiKey').value.trim();
+  if (apiKey && apiKey.startsWith('nav_')) {
+    localStorage.setItem('navada_api_key', apiKey);
+    document.getElementById('jNoKey').style.display = 'none';
+  }
+
+  const qs = new URLSearchParams(params).toString();
+  const url = `/api/v1/${endpoint}${qs ? '?' + qs : ''}`;
+  const maskedKey = apiKey ? apiKey.slice(0, 7) + '***' : '(none)';
+
+  try {
+    // Step 0: Browser
+    currentStep = 0;
+    showStepDetail(0);
+    highlightNode(0);
+    addLog(`Constructing request: <span class="log-info">GET ${url}</span>`);
+    addLog(`Adding header: <span class="log-info">X-API-Key: ${maskedKey}</span>`);
+    await waitForStep();
+    completeNode(0);
+
+    // Step 1: Internet
+    currentStep = 1;
+    showStepDetail(1);
+    highlightNode(1);
+    addLog(`Sending request to <span class="log-info">alexnavada.xyz</span>...`);
+    await waitForStep();
+    completeNode(1);
+
+    // Step 2: API Gateway
+    currentStep = 2;
+    showStepDetail(2);
+    highlightNode(2);
+    addLog(`Server received request`);
+    addLog(`Parsing endpoint: <span class="log-info">/api/v1/${endpoint}</span>`);
+    addLog(`Checking endpoint exists in valid list... <span class="log-ok">&#10003;</span>`);
+    await waitForStep();
+    completeNode(2);
+
+    // Step 3: Auth Check
+    currentStep = 3;
+    showStepDetail(3);
+    highlightNode(3);
+    addLog(`Validating API key...`);
+
+    if (!apiKey) {
+      addLog(`<span class="log-fail">&#10007; No API key provided</span>`);
+      errorNode(3);
+      addLog(`<span class="log-fail">Response: 401 Unauthorized</span>`);
+      finishJourney();
+      const res = await fetch(url);
+      const data = await res.json();
+      showResponseData(data, res.status, 0);
+      return;
+    }
+
+    addLog(`API key format valid (starts with nav_) <span class="log-ok">&#10003;</span>`);
+    addLog(`Key found in database <span class="log-ok">&#10003;</span>`);
+    addLog(`Key status: active <span class="log-ok">&#10003;</span>`);
+    addLog(`Rate limit check: <span class="log-ok">&#10003; requests remaining today</span>`);
+    await waitForStep();
+    completeNode(3);
+
+    // Step 4: Data Source — fire real API call here
+    currentStep = 4;
+    showStepDetail(4);
+    highlightNode(4);
+    addLog(`Checking Redis cache for key: <span class="log-info">api:v1:${endpoint}:...</span>`);
+
+    const startTime = Date.now();
+    const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+    const data = await res.json();
+    const elapsed = Date.now() - startTime;
+
+    if (data.cached_at && data.data && !data.data.error) {
+      const isCached = data.data._cached_at && (new Date(data.data._cached_at) < new Date(Date.now() - 5000));
+      if (isCached) {
+        addLog(`Cache <span class="log-ok">HIT</span> — returning stored data (saves time &amp; API costs)`);
+      } else {
+        addLog(`Cache <span class="log-info">MISS</span> — fetching fresh data from source`);
+        addLog(`Calling external API / computing result...`);
+        addLog(`Data received — caching for 24 hours`);
+      }
+      addLog(`Data ready <span class="log-ok">&#10003;</span> <span class="log-time">(${elapsed}ms)</span>`);
+    } else {
+      addLog(`<span class="log-fail">Data source returned an issue</span>`);
+    }
+    await waitForStep();
+    completeNode(4);
+
+    // Step 5: Response
+    currentStep = 5;
+    showStepDetail(5);
+    highlightNode(5);
+    addLog(`Building JSON response envelope: { endpoint, data, cached_at, params }`);
+    addLog(`Setting HTTP status: <span class="${res.status === 200 ? 'log-ok' : 'log-fail'}">${res.status} ${res.status === 200 ? 'OK' : 'Error'}</span>`);
+    addLog(`Adding rate limit headers: X-RateLimit-Remaining`);
+    addLog(`Response sent <span class="log-ok">&#10003;</span> <span class="log-time">(total: ${elapsed}ms)</span>`);
+
+    if (res.status === 200) completeNode(5);
+    else errorNode(5);
+
+    if (stepMode) await waitForStep();
+    showResponseData(data, res.status, elapsed);
+    document.getElementById('stepDetail').style.display = 'none';
+
+  } catch (err) {
+    addLog(`<span class="log-fail">Network error: ${err.message}</span>`);
+    errorNode(1);
+  }
+
+  finishJourney();
+}
+
+function finishJourney() {
+  const sendBtn = document.getElementById('jSendBtn');
+  const nextBtn = document.getElementById('jNextBtn');
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send Request';
+  sendBtn.style.display = 'inline-block';
+  nextBtn.style.display = 'none';
+  journeyRunning = false;
+  currentStep = -1;
+  document.getElementById('stepDetail').style.display = 'none';
+}
+
+function showResponseData(data, status, elapsed) {
+  const panel = document.getElementById('responsePanel');
+  panel.className = 'response-panel show';
+  const color = status === 200 ? '#22c55e' : '#e840a0';
+  panel.style.color = color;
+  panel.textContent = JSON.stringify(data, null, 2);
+}
+</script>
+
+<script src="/nav.js"></script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>ALEX API Library — Free Educational APIs</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    :root { --bg: #0a0a0f; --card: #12121a; --border: #1e1e2e; --text: #e0e0e0; --muted: #888; --green: #22c55e; --blue: #3b82f6; --amber: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+    a { color: var(--blue); text-decoration: none; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 3rem 0 2rem; }
+    .hero h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .hero p { color: var(--muted); font-size: 1rem; margin-bottom: 1.5rem; }
+    .btn { display: inline-block; background: var(--blue); color: #fff; border: none; padding: 0.6rem 1.5rem; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 500; }
+    .btn:hover { background: #2563eb; }
+    .btn-sm { padding: 0.4rem 1rem; font-size: 0.8rem; }
+
+    /* Key gen */
+    .keygen { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 2rem 0; max-width: 500px; margin-left: auto; margin-right: auto; }
+    .keygen h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    .keygen label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; margin-top: 0.75rem; }
+    .keygen input { width: 100%; background: #1a1a26; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 0.5rem 0.75rem; font-size: 0.85rem; outline: none; }
+    .keygen input:focus { border-color: var(--blue); }
+    .keygen .btn { margin-top: 1rem; width: 100%; }
+    .key-result { margin-top: 1rem; padding: 1rem; background: #0a0a0f; border: 1px solid var(--green); border-radius: 8px; display: none; }
+    .key-result.show { display: block; }
+    .key-result code { display: block; background: #1a1a26; padding: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; color: var(--green); word-break: break-all; margin: 0.5rem 0; }
+    .key-result .warn { color: var(--amber); font-size: 0.75rem; margin-top: 0.5rem; }
+    .copy-btn { background: var(--border); color: var(--text); border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 0.25rem; }
+    .copy-btn:hover { background: #2a2a3e; }
+    .keygen .error { color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem; }
+
+    /* Rate limit info */
+    .info-bar { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 1rem 0 2rem; }
+    .info-bar span { background: rgba(59,130,246,0.1); color: var(--blue); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; }
+
+    /* Categories */
+    .category { margin-bottom: 2rem; }
+    .category h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+    .api-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+
+    /* API Cards */
+    .api-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .api-card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .api-card h3 .method { font-size: 0.65rem; background: rgba(34,197,94,0.15); color: var(--green); padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.5rem; font-weight: 500; vertical-align: middle; }
+    .api-card .desc { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .api-card .endpoint { font-family: monospace; font-size: 0.75rem; color: var(--blue); background: #0a0a0f; padding: 0.3rem 0.5rem; border-radius: 4px; display: block; margin-bottom: 0.5rem; overflow-x: auto; }
+    .api-card .response { font-family: monospace; font-size: 0.7rem; color: #aaa; background: #0a0a0f; padding: 0.4rem 0.5rem; border-radius: 4px; white-space: pre; overflow-x: auto; max-height: 80px; }
+
+    /* Code examples */
+    .examples { margin: 2rem 0; }
+    .examples h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+    .tab-bar { display: flex; gap: 0.25rem; margin-bottom: 0; }
+    .tab { padding: 0.4rem 1rem; background: var(--card); border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; font-size: 0.8rem; color: var(--muted); cursor: pointer; }
+    .tab.active { color: var(--blue); background: #1a1a26; }
+    .code-block { background: #1a1a26; border: 1px solid var(--border); border-radius: 0 8px 8px 8px; padding: 1rem; font-family: monospace; font-size: 0.78rem; color: #ccc; white-space: pre; overflow-x: auto; line-height: 1.6; }
+    .code-block.hidden { display: none; }
+
+    /* How-to guide */
+    .howto { margin: 0 0 2rem; }
+    .howto h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+    .steps { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .step { display: flex; align-items: flex-start; gap: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; }
+    .step-num { background: var(--blue); color: #fff; min-width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+    .step-content strong { font-size: 0.85rem; display: block; margin-bottom: 0.15rem; }
+    .step-content p { font-size: 0.8rem; color: var(--muted); }
+    .step-content code { background: #1a1a26; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; color: var(--green); }
+    .error-ref { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+    .error-ref h3 { font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .error-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .error-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+    .error-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(30,30,46,0.5); }
+    .error-table code { background: #1a1a26; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
+    .rate-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.75rem; }
+
+    /* Skill cards */
+    .skill-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .skill-card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--blue); }
+    .skill-card .desc { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .skill-caps { list-style: none; padding: 0; }
+    .skill-caps li { font-size: 0.78rem; color: var(--text); padding: 0.2rem 0; padding-left: 1rem; position: relative; }
+    .skill-caps li::before { content: ''; position: absolute; left: 0; top: 0.55rem; width: 5px; height: 5px; background: var(--blue); border-radius: 50%; opacity: 0.5; }
+
+    /* Beginner section */
+    .beginner-section { margin: 0 0 1rem; }
+    .beginner-toggle { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.6rem; cursor: pointer; color: var(--blue); font-size: 0.9rem; font-weight: 500; }
+    .beginner-toggle:hover { color: #60a5fa; }
+    .toggle-arrow { transition: transform 0.3s; font-size: 0.7rem; }
+    .beginner-toggle.collapsed .toggle-arrow { transform: rotate(-90deg); }
+    .beginner-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; overflow: hidden; transition: max-height 0.3s, opacity 0.3s; }
+    .beginner-cards.hidden { max-height: 0; opacity: 0; margin: 0; }
+    .beginner-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .beginner-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .beginner-card h3 { font-size: 0.95rem; margin-bottom: 0.4rem; color: var(--blue); }
+    .beginner-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+    /* Try it Live */
+    .try-btn { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); padding: 0.3rem 0.8rem; border-radius: 5px; cursor: pointer; font-size: 0.75rem; margin-top: 0.5rem; }
+    .try-btn:hover { background: rgba(59,130,246,0.25); }
+    .try-panel { margin-top: 0.75rem; padding: 0.75rem; background: #0a0a0f; border: 1px solid var(--border); border-radius: 6px; display: none; }
+    .try-panel.open { display: block; }
+    .try-panel input { width: 100%; background: #1a1a26; border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 0.4rem 0.6rem; font-size: 0.8rem; margin-bottom: 0.4rem; outline: none; font-family: monospace; }
+    .try-panel input:focus { border-color: var(--blue); }
+    .try-panel label { font-size: 0.7rem; color: var(--muted); display: block; margin-bottom: 0.15rem; }
+    .try-run { background: var(--green); color: #fff; border: none; padding: 0.35rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 500; margin-right: 0.5rem; }
+    .try-run:hover { background: #16a34a; }
+    .try-run:disabled { opacity: 0.5; cursor: not-allowed; }
+    .try-curl { background: var(--border); color: var(--text); border: none; padding: 0.35rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.72rem; }
+    .try-result { margin-top: 0.5rem; font-family: monospace; font-size: 0.72rem; color: #aaa; background: #1a1a26; padding: 0.5rem; border-radius: 4px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
+    .try-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+    .try-no-key { color: var(--amber); font-size: 0.75rem; margin-bottom: 0.4rem; }
+
+    /* Quick Start */
+    .quick-start { background: var(--card); border: 1px solid var(--green); border-radius: 10px; padding: 1.25rem; margin-top: 1.25rem; }
+    .quick-start h3 { font-size: 0.95rem; color: var(--green); margin-bottom: 0.3rem; }
+    .quick-start p { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .quick-start-tabs { display: flex; gap: 0.25rem; margin-bottom: 0; }
+    .qs-tab { padding: 0.3rem 0.8rem; background: #1a1a26; border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; font-size: 0.75rem; color: var(--muted); cursor: pointer; }
+    .qs-tab.active { color: var(--green); background: #0f1f0f; }
+    .quick-start-code { background: #0a0a0f; border: 1px solid var(--border); border-radius: 0 6px 6px 6px; padding: 0.75rem; font-family: monospace; font-size: 0.76rem; color: var(--green); white-space: pre; overflow-x: auto; line-height: 1.5; margin: 0; }
+    .quick-start-code.hidden { display: none; }
+
+    /* Key indicator */
+    .key-indicator { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(34,197,94,0.1); color: var(--green); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.5rem; }
+      .api-grid { grid-template-columns: 1fr; }
+      .container { padding: 1rem 0.75rem 3rem; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 2rem 0 1rem; }
+      .hero h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>ALEX API Library</h1>
+      <p>Free Educational APIs — No registration required</p>
+      <a href="#get-key" class="btn">Get Your API Key</a>
+      <a href="/api-learn" class="btn" style="background:transparent;border:1px solid var(--blue);margin-left:0.5rem;">Learn How APIs Work</a>
+    </div>
+
+    <div class="beginner-section" id="beginner-section">
+      <div class="beginner-toggle" onclick="toggleBeginner()">
+        <span>New to APIs? Start here</span>
+        <span class="toggle-arrow">&#9660;</span>
+      </div>
+      <div class="beginner-cards" id="beginner-cards">
+        <div class="beginner-card">
+          <div class="beginner-icon">&#x1F6AA;</div>
+          <h3>What is an API?</h3>
+          <p>An API is like a door with rules. You knock in a specific way (send a request), and you get specific information back (a response). This API gives you data about stocks, weather, science, and more — all through simple web requests.</p>
+        </div>
+        <div class="beginner-card">
+          <div class="beginner-icon">&#x1F511;</div>
+          <h3>What is an API Key?</h3>
+          <p>An API key is like a private pass. It tells the door who you are. You get one for free below — just give it a name and click Generate. Include it in every request so the API knows it's you.</p>
+        </div>
+        <div class="beginner-card">
+          <div class="beginner-icon">&#x1F680;</div>
+          <h3>How Do I Start?</h3>
+          <p>1. Get your free API key below. 2. Pick any endpoint that interests you. 3. Click "Try it Live" on any card to test it right here. 4. Copy the code into your own project. That's it — you're building!</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-bar">
+      All endpoints use <span>GET</span> &middot; Include <span>X-API-Key</span> header &middot; Rate limit: <span>100 requests/day</span> per key
+    </div>
+
+    <!-- Key Generation -->
+    <div class="keygen" id="get-key">
+      <h2>Get Your API Key</h2>
+      <label for="kg-name">Label (required)</label>
+      <input type="text" id="kg-name" placeholder="e.g. My School Project" maxlength="100" />
+      <label for="kg-email">Email (optional)</label>
+      <input type="email" id="kg-email" placeholder="you@example.com" maxlength="200" />
+      <button class="btn" id="kg-btn" onclick="generateKey()">Generate API Key</button>
+      <div class="error" id="kg-error"></div>
+      <div class="key-result" id="kg-result">
+        <strong>Your API Key:</strong>
+        <code id="kg-key"></code>
+        <button class="copy-btn" onclick="copyKey()">Copy to clipboard</button>
+        <div class="warn">Save this key! It won't be shown again.</div>
+      </div>
+      <div class="quick-start" id="quick-start" style="display:none">
+        <h3>Quick Start — Your key is ready!</h3>
+        <p>Copy any of these to start using the API right now:</p>
+        <div class="quick-start-tabs">
+          <button onclick="showQSTab('qs-js')" class="qs-tab active">JavaScript</button>
+          <button onclick="showQSTab('qs-py')" class="qs-tab">Python</button>
+          <button onclick="showQSTab('qs-curl')" class="qs-tab">cURL</button>
+        </div>
+        <pre class="quick-start-code" id="qs-js"></pre>
+        <pre class="quick-start-code hidden" id="qs-py"></pre>
+        <pre class="quick-start-code hidden" id="qs-curl"></pre>
+      </div>
+    </div>
+
+    <!-- How-To Guide -->
+    <div class="howto" id="how-to">
+      <h2>How to Use the API</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <strong>Get Your Free Pass</strong>
+            <p>Click Generate below. You'll get a unique key starting with <code>nav_</code> — it's your free pass to all 30 endpoints.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <strong>Choose What Interests You</strong>
+            <p>Browse the categories: finance, AI, science, education, and more. Each card shows exactly what data you'll get back.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <strong>Try it Right Here</strong>
+            <p>Click "Try it Live" on any card to test the endpoint instantly — no coding required. Your API key is filled in automatically.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <strong>Copy the Code</strong>
+            <p>Every response includes ready-to-use code snippets in JavaScript, Python, and cURL. Just copy, paste, and customise.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <strong>You're Building!</strong>
+            <p>That's it. You're now using a real API. Use it in school projects, personal apps, or just to explore data.</p>
+          </div>
+        </div>
+      </div>
+      <div class="error-ref">
+        <h3>Error Reference</h3>
+        <table class="error-table">
+          <thead><tr><th>Status</th><th>Meaning</th><th>What to Do</th></tr></thead>
+          <tbody>
+            <tr><td><code>401</code></td><td>Invalid API key</td><td>Check your key is correct and starts with <code>nav_</code></td></tr>
+            <tr><td><code>403</code></td><td>Key revoked</td><td>Your key has been deactivated. Generate a new one.</td></tr>
+            <tr><td><code>429</code></td><td>Rate limit exceeded</td><td>You've used all 100 daily requests. Resets at midnight UTC.</td></tr>
+            <tr><td><code>404</code></td><td>Endpoint not found</td><td>Check the endpoint name matches one listed below.</td></tr>
+          </tbody>
+        </table>
+        <p class="rate-note">Rate limit: <strong>100 requests per day</strong> per API key. The counter resets at midnight UTC. Each successful or failed request counts toward the limit.</p>
+      </div>
+    </div>
+
+    <!-- Finance -->
+    <div class="category">
+      <h2>Finance</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="stock-quote" data-params='{"symbol":"AAPL"}'>
+          <h3>stock-quote <span class="method">GET</span></h3>
+          <div class="desc">Get current stock price and daily change</div>
+          <code class="endpoint">/api/v1/stock-quote?symbol=AAPL</code>
+          <div class="response">{"symbol":"AAPL","price":187.44,"change":"+1.23"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="crypto-rate" data-params='{"coin":"BTC"}'>
+          <h3>crypto-rate <span class="method">GET</span></h3>
+          <div class="desc">Get cryptocurrency exchange rate in USD</div>
+          <code class="endpoint">/api/v1/crypto-rate?coin=BTC</code>
+          <div class="response">{"coin":"BTC","price_usd":43250.80}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="forex-rate" data-params='{"from":"USD","to":"GBP"}'>
+          <h3>forex-rate <span class="method">GET</span></h3>
+          <div class="desc">Get foreign exchange rate between currencies</div>
+          <code class="endpoint">/api/v1/forex-rate?from=USD&amp;to=GBP</code>
+          <div class="response">{"from":"USD","to":"GBP","rate":0.7892}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="market-news" data-params='{}'>
+          <h3>market-news <span class="method">GET</span></h3>
+          <div class="desc">Latest financial market news headlines</div>
+          <code class="endpoint">/api/v1/market-news</code>
+          <div class="response">{"headlines":[{"title":"...","source":"..."}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="economic-indicator" data-params='{"name":"GDP"}'>
+          <h3>economic-indicator <span class="method">GET</span></h3>
+          <div class="desc">Get macroeconomic indicators (GDP, CPI, etc.)</div>
+          <code class="endpoint">/api/v1/economic-indicator?name=GDP</code>
+          <div class="response">{"indicator":"GDP","value":"25.46T","unit":"USD"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="company-overview" data-params='{"symbol":"MSFT"}'>
+          <h3>company-overview <span class="method">GET</span></h3>
+          <div class="desc">Company fundamentals and key financial metrics</div>
+          <code class="endpoint">/api/v1/company-overview?symbol=MSFT</code>
+          <div class="response">{"name":"Microsoft","sector":"Technology",...}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="stock-search" data-params='{"q":"tesla"}'>
+          <h3>stock-search <span class="method">GET</span></h3>
+          <div class="desc">Search for stock ticker symbols by name</div>
+          <code class="endpoint">/api/v1/stock-search?q=tesla</code>
+          <div class="response">{"results":[{"symbol":"TSLA","name":"Tesla"}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="commodity-price" data-params='{"name":"gold"}'>
+          <h3>commodity-price <span class="method">GET</span></h3>
+          <div class="desc">Current commodity prices (gold, oil, etc.)</div>
+          <code class="endpoint">/api/v1/commodity-price?name=gold</code>
+          <div class="response">{"commodity":"Gold","price":2045.30,"unit":"oz"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI & Language -->
+    <div class="category">
+      <h2>AI &amp; Language</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="text-summary" data-params='{"text":"The quick brown fox jumps over the lazy dog. This sentence is used for testing."}'>
+          <h3>text-summary <span class="method">GET</span></h3>
+          <div class="desc">Summarise a block of text into key points</div>
+          <code class="endpoint">/api/v1/text-summary?text=...</code>
+          <div class="response">{"summary":"...","word_count":45}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="sentiment-analysis" data-params='{"text":"I absolutely love this product, it changed my life!"}'>
+          <h3>sentiment-analysis <span class="method">GET</span></h3>
+          <div class="desc">Analyse the sentiment of a given text</div>
+          <code class="endpoint">/api/v1/sentiment-analysis?text=...</code>
+          <div class="response">{"sentiment":"positive","score":0.87}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="translate" data-params='{"text":"Hello, how are you?","to":"es"}'>
+          <h3>translate <span class="method">GET</span></h3>
+          <div class="desc">Translate text between languages</div>
+          <code class="endpoint">/api/v1/translate?text=hello&amp;to=es</code>
+          <div class="response">{"translated":"hola","language":"Spanish"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="explain-concept" data-params='{"topic":"inflation"}'>
+          <h3>explain-concept <span class="method">GET</span></h3>
+          <div class="desc">Get a simple explanation of a concept</div>
+          <code class="endpoint">/api/v1/explain-concept?topic=inflation</code>
+          <div class="response">{"topic":"Inflation","explanation":"..."}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="quiz-generator" data-params='{"subject":"physics"}'>
+          <h3>quiz-generator <span class="method">GET</span></h3>
+          <div class="desc">Generate quiz questions on any subject</div>
+          <code class="endpoint">/api/v1/quiz-generator?subject=physics</code>
+          <div class="response">{"questions":[{"q":"...","options":[...]}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data & Reference -->
+    <div class="category">
+      <h2>Data &amp; Reference</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="country-info" data-params='{"name":"Japan"}'>
+          <h3>country-info <span class="method">GET</span></h3>
+          <div class="desc">Get country details: population, capital, currency</div>
+          <code class="endpoint">/api/v1/country-info?name=Japan</code>
+          <div class="response">{"name":"Japan","capital":"Tokyo","pop":"125M"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="weather" data-params='{"city":"London"}'>
+          <h3>weather <span class="method">GET</span></h3>
+          <div class="desc">Current weather conditions for a city</div>
+          <code class="endpoint">/api/v1/weather?city=London</code>
+          <div class="response">{"city":"London","temp_c":12,"condition":"Cloudy"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="news-headlines" data-params='{}'>
+          <h3>news-headlines <span class="method">GET</span></h3>
+          <div class="desc">Top news headlines from around the world</div>
+          <code class="endpoint">/api/v1/news-headlines</code>
+          <div class="response">{"headlines":[{"title":"...","source":"..."}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="historical-events" data-params='{"date":"07-20"}'>
+          <h3>historical-events <span class="method">GET</span></h3>
+          <div class="desc">Notable historical events on a given date</div>
+          <code class="endpoint">/api/v1/historical-events?date=07-20</code>
+          <div class="response">{"events":[{"year":1969,"event":"Moon landing"}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="unit-convert" data-params='{"value":"100","from":"km","to":"miles"}'>
+          <h3>unit-convert <span class="method">GET</span></h3>
+          <div class="desc">Convert between measurement units</div>
+          <code class="endpoint">/api/v1/unit-convert?value=100&amp;from=km&amp;to=miles</code>
+          <div class="response">{"from":"100 km","to":"62.14 miles"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="time-zones" data-params='{"tz":"Asia/Tokyo"}'>
+          <h3>time-zones <span class="method">GET</span></h3>
+          <div class="desc">Get current time in any timezone</div>
+          <code class="endpoint">/api/v1/time-zones?tz=Asia/Tokyo</code>
+          <div class="response">{"timezone":"Asia/Tokyo","time":"14:30","offset":"+9"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Science & Math -->
+    <div class="category">
+      <h2>Science &amp; Math</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="math-solve" data-params='{"expr":"2*3+4"}'>
+          <h3>math-solve <span class="method">GET</span></h3>
+          <div class="desc">Solve mathematical expressions and equations</div>
+          <code class="endpoint">/api/v1/math-solve?expr=2*x+5=15</code>
+          <div class="response">{"expression":"2x+5=15","solution":"x=5"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="periodic-table" data-params='{"element":"Au"}'>
+          <h3>periodic-table <span class="method">GET</span></h3>
+          <div class="desc">Get element details from the periodic table</div>
+          <code class="endpoint">/api/v1/periodic-table?element=Au</code>
+          <div class="response">{"symbol":"Au","name":"Gold","number":79}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="space-facts" data-params='{"topic":"mars"}'>
+          <h3>space-facts <span class="method">GET</span></h3>
+          <div class="desc">Facts about planets, stars, and space</div>
+          <code class="endpoint">/api/v1/space-facts?topic=mars</code>
+          <div class="response">{"topic":"Mars","facts":["Red planet","..."]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="statistics-calc" data-params='{"data":"1,2,3,4,5,6,7,8,9,10"}'>
+          <h3>statistics-calc <span class="method">GET</span></h3>
+          <div class="desc">Calculate mean, median, mode, and std deviation</div>
+          <code class="endpoint">/api/v1/statistics-calc?data=1,2,3,4,5</code>
+          <div class="response">{"mean":3,"median":3,"mode":null,"std":1.41}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="carbon-footprint" data-params='{"activity":"flight","km":"1000"}'>
+          <h3>carbon-footprint <span class="method">GET</span></h3>
+          <div class="desc">Estimate carbon footprint for activities</div>
+          <code class="endpoint">/api/v1/carbon-footprint?activity=flight&amp;km=1000</code>
+          <div class="response">{"activity":"flight","kg_co2":250,"trees":11}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Web & Dev -->
+    <div class="category">
+      <h2>Web &amp; Dev</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="qr-generate" data-params='{"text":"https://alexnavada.xyz"}'>
+          <h3>qr-generate <span class="method">GET</span></h3>
+          <div class="desc">Generate a QR code for any text or URL</div>
+          <code class="endpoint">/api/v1/qr-generate?text=https://example.com</code>
+          <div class="response">{"qr_url":"data:image/png;base64,..."}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="color-palette" data-params='{"base":"3b82f6"}'>
+          <h3>color-palette <span class="method">GET</span></h3>
+          <div class="desc">Generate harmonious colour palettes</div>
+          <code class="endpoint">/api/v1/color-palette?base=%233b82f6</code>
+          <div class="response">{"colors":["#3b82f6","#1d4ed8","#93c5fd"]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="lorem-ipsum" data-params='{"paragraphs":"2"}'>
+          <h3>lorem-ipsum <span class="method">GET</span></h3>
+          <div class="desc">Generate placeholder text paragraphs</div>
+          <code class="endpoint">/api/v1/lorem-ipsum?paragraphs=2</code>
+          <div class="response">{"text":"Lorem ipsum dolor sit amet..."}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Education -->
+    <div class="category">
+      <h2>Education</h2>
+      <div class="api-grid">
+        <div class="api-card" data-endpoint="word-definition" data-params='{"word":"serendipity"}'>
+          <h3>word-definition <span class="method">GET</span></h3>
+          <div class="desc">Get definitions, synonyms, and usage examples</div>
+          <code class="endpoint">/api/v1/word-definition?word=serendipity</code>
+          <div class="response">{"word":"serendipity","definition":"...","pos":"noun"}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="book-summary" data-params='{"title":"1984"}'>
+          <h3>book-summary <span class="method">GET</span></h3>
+          <div class="desc">Get summaries of well-known books</div>
+          <code class="endpoint">/api/v1/book-summary?title=1984</code>
+          <div class="response">{"title":"1984","author":"Orwell","summary":"..."}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+        <div class="api-card" data-endpoint="study-plan" data-params='{"subject":"calculus","weeks":"4"}'>
+          <h3>study-plan <span class="method">GET</span></h3>
+          <div class="desc">Generate a study plan for any subject</div>
+          <code class="endpoint">/api/v1/study-plan?subject=calculus&amp;weeks=4</code>
+          <div class="response">{"subject":"Calculus","weeks":[{"week":1,...}]}</div>
+          <button class="try-btn" onclick="tryItLive(this.parentElement)">Try it Live</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Code Examples -->
+    <div class="examples">
+      <h2>Code Examples</h2>
+      <div class="tab-bar">
+        <div class="tab active" onclick="showTab('js')">JavaScript</div>
+        <div class="tab" onclick="showTab('py')">Python</div>
+        <div class="tab" onclick="showTab('curl')">cURL</div>
+      </div>
+      <pre class="code-block" id="tab-js">const res = await fetch('https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {
+  headers: { 'X-API-Key': 'nav_your_key_here' }
+});
+const data = await res.json();
+console.log(data);</pre>
+      <pre class="code-block hidden" id="tab-py">import requests
+
+res = requests.get(
+    'https://alexnavada.xyz/api/v1/stock-quote',
+    params={'symbol': 'AAPL'},
+    headers={'X-API-Key': 'nav_your_key_here'}
+)
+print(res.json())</pre>
+      <pre class="code-block hidden" id="tab-curl">curl -H "X-API-Key: nav_your_key_here" \
+  "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</pre>
+    </div>
+
+    <!-- ALEX Skills Library -->
+    <div class="category" id="skills">
+      <h2>ALEX Skills Library</h2>
+      <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem;">ALEX has 10 specialist skills — pre-trained research frameworks that guide analysis and output quality.</p>
+      <div class="api-grid">
+        <div class="skill-card">
+          <h3>Economic Research</h3>
+          <p class="desc">Macro data analysis and emerging market intelligence</p>
+          <ul class="skill-caps">
+            <li>Macroeconomic data collection and trend analysis</li>
+            <li>Market pattern recognition and forecasting</li>
+            <li>African tech ecosystem monitoring</li>
+            <li>Regulatory and policy change tracking</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Financial Analysis</h3>
+          <p class="desc">Company financials, valuation, and modelling</p>
+          <ul class="skill-caps">
+            <li>Financial statement analysis and ratio computation</li>
+            <li>DCF valuation and revenue modelling</li>
+            <li>Comparative benchmarking across sectors</li>
+            <li>Risk assessment and scenario analysis</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Company Analysis</h3>
+          <p class="desc">Deep-dive company research and competitive intelligence</p>
+          <ul class="skill-caps">
+            <li>SWOT analysis and strategic positioning</li>
+            <li>Competitive landscape mapping</li>
+            <li>Management and leadership assessment</li>
+            <li>Market share and growth trajectory analysis</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Startup Analysis</h3>
+          <p class="desc">Investment-grade startup evaluation framework</p>
+          <ul class="skill-caps">
+            <li>Team capability and track record assessment</li>
+            <li>Market size and opportunity validation</li>
+            <li>Product-market fit evaluation</li>
+            <li>Financial health and runway analysis</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Email Drafting</h3>
+          <p class="desc">Professional communications for NAVADA operations</p>
+          <ul class="skill-caps">
+            <li>Investment outreach and follow-up emails</li>
+            <li>Partnership proposal drafting</li>
+            <li>Research summary distribution</li>
+            <li>Professional tone with brand consistency</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Code Execution</h3>
+          <p class="desc">Run code for data analysis and automation</p>
+          <ul class="skill-caps">
+            <li>Python, Bash, Node.js, and SQL execution</li>
+            <li>Data processing and transformation pipelines</li>
+            <li>Chart and visualisation generation</li>
+            <li>Automated reporting and file operations</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Web Browsing</h3>
+          <p class="desc">Real-time web research and fact verification</p>
+          <ul class="skill-caps">
+            <li>News search and current events monitoring</li>
+            <li>Fact verification across multiple sources</li>
+            <li>Company and market research</li>
+            <li>Academic and industry report retrieval</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Image Generation</h3>
+          <p class="desc">DALL-E 3 powered visual content creation</p>
+          <ul class="skill-caps">
+            <li>Logo and brand asset concepts</li>
+            <li>Illustration and infographic drafts</li>
+            <li>Concept visualisation for presentations</li>
+            <li>Custom imagery for reports and articles</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>Calendar Management</h3>
+          <p class="desc">Scheduling, reminders, and timezone coordination</p>
+          <ul class="skill-caps">
+            <li>Meeting tracking and conflict detection</li>
+            <li>Automated reminders and follow-ups</li>
+            <li>Multi-timezone coordination</li>
+            <li>Deadline monitoring and alerts</li>
+          </ul>
+        </div>
+        <div class="skill-card">
+          <h3>File Management</h3>
+          <p class="desc">File operations and data organisation on Pi</p>
+          <ul class="skill-caps">
+            <li>File creation, reading, and editing</li>
+            <li>Directory structure management</li>
+            <li>Backup and archival operations</li>
+            <li>Template and report file generation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showTab(id) {
+      document.querySelectorAll('.code-block').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + id).classList.remove('hidden');
+      event.target.classList.add('active');
+    }
+
+    async function generateKey() {
+      const name = document.getElementById('kg-name').value.trim();
+      const email = document.getElementById('kg-email').value.trim();
+      const errEl = document.getElementById('kg-error');
+      const resultEl = document.getElementById('kg-result');
+      const btn = document.getElementById('kg-btn');
+
+      errEl.textContent = '';
+      resultEl.classList.remove('show');
+
+      if (!name || name.length < 2) {
+        errEl.textContent = 'Please enter a label (at least 2 characters).';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+
+      try {
+        const res = await fetch('/api/keys/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email: email || undefined }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Failed to generate key.';
+          return;
+        }
+
+        document.getElementById('kg-key').textContent = data.key;
+        resultEl.classList.add('show');
+
+        localStorage.setItem('navada_api_key', data.key);
+
+        // Show quick start
+        const qs = document.getElementById('quick-start');
+        qs.style.display = 'block';
+        document.getElementById('qs-js').textContent = `const res = await fetch('https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL', {\n  headers: { 'X-API-Key': '${data.key}' }\n});\nconst data = await res.json();\nconsole.log(data);`;
+        document.getElementById('qs-py').textContent = `import requests\n\nres = requests.get(\n    'https://alexnavada.xyz/api/v1/stock-quote',\n    params={'symbol': 'AAPL'},\n    headers={'X-API-Key': '${data.key}'}\n)\nprint(res.json())`;
+        document.getElementById('qs-curl').textContent = `curl -H "X-API-Key: ${data.key}" \\\n  "https://alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"`;
+      } catch (e) {
+        errEl.textContent = 'Network error. Please try again.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate API Key';
+      }
+    }
+
+    function copyKey() {
+      const key = document.getElementById('kg-key').textContent;
+      navigator.clipboard.writeText(key).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy to clipboard', 2000);
+      });
+    }
+
+    function toggleBeginner() {
+      const cards = document.getElementById('beginner-cards');
+      const toggle = document.querySelector('.beginner-toggle');
+      const hidden = cards.classList.toggle('hidden');
+      toggle.classList.toggle('collapsed', hidden);
+      localStorage.setItem('hide_api_beginner', hidden);
+    }
+
+    function tryItLive(card) {
+      // Close any other open panels
+      document.querySelectorAll('.try-panel.open').forEach(function(p) { if (p !== card.querySelector('.try-panel')) p.classList.remove('open'); });
+
+      var panel = card.querySelector('.try-panel');
+      if (panel) { panel.classList.toggle('open'); return; }
+
+      var endpoint = card.dataset.endpoint;
+      var params = JSON.parse(card.dataset.params || '{}');
+      var apiKey = localStorage.getItem('navada_api_key');
+
+      panel = document.createElement('div');
+      panel.className = 'try-panel open';
+
+      var html = '';
+      if (!apiKey) html += '<div class="try-no-key">Generate an API key above first, then come back to try it live.</div>';
+
+      // Create input fields for each param
+      for (var key in params) {
+        if (params.hasOwnProperty(key)) {
+          html += '<label>' + key + '</label><input type="text" data-param="' + key + '" value="' + params[key].replace(/"/g, '&quot;') + '" />';
+        }
+      }
+
+      html += '<div class="try-actions">';
+      html += '<button class="try-run" onclick="runTryIt(this, \'' + endpoint + '\')" ' + (!apiKey ? 'disabled' : '') + '>Run</button>';
+      html += '<button class="try-curl" onclick="copyCurl(this, \'' + endpoint + '\')">Copy as cURL</button>';
+      html += '</div>';
+      html += '<pre class="try-result" style="display:none"></pre>';
+
+      panel.innerHTML = html;
+      card.appendChild(panel);
+    }
+
+    async function runTryIt(btn, endpoint) {
+      var panel = btn.closest('.try-panel');
+      var resultEl = panel.querySelector('.try-result');
+      var apiKey = localStorage.getItem('navada_api_key');
+      if (!apiKey) return;
+
+      var params = {};
+      panel.querySelectorAll('input[data-param]').forEach(function(input) {
+        if (input.value.trim()) params[input.dataset.param] = input.value.trim();
+      });
+
+      var qs = new URLSearchParams(params).toString();
+      var url = '/api/v1/' + endpoint + (qs ? '?' + qs : '');
+
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Loading...';
+
+      try {
+        var res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+        var data = await res.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        resultEl.textContent = 'Error: ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run';
+      }
+    }
+
+    function copyCurl(btn, endpoint) {
+      var panel = btn.closest('.try-panel');
+      var apiKey = localStorage.getItem('navada_api_key') || 'nav_your_key_here';
+      var params = {};
+      panel.querySelectorAll('input[data-param]').forEach(function(input) {
+        if (input.value.trim()) params[input.dataset.param] = input.value.trim();
+      });
+      var qs = new URLSearchParams(params).toString();
+      var url = 'https://alexnavada.xyz/api/v1/' + endpoint + (qs ? '?' + qs : '');
+      var curl = 'curl -H "X-API-Key: ' + apiKey + '" "' + url + '"';
+      navigator.clipboard.writeText(curl).then(function() {
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy as cURL'; }, 2000);
+      });
+    }
+
+    function showQSTab(id) {
+      document.querySelectorAll('.quick-start-code').forEach(function(el) { el.classList.add('hidden'); });
+      document.querySelectorAll('.qs-tab').forEach(function(el) { el.classList.remove('active'); });
+      document.getElementById(id).classList.remove('hidden');
+      event.target.classList.add('active');
+    }
+
+    // On page load
+    document.addEventListener('DOMContentLoaded', function() {
+      // Beginner section
+      if (localStorage.getItem('hide_api_beginner') === 'true') {
+        document.getElementById('beginner-cards').classList.add('hidden');
+        document.querySelector('.beginner-toggle').classList.add('collapsed');
+      }
+
+      // Key indicator
+      var savedKey = localStorage.getItem('navada_api_key');
+      if (savedKey) {
+        var indicator = document.createElement('span');
+        indicator.className = 'key-indicator';
+        indicator.textContent = 'Key: ' + savedKey.substring(0, 8) + '...';
+        document.querySelector('.info-bar').appendChild(indicator);
+      }
+    });
+  </script>
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

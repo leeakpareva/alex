@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>Phase 2: Value Quantification — ALEX</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .page-wrapper {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--foreground); }
+    .back-link svg { width: 16px; height: 16px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 1.5rem 0 2.5rem;
+    }
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Section headings */
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Metrics grid */
+    .metrics-section {
+      margin: 3rem 0;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+    }
+    .metric-card {
+      padding: 1.5rem;
+    }
+    .metric-card h3 {
+      font-size: 1.05rem;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .metric-card h3 .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-pink { background: var(--neon-pink); }
+    .dot-cyan { background: var(--neon-cyan); }
+    .dot-orange { background: var(--sunset-orange); }
+    .metric-card p {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+    }
+
+    /* Value equation */
+    .equation-section {
+      margin: 3rem 0;
+    }
+    .equation-card {
+      padding: 2rem;
+      text-align: center;
+    }
+    .equation-label {
+      font-size: 1rem;
+      color: var(--muted-foreground);
+      margin-bottom: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .equation-formula {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--neon-cyan);
+      background: oklch(0.7 0.2 195 / 0.08);
+      border: 1px solid oklch(0.7 0.2 195 / 0.2);
+      border-radius: 0.5rem;
+      padding: 1rem 1.5rem;
+      margin: 1.25rem auto;
+      max-width: 640px;
+      line-height: 1.6;
+    }
+    .equation-desc {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      max-width: 560px;
+      margin: 1rem auto 0;
+      line-height: 1.7;
+    }
+
+    /* Analytics features */
+    .analytics-section {
+      margin: 3rem 0;
+    }
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+    }
+    .analytics-card {
+      padding: 1.5rem;
+    }
+    .analytics-card h3 {
+      font-size: 1rem;
+      color: var(--foreground);
+      margin-bottom: 0.4rem;
+    }
+    .analytics-card p {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+    }
+
+    /* Navigation */
+    .page-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 2.5rem;
+      margin-top: 2.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .page-nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .page-nav a:hover { color: var(--neon-pink); }
+    .page-nav a svg { width: 16px; height: 16px; }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2.5rem;
+    }
+    .footer-name {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.3rem;
+    }
+    .footer-brand {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper { padding: 1.25rem 1rem 3rem; }
+      .hero h1 { font-size: 1.75rem; }
+      .hero p { font-size: 0.95rem; }
+      .section-title { font-size: 1.2rem; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .analytics-grid { grid-template-columns: 1fr; }
+      .equation-formula { font-size: 0.8rem; padding: 0.75rem 1rem; }
+      .equation-card { padding: 1.5rem; }
+      .metric-card { padding: 1.25rem; }
+      .analytics-card { padding: 1.25rem; }
+    }
+
+    @media (max-width: 480px) {
+      .page-wrapper { padding: 1rem 0.75rem 2.5rem; }
+      .hero h1 { font-size: 1.5rem; }
+      .hero p { font-size: 0.9rem; }
+      .section-title { font-size: 1.1rem; }
+      .metric-card { padding: 1rem; }
+      .metric-card h3 { font-size: 0.95rem; }
+      .metric-card p { font-size: 0.8rem; }
+      .equation-card { padding: 1.25rem; }
+      .equation-formula {
+        font-size: 0.7rem;
+        padding: 0.6rem 0.75rem;
+        overflow-x: auto;
+      }
+      .equation-label { font-size: 0.9rem; }
+      .equation-desc { font-size: 0.85rem; }
+      .analytics-card { padding: 1rem; }
+      .analytics-card h3 { font-size: 0.95rem; }
+      .analytics-card p { font-size: 0.8rem; }
+      .page-nav { flex-direction: column; gap: 1rem; align-items: flex-start; }
+      .page-nav a { font-size: 0.85rem; }
+      .site-footer { padding: 2rem 0 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="page-wrapper">
+
+      <!-- Back link -->
+      <a href="/experiment" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <path d="M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Experiment
+      </a>
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-badges">
+          <span class="badge badge-pink">Phase 2</span>
+          <span class="badge badge-cyan">2025</span>
+        </div>
+        <h1>Value Quantification</h1>
+        <p>Develop metrics that accurately measure the contribution of every employee through their AI agent usage — tokens used, tasks completed, quality scores, and efficiency ratios.</p>
+      </div>
+
+      <!-- Core Value Metrics -->
+      <div class="metrics-section">
+        <h2 class="section-title">Core Value Metrics</h2>
+        <div class="metrics-grid">
+          <div class="theme-card theme-card-pink metric-card">
+            <h3><span class="dot dot-pink"></span> Token Efficiency Ratio</h3>
+            <p>Output quality per token spent. High-value employees produce more with fewer tokens.</p>
+          </div>
+          <div class="theme-card theme-card-cyan metric-card">
+            <h3><span class="dot dot-cyan"></span> Task Completion Rate</h3>
+            <p>Percentage of AI-assisted tasks completed successfully within expected timeframes.</p>
+          </div>
+          <div class="theme-card theme-card-orange metric-card">
+            <h3><span class="dot dot-orange"></span> Quality Score</h3>
+            <p>Assessed through feedback loops, peer review, and outcome tracking.</p>
+          </div>
+          <div class="theme-card theme-card-pink metric-card">
+            <h3><span class="dot dot-pink"></span> Productivity Multiplier</h3>
+            <p>Ratio of AI-assisted output vs. pre-AI baseline for the same employee.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- The Value Equation -->
+      <div class="equation-section">
+        <h2 class="section-title">The Value Equation</h2>
+        <div class="theme-card gradient-cyan-pink equation-card">
+          <div class="equation-label">Tokens + Time = Output</div>
+          <div class="equation-formula">Employee Value Score = (Tasks Completed &times; Quality Score &times; Efficiency Ratio) / Token Cost</div>
+          <p class="equation-desc">This formula creates a universal metric for comparing employee contributions across roles, teams, and departments — making performance transparent and compensation fair.</p>
+        </div>
+      </div>
+
+      <!-- Analytics Dashboard Features -->
+      <div class="analytics-section">
+        <h2 class="section-title">Analytics Dashboard Features</h2>
+        <div class="analytics-grid">
+          <div class="theme-card theme-card-pink analytics-card">
+            <h3>Token Distribution</h3>
+            <p>See how tokens are allocated across teams, projects, and task types</p>
+          </div>
+          <div class="theme-card theme-card-cyan analytics-card">
+            <h3>Real-Time Tracking</h3>
+            <p>Live dashboards showing current token usage, costs, and efficiency scores</p>
+          </div>
+          <div class="theme-card theme-card-orange analytics-card">
+            <h3>Trend Analysis</h3>
+            <p>Week-over-week and month-over-month productivity trends with AI assistance</p>
+          </div>
+          <div class="theme-card theme-card-pink analytics-card">
+            <h3>Team Leaderboards</h3>
+            <p>Anonymous efficiency rankings that encourage optimization without surveillance</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="page-nav">
+        <a href="/experiment/phase-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"/>
+            <path d="M12 19l-7-7 7-7"/>
+          </svg>
+          Phase 1: Copilot Integration
+        </a>
+        <a href="/experiment/phase-3">
+          Phase 3: Dynamic Compensation
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

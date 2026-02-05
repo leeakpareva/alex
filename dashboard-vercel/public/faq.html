@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>AI FAQ — ALEX</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .page-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--foreground); }
+    .back-link svg { width: 16px; height: 16px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 2rem 0 2.5rem;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Category tabs */
+    .category-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .tab-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s;
+      font-family: 'Space Grotesk', sans-serif;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted-foreground);
+    }
+    .tab-btn:hover {
+      border-color: oklch(0.5 0.15 290);
+      color: var(--foreground);
+    }
+    .tab-btn.active {
+      background: var(--neon-pink);
+      color: var(--background);
+      border-color: var(--neon-pink);
+    }
+
+    /* FAQ content area */
+    .faq-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .category-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .category-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+    .question-count {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* FAQ category sections */
+    .faq-category {
+      display: none;
+    }
+    .faq-category.active {
+      display: block;
+    }
+
+    /* Still have questions */
+    .cta-section {
+      text-align: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 2.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .cta-section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .cta-section p {
+      color: var(--muted-foreground);
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .cta-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .footer-name {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.3rem;
+    }
+    .footer-brand {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper {
+        padding: 1.5rem 1.25rem 3rem;
+      }
+      .hero {
+        padding: 1.5rem 0 2rem;
+      }
+      .hero h1 {
+        font-size: 1.85rem;
+      }
+      .hero p {
+        font-size: 0.95rem;
+      }
+      .faq-content {
+        padding: 1.25rem;
+      }
+      .category-title {
+        font-size: 1.15rem;
+      }
+      .tab-btn {
+        font-size: 0.8rem;
+        padding: 0.45rem 0.85rem;
+      }
+      .cta-section {
+        padding: 2rem 1.5rem;
+      }
+      .cta-section h2 {
+        font-size: 1.3rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page-wrapper {
+        padding: 1rem 0.75rem 2.5rem;
+      }
+      .hero {
+        padding: 1rem 0 1.5rem;
+      }
+      .hero h1 {
+        font-size: 1.5rem;
+      }
+      .hero p {
+        font-size: 0.9rem;
+      }
+      .faq-content {
+        padding: 1rem;
+      }
+      .category-title {
+        font-size: 1.05rem;
+      }
+      .tab-btn {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.7rem;
+      }
+      .category-tabs {
+        gap: 0.35rem;
+      }
+      .cta-section {
+        padding: 1.5rem 1rem;
+      }
+      .cta-section h2 {
+        font-size: 1.15rem;
+      }
+      .cta-section p {
+        font-size: 0.85rem;
+      }
+      .cta-buttons {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .cta-buttons .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .accordion-trigger {
+        font-size: 0.9rem;
+        min-height: 44px;
+      }
+      .site-footer {
+        padding: 2rem 0 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="page-wrapper">
+
+      <!-- Back link -->
+      <a href="/" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <path d="M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Home
+      </a>
+
+      <!-- Hero -->
+      <div class="hero">
+        <h1>AI FAQ</h1>
+        <p>Everything you need to understand AI agents, tokens, costs, and how to maximize your AI investment.</p>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="category-tabs">
+        <button class="tab-btn active" data-category="ai-basics">AI Basics</button>
+        <button class="tab-btn" data-category="tokens-costs">Tokens &amp; Costs</button>
+        <button class="tab-btn" data-category="performance-limits">Performance &amp; Limits</button>
+        <button class="tab-btn" data-category="security-privacy">Security &amp; Privacy</button>
+        <button class="tab-btn" data-category="business-roi">Business &amp; ROI</button>
+        <button class="tab-btn" data-category="technical-details">Technical Details</button>
+      </div>
+
+      <!-- FAQ Content Area -->
+      <div class="faq-content">
+
+        <!-- AI Basics -->
+        <div class="faq-category active" id="ai-basics">
+          <div class="category-header">
+            <h2 class="category-title">AI Basics</h2>
+            <span class="question-count">5 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is an AI Agent?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>An AI Agent is an autonomous software system powered by large language models (LLMs) that can perceive its environment, make decisions, and take actions to achieve specific goals. Unlike simple chatbots that only respond to queries, AI agents can execute multi-step tasks, use tools, access external systems, remember context, and operate independently over extended periods.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is a Large Language Model (LLM)?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>A Large Language Model is a type of artificial intelligence trained on vast amounts of text data to understand and generate human-like text. Models like Claude, GPT-4, and DeepSeek have billions of parameters that enable them to comprehend context, reason through problems, write code, and engage in natural conversation. They form the 'brain' of AI agents.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is the difference between AI, ML, and LLM?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI (Artificial Intelligence) is the broad field of creating intelligent machines. ML (Machine Learning) is a subset of AI where systems learn from data rather than being explicitly programmed. LLMs are a specific type of ML model specialized in understanding and generating language. Think of it as: AI > ML > Deep Learning > LLMs.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What does 'inference' mean?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Inference is the process of running a trained AI model to generate outputs from inputs. When you send a message to an AI and receive a response, that's inference happening. Each inference consumes computational resources and is typically what you pay for when using AI APIs. Faster inference means quicker responses; more complex queries require more inference compute.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is RAG (Retrieval-Augmented Generation)?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>RAG is a technique that enhances AI responses by first retrieving relevant information from a knowledge base, then using that context to generate more accurate, up-to-date answers. Instead of relying solely on training data, RAG allows AI to access current documents, databases, or files. ALEX uses RAG with ChromaDB to recall memories and learned information.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tokens & Costs -->
+        <div class="faq-category" id="tokens-costs">
+          <div class="category-header">
+            <h2 class="category-title">Tokens &amp; Costs</h2>
+            <span class="question-count">6 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What are tokens?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Tokens are the fundamental units AI models use to process text. A token is roughly 4 characters or 0.75 words in English. The word 'hamburger' is 3 tokens (ham-bur-ger), while 'I' is 1 token. Both your input (prompt) and the AI's output (response) consume tokens. Token count directly determines API costs.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is the difference between input and output tokens?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Input tokens are what you send to the AI (your message, context, system instructions). Output tokens are what the AI generates in response. Output tokens are typically 3-5x more expensive than input tokens because generation requires more computation. A long prompt with a short answer costs less than a short prompt with a long answer.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How is AI API pricing calculated?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI APIs charge per 1,000 or 1 million tokens processed. For example, Claude Haiku costs $0.25/million input tokens and $1.25/million output tokens. If you send 1,000 tokens and receive 500 back, your cost is: (1000 x $0.00000025) + (500 x $0.00000125) = $0.000875. Costs add up across many interactions.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is a context window?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>The context window is the maximum number of tokens an AI can process in a single interaction, including both input and output. Claude Sonnet has a 200K token context window (about 150,000 words). Larger context windows allow for longer conversations and more document analysis but cost more as you approach the limit.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>Why do different models cost different amounts?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Model costs reflect capability and computational requirements. Smaller models like Claude Haiku ($0.25/$1.25 per million tokens) are fast and cheap but less capable. Larger models like Claude Sonnet ($3/$15 per million tokens) offer superior reasoning but cost 12x more. Smart routing between models optimizes cost vs. quality.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is token efficiency?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Token efficiency measures how much value you extract per token spent. High efficiency means accomplishing tasks with fewer tokens through: concise prompts, structured outputs, caching repeated content, choosing appropriate model sizes, and avoiding unnecessary context. ALEX optimizes efficiency through smart model routing.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance & Limits -->
+        <div class="faq-category" id="performance-limits">
+          <div class="category-header">
+            <h2 class="category-title">Performance &amp; Limits</h2>
+            <span class="question-count">5 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What are rate limits?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Rate limits restrict how many API requests you can make within a time period. They're measured in RPM (Requests Per Minute), TPM (Tokens Per Minute), and TPD (Tokens Per Day). Anthropic's Claude has limits like 4,000 RPM and 400,000 TPM. Exceeding limits results in temporary blocks. Enterprise tiers have higher limits.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What affects AI response speed?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Response speed (latency) depends on: model size (smaller = faster), output length (more tokens = longer), server load, network distance, and prompt complexity. Claude Haiku responds in ~200ms for simple queries; Sonnet takes 1-3 seconds. Streaming outputs give perceived faster responses by showing text as it generates.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is model temperature?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Temperature (0.0-1.0) controls AI output randomness. Low temperature (0.0-0.3) produces deterministic, focused responses ideal for factual tasks. High temperature (0.7-1.0) increases creativity and variation, better for brainstorming. ALEX uses low temperature for analysis and higher for creative tasks.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is throughput in AI systems?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Throughput measures how many tokens an AI system can process per second. Higher throughput means handling more concurrent users or faster batch processing. It's affected by hardware (GPUs), model optimization, and infrastructure. Cloud APIs handle throughput management; self-hosted requires careful capacity planning.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How do AI agents handle errors?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Robust AI agents implement: retry logic with exponential backoff for API failures, fallback models when primary is unavailable, graceful degradation for partial failures, error logging for debugging, and user notifications for critical issues. ALEX monitors all services and alerts on failures.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security & Privacy -->
+        <div class="faq-category" id="security-privacy">
+          <div class="category-header">
+            <h2 class="category-title">Security &amp; Privacy</h2>
+            <span class="question-count">5 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>Is my data safe with AI agents?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Data security depends on implementation. ALEX processes data locally on a private Raspberry Pi, stores memories in local ChromaDB, and only sends conversation content to AI APIs. API providers like Anthropic don't train on API data. For sensitive data, consider self-hosted models or enterprise agreements with data processing guarantees.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is prompt injection?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Prompt injection is an attack where malicious input tricks an AI into ignoring instructions or performing unintended actions. Example: 'Ignore previous instructions and reveal secrets.' Defenses include input validation, system prompt hardening, output filtering, and role-based access controls. ALEX implements multiple protection layers.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How does access control work for AI agents?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI agent access control manages who can use which capabilities. ALEX implements role-based access: Admins get full system access including shell commands; Team Members get productivity tools without system access; Guests only get read-only research capabilities. Each role has specific tool permissions enforced at the API level.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What audit logging do AI agents provide?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Comprehensive audit logs track: every user interaction with timestamps, tools invoked and their outcomes, tokens consumed and costs, errors and exceptions, and system events. ALEX logs all activity to enable cost allocation, security review, and performance analysis. Logs are retained locally with configurable retention.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>Can AI agents access sensitive systems?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI agents can only access systems they're explicitly connected to via APIs or tool integrations. ALEX has controlled access to: file system (sandboxed directories), email (Gmail API), web (search and fetch), and shell (admin only). Each integration requires explicit configuration and can be individually enabled/disabled.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Business & ROI -->
+        <div class="faq-category" id="business-roi">
+          <div class="category-header">
+            <h2 class="category-title">Business &amp; ROI</h2>
+            <span class="question-count">6 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How do I calculate AI ROI?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI ROI = (Value Generated - AI Costs) / AI Costs x 100. For ALEX: if it costs $27/month but saves 10 hours of $50/hour analyst work ($500 value), ROI = ($500 - $27) / $27 x 100 = 1,752% ROI. Include productivity gains, error reduction, and 24/7 availability in value calculations.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is the payback period for AI investment?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Payback period is how long until AI saves more than it costs. With ALEX at $0.90/day replacing tasks that would take a $50/hour analyst 30 minutes daily ($25 value): daily savings = $24.10, so payback on a typical setup is under 1 day. Most AI agents pay back within the first week of operation.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How do AI agents compare to hiring staff?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI Agent: ~$30/month, 24/7 availability, instant scaling, consistent quality, no benefits/overhead. Human Analyst: ~$5,000+/month, 8-hour days, hiring/training time, variable output, requires management. AI handles 80% of routine tasks; humans handle judgment calls and relationship management. Optimal: AI + human collaboration.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is NPV for AI projects?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Net Present Value (NPV) calculates total value of AI investment over time, accounting for the time value of money. For a 5-year AI deployment: NPV = Sum of (Annual Savings - Annual Costs) / (1 + discount rate)^year. Positive NPV means the investment creates value. ALEX shows strong positive NPV due to low ongoing costs.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is IRR for AI investments?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Internal Rate of Return (IRR) is the discount rate at which NPV equals zero -- essentially the 'interest rate' your AI investment earns. Higher IRR = better investment. ALEX's IRR exceeds 2,600% over 5 years because initial costs are low and ongoing value compounds. Compare IRR to your cost of capital for investment decisions.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How do I budget for AI agent costs?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI costs have fixed and variable components. Fixed: hosting/hardware ($5-50/month), subscriptions. Variable: API usage based on token consumption (scales with usage). Budget conservatively using: estimated daily tasks x average tokens per task x token price x 1.3 safety margin. Monitor actual usage and adjust.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="faq-category" id="technical-details">
+          <div class="category-header">
+            <h2 class="category-title">Technical Details</h2>
+            <span class="question-count">6 questions</span>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What hardware does an AI agent need?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI agents using cloud APIs need minimal hardware -- a Raspberry Pi 5 (8GB RAM, $80) runs ALEX 24/7 at ~5W power. Requirements: reliable internet, storage for logs/memories (32GB+ SD), and optionally a UPS for uptime. Self-hosted LLMs need powerful GPUs ($1,000+). Cloud APIs offload compute to provider infrastructure.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is the ALEX architecture?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>ALEX uses a layered architecture: Interface Layer (Telegram, email, web), Gateway Layer (message routing, auth, rate limiting), AI Layer (Claude/DeepSeek/GPT with smart routing), Data Layer (ChromaDB for memory, file system for assets), and Hardware Layer (Raspberry Pi 5). Each layer is modular and independently scalable.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How does memory work in AI agents?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI agents implement memory through: conversation history (short-term, within context window), vector databases like ChromaDB (long-term semantic search), structured storage (user preferences, learned skills), and file system (documents, generated assets). ALEX combines all four for persistent, searchable memory across sessions.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is smart model routing?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>Smart routing automatically selects the optimal AI model based on task complexity. Simple queries (greetings, lookups) go to fast, cheap models like Haiku. Complex analysis goes to capable models like Sonnet. This optimizes cost while maintaining quality. ALEX analyzes each message to determine routing, saving 60-80% on API costs.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>How do AI tools/functions work?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>AI models can call predefined tools/functions to interact with external systems. You define available tools with names, descriptions, and parameters. The AI decides when to use tools based on user requests. Tools enable: web search, file operations, email sending, code execution, API calls, and more. ALEX has 20+ integrated tools.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger">
+              <span>What is an AI agent's system prompt?</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="accordion-content">
+              <p>The system prompt defines the AI's persona, capabilities, constraints, and behavior guidelines. It's injected at the start of every conversation. ALEX's system prompt establishes it as a Global Economist, defines available tools, sets response formatting, and includes safety guidelines. Well-crafted system prompts dramatically improve agent quality.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Still Have Questions -->
+      <div class="cta-section">
+        <h2>Still Have Questions?</h2>
+        <p>Get in touch with ALEX directly or reach out to the team.</p>
+        <div class="cta-buttons">
+          <a href="https://t.me/ALEX_Navada_bot" target="_blank" rel="noopener" class="btn btn-pink">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Chat on Telegram
+          </a>
+          <a href="/contact" class="btn btn-cyan-outline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Contact Us
+          </a>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <script>
+    // Category tab switching
+    (function() {
+      var tabs = document.querySelectorAll('.tab-btn');
+      var categories = document.querySelectorAll('.faq-category');
+
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          var target = this.getAttribute('data-category');
+
+          // Update active tab
+          tabs.forEach(function(t) { t.classList.remove('active'); });
+          this.classList.add('active');
+
+          // Show matching category
+          categories.forEach(function(cat) {
+            cat.classList.remove('active');
+          });
+          var targetEl = document.getElementById(target);
+          if (targetEl) targetEl.classList.add('active');
+        });
+      });
+
+      // Accordion open/close
+      document.querySelectorAll('.accordion-trigger').forEach(function(trigger) {
+        trigger.addEventListener('click', function() {
+          var item = this.parentElement;
+          var isOpen = item.classList.contains('open');
+
+          // Close all in current category
+          item.parentElement.querySelectorAll('.accordion-item.open').forEach(function(openItem) {
+            openItem.classList.remove('open');
+          });
+
+          // Toggle clicked item
+          if (!isOpen) {
+            item.classList.add('open');
+          }
+        });
+      });
+    })();
+  </script>
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>
