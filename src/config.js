@@ -5,6 +5,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import yaml from 'js-yaml';
 import { loadEncryptedConfig, saveEncryptedConfig } from './secrets.js';
 
 export const CONFIG_PATH = process.env.ALEX_CONFIG || path.join(os.homedir(), '.alex/config.json');
@@ -63,6 +64,25 @@ const OPTIONAL_KEYS = {
     local_redis_url: { type: 'string' },
 };
 
+/**
+ * Load YAML config for non-secret behavioral settings.
+ * Returns empty object if file doesn't exist or fails to parse.
+ */
+export async function loadYamlConfig() {
+    const yamlPath = path.join(WORKSPACE_PATH, 'config.yaml');
+    try {
+        const content = await fs.readFile(yamlPath, 'utf8');
+        const parsed = yaml.load(content) || {};
+        console.log('[CONFIG] YAML config loaded');
+        return parsed;
+    } catch (err) {
+        if (err.code !== 'ENOENT') {
+            console.warn(`[CONFIG] YAML config error: ${err.message}`);
+        }
+        return {};
+    }
+}
+
 export async function loadConfig() {
     await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
 
@@ -76,6 +96,10 @@ export async function loadConfig() {
         console.log('Run: alex-setup to configure');
         process.exit(1);
     }
+
+    // Merge YAML config (non-secrets) — JSON wins on conflicts
+    const yamlConfig = await loadYamlConfig();
+    config._yaml = yamlConfig;
 
     // Validate required keys
     for (const key of REQUIRED_KEYS) {

@@ -6,10 +6,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { WORKSPACE_PATH } from './config.js';
 import { archiveOldDone } from './email-filing.js';
 import { cacheFacts, cleanExpired as cleanCache } from './content-cache.js';
 import { writeDiaryEntry } from './daily-journal.js';
+import { runRalphReview } from './ralph.js';
 
 // dashPost is set by gateway.js via setDashPost()
 let dashPost = () => {};
@@ -17,6 +19,49 @@ let redisRef = null;
 
 export function setDashPost(fn) { dashPost = fn; }
 export function setRedis(r) { redisRef = r; }
+
+// Anti-repetition: track recent output hashes (4-hour window)
+const recentOutputHashes = new Map();
+const DEDUP_WINDOW_MS = 4 * 3600 * 1000;
+
+/**
+ * Check if task output is a repeat of recent output (anti-repetition)
+ * Uses MD5 of first 500 chars with a 4-hour sliding window.
+ */
+export function isRepeatOutput(taskName, text) {
+    const now = Date.now();
+    // Lazy cleanup of stale entries
+    for (const [key, ts] of recentOutputHashes) {
+        if (now - ts > DEDUP_WINDOW_MS) recentOutputHashes.delete(key);
+    }
+    const hash = crypto.createHash('md5').update(text.substring(0, 500)).digest('hex');
+    const key = `${taskName}:${hash}`;
+    if (recentOutputHashes.has(key)) return true;
+    recentOutputHashes.set(key, now);
+    return false;
+}
+
+/**
+ * Save full task output to ~/.alex/tasks/outputs/{Mon-YYYY}/{taskName}-{HH-MM}.md
+ */
+async function saveTaskOutput(taskName, model, text) {
+    const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthFolder = `${monthNames[now.getMonth()]}-${now.getFullYear()}`;
+    const dir = path.join(WORKSPACE_PATH, 'tasks', 'outputs', monthFolder);
+    await fs.mkdir(dir, { recursive: true });
+
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const filename = `${taskName}-${hh}-${mm}.md`;
+    const title = taskName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const content = `# ${title}\n**Date:** ${now.toISOString()}\n**Model:** ${model}\n---\n\n${text}\n`;
+
+    const filePath = path.join(dir, filename);
+    await fs.writeFile(filePath, content);
+    await fs.chmod(filePath, 0o600);
+    console.log(`[HEARTBEAT] Saved task output: ${monthFolder}/${filename}`);
+}
 
 /**
  * Built-in heartbeat task definitions — looked up by the /api/trigger endpoint
@@ -125,10 +170,16 @@ Focus on the financial endpoints first as those are most time-sensitive. Static 
 3. Check your skills — should any new skills be created based on recurring requests?
 4. Review dashboard data quality — are all sections being updated properly?
 5. Check for any errors in gateway.log from the past week
-6. Suggest 2-3 concrete improvements you could make to yourself
+6. Read recent user feedback from ~/.alex/logs/feedback/ — what does Lee find valuable vs useless?
+7. Read Ralph's recent fix proposals from ~/.alex/fixes/ — have any been addressed?
+8. Suggest 2-3 concrete improvements you could make to yourself
 
 Save your findings to memory under 'knowledge' and send a summary to Lee.
 This is your chance to evolve and get better each week.`
+    }],
+    ['ralph-review', {
+        name: 'ralph-review',
+        task_description: 'Ralph self-improvement engine: analyse diary and feedback, identify failures, propose fixes.'
     }],
 ]);
 
@@ -138,7 +189,7 @@ This is your chance to evolve and get better each week.`
 // Tasks that need Sonnet's reasoning — complex research, multi-step analysis, strategic thinking
 const SONNET_TASKS = new Set(['morning-briefing', 'midday-research', 'evening-summary', 'weekly-self-review']);
 
-export async function handleScheduledTask(task, { callAnthropicQueued, processResponse, buildSystemPrompt, config, bot, TOOLS }) {
+export async function handleScheduledTask(task, { callAnthropicQueued, processResponse, buildSystemPrompt, config, bot, TOOLS, memory }) {
     try {
         const systemPrompt = await buildSystemPrompt();
 
@@ -185,6 +236,33 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
             } catch {}
         }
 
+        // Save full task output to disk (fire-and-forget, always runs regardless of dedup)
+        if (finalText.trim()) {
+            saveTaskOutput(task.name, model, finalText).catch(err =>
+                console.error(`[HEARTBEAT] Failed to save task output:`, err.message));
+        }
+
+        // Distill key learnings into KNOWLEDGE.md (long-term memory)
+        if (finalText.length > 200 && memory) {
+            try {
+                const distillResult = await callAnthropicQueued({
+                    model: 'claude-3-5-haiku-20241022',
+                    max_tokens: 400,
+                    messages: [{ role: 'user', content: `Extract 1-3 key learnings worth remembering long-term from this task output. Focus on facts, trends, or insights that would be useful weeks or months from now. If nothing is novel or worth long-term retention, return exactly "None".\n\nTask: ${task.name}\nOutput:\n${finalText.substring(0, 3000)}` }]
+                }, 0, { source: 'knowledge-distill' });
+                const learnings = distillResult?.content?.[0]?.text || '';
+                if (learnings.trim() && learnings.trim().toLowerCase() !== 'none') {
+                    await memory.appendKnowledge(`[${task.name}] ${learnings.trim()}`);
+                    console.log(`[HEARTBEAT] Distilled knowledge from ${task.name}`);
+                }
+            } catch (err) {
+                console.error(`[HEARTBEAT] Knowledge distillation failed:`, err.message);
+            }
+        }
+
+        // Check for repeat output (anti-repetition)
+        const isDuplicate = finalText.trim() && isRepeatOutput(task.name, finalText);
+
         // Update dashboard with task result
         dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'completed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
         dashPost('add_activity', { entry: `Heartbeat: ${task.name} completed` });
@@ -197,12 +275,27 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
 
         if (config.telegram_notify_tasks && config.telegram_owner_id && finalText.trim() && bot) {
             const taskTitle = task.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const msgText = `<b>${taskTitle}</b>\n\n${finalText.substring(0, 3500)}`;
-            try {
-                await bot.sendMessage(config.telegram_owner_id, msgText, { parse_mode: 'HTML' });
-            } catch (parseErr) {
-                // HTML parse failed — send as plain text
-                await bot.sendMessage(config.telegram_owner_id, `${taskTitle}\n\n${finalText.substring(0, 3500)}`);
+            // Feedback buttons for heartbeat messages
+            const feedbackButtons = {
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '\ud83d\udc4d', callback_data: `fb_good_${task.name}` },
+                        { text: '\ud83d\udc4e', callback_data: `fb_bad_${task.name}` },
+                    ]]
+                }
+            };
+            if (isDuplicate) {
+                // Skip sending full output if it's a repeat within the dedup window
+                console.log(`[HEARTBEAT] Dedup: suppressed repeat output for ${task.name}`);
+                await bot.sendMessage(config.telegram_owner_id, `<b>${taskTitle}</b>\n\n<i>No significant new updates since last run.</i>`, { parse_mode: 'HTML' });
+            } else {
+                const msgText = `<b>${taskTitle}</b>\n\n${finalText.substring(0, 3500)}`;
+                try {
+                    await bot.sendMessage(config.telegram_owner_id, msgText, { parse_mode: 'HTML', ...feedbackButtons });
+                } catch (parseErr) {
+                    // HTML parse failed — send as plain text with buttons
+                    await bot.sendMessage(config.telegram_owner_id, `${taskTitle}\n\n${finalText.substring(0, 3500)}`, feedbackButtons);
+                }
             }
         }
 
@@ -361,6 +454,34 @@ export async function runCleanup(memory) {
         if (cleaned > 0) console.log(`[CLEANUP] Cleaned ${cleaned} expired cache entries`);
     } catch (err) {
         console.error('[CLEANUP] Cache cleanup failed:', err.message);
+    }
+    // Purge task output files older than 3 days
+    try {
+        const outputsDir = path.join(WORKSPACE_PATH, 'tasks', 'outputs');
+        const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+        let purged = 0;
+        const months = await fs.readdir(outputsDir).catch(() => []);
+        for (const month of months) {
+            const monthDir = path.join(outputsDir, month);
+            const stat = await fs.stat(monthDir).catch(() => null);
+            if (!stat?.isDirectory()) continue;
+            const files = await fs.readdir(monthDir).catch(() => []);
+            for (const file of files) {
+                if (!file.endsWith('.md')) continue;
+                const filePath = path.join(monthDir, file);
+                const fstat = await fs.stat(filePath).catch(() => null);
+                if (fstat && fstat.mtimeMs < cutoff) {
+                    await fs.unlink(filePath);
+                    purged++;
+                }
+            }
+            // Remove empty month directories
+            const remaining = await fs.readdir(monthDir).catch(() => ['x']);
+            if (remaining.length === 0) await fs.rmdir(monthDir).catch(() => {});
+        }
+        if (purged > 0) console.log(`[CLEANUP] Purged ${purged} task output files older than 3 days`);
+    } catch (err) {
+        console.error('[CLEANUP] Task output purge failed:', err.message);
     }
     // Clean expired RAG entries (TTL-based document chunks)
     try {

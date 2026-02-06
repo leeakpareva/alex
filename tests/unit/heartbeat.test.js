@@ -2,7 +2,7 @@
  * Unit tests for heartbeat.js
  */
 import { describe, it, expect } from 'vitest';
-import { BUILTIN_TASKS } from '../../src/heartbeat.js';
+import { BUILTIN_TASKS, isRepeatOutput } from '../../src/heartbeat.js';
 
 describe('heartbeat.js', () => {
     describe('BUILTIN_TASKS', () => {
@@ -40,6 +40,35 @@ describe('heartbeat.js', () => {
 
         it('has at least 7 tasks', () => {
             expect(BUILTIN_TASKS.size).toBeGreaterThanOrEqual(7);
+        });
+    });
+
+    describe('isRepeatOutput (anti-repetition)', () => {
+        it('returns false for first occurrence', () => {
+            const result = isRepeatOutput('test-unique-first', 'This is brand new content that has never been seen before');
+            expect(result).toBe(false);
+        });
+
+        it('returns true for duplicate within window', () => {
+            const text = 'Duplicate detection test content for repeat check';
+            isRepeatOutput('test-dedup', text); // First call — registers it
+            const result = isRepeatOutput('test-dedup', text); // Second call — should detect
+            expect(result).toBe(true);
+        });
+
+        it('returns false for different content', () => {
+            const text1 = 'First unique message about markets rising today';
+            const text2 = 'Completely different message about weather forecast';
+            isRepeatOutput('test-diff', text1);
+            const result = isRepeatOutput('test-diff', text2);
+            expect(result).toBe(false);
+        });
+
+        it('returns false for same content on different tasks', () => {
+            const text = 'Shared content across different task names for isolation test';
+            isRepeatOutput('task-alpha', text);
+            const result = isRepeatOutput('task-beta', text);
+            expect(result).toBe(false);
         });
     });
 });

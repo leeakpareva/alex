@@ -61,7 +61,7 @@ async function extractPdfForRag(pdfPath) {
 }
 
 import { WORKSPACE_PATH, loadConfig } from './config.js';
-import { appendFile, mkdir, readFile, writeFile, unlink } from 'fs/promises';
+import { appendFile, mkdir, readFile, writeFile, unlink, symlink as fsSymlink } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
@@ -73,6 +73,7 @@ import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit, selectModel } from './chat.js';
 import { processUploadedFile } from './document-processor.js';
+import { runRalphReview } from './ralph.js';
 import { init as initJournal, appendExchange, writeDiaryEntry, loadShortCache, forceSaveChat, getLastDailyLines, getDiaryContext, modelLabel as journalModelLabel, setJournalRedis, runChurn } from './daily-journal.js';
 
 // ============================================================================
@@ -433,6 +434,34 @@ Just message me naturally — I'm here to help.
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         const lines = await getLastDailyLines(5);
         await bot.sendMessage(chatId, `Alex's Diary (last 5):\n\n${lines}`);
+    });
+
+    bot.onText(/\/feedback\s*(good|bad)?(?:\s+(.+))?/i, async (msg, match) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        const rating = match?.[1]?.toLowerCase();
+        const comment = match?.[2]?.trim();
+
+        if (!rating) {
+            await bot.sendMessage(chatId, `*Feedback*\n\nUsage: \`/feedback good [comment]\` or \`/feedback bad [comment]\`\n\nThis helps me learn what's useful and what to improve.`, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        const feedbackDir = path.join(WORKSPACE_PATH, 'logs', 'feedback');
+        await mkdir(feedbackDir, { recursive: true });
+        const date = new Date().toISOString().split('T')[0];
+        const entry = {
+            timestamp: new Date().toISOString(),
+            task_name: 'manual',
+            rating,
+            comment: comment || null,
+            user_id: msg.from.id,
+        };
+        await appendFile(
+            path.join(feedbackDir, `feedback_${date}.jsonl`),
+            JSON.stringify(entry) + '\n'
+        );
+        await bot.sendMessage(chatId, `Feedback recorded: ${rating === 'good' ? 'positive' : 'negative'}${comment ? ` — "${comment}"` : ''}`);
     });
 
     bot.onText(/\/learn/, async (msg) => {
@@ -3113,6 +3142,34 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
             return;
         }
         const data = query.data;
+
+        // Handle feedback buttons (from heartbeat messages)
+        if (data?.startsWith('fb_')) {
+            const match = data.match(/^fb_(good|bad)_(.+)$/);
+            if (match) {
+                const [, rating, taskName] = match;
+                const feedbackDir = path.join(WORKSPACE_PATH, 'logs', 'feedback');
+                await mkdir(feedbackDir, { recursive: true });
+                const date = new Date().toISOString().split('T')[0];
+                const entry = {
+                    timestamp: new Date().toISOString(),
+                    task_name: taskName,
+                    rating,
+                    message_id: query.message?.message_id,
+                    user_id: userId,
+                };
+                await appendFile(
+                    path.join(feedbackDir, `feedback_${date}.jsonl`),
+                    JSON.stringify(entry) + '\n'
+                );
+                await bot.answerCallbackQuery(query.id, {
+                    text: rating === 'good' ? 'Thanks! Noted as useful.' : 'Thanks! I\'ll try to improve.',
+                });
+                console.log(`[FEEDBACK] ${rating} for ${taskName} from user ${userId}`);
+            }
+            return;
+        }
+
         if (!data?.startsWith('em_')) return;
 
         await bot.answerCallbackQuery(query.id);
@@ -4627,6 +4684,23 @@ Call the send_email tool now with exactly these parameters.`;
                         res.end(JSON.stringify({ success: true, task: taskName }));
                         return;
                     }
+                    if (taskName === 'ralph-review') {
+                        runRalphReview({
+                            callAnthropicQueued: chatSystem.callAnthropicQueued,
+                            config,
+                        }).then(result => {
+                            // Notify owner if configured
+                            if (config.telegram_notify_tasks && config.telegram_owner_id && bot && result) {
+                                const msg = `<b>Ralph Self-Improvement Review</b>\n\n${result.substring(0, 3500)}`;
+                                bot.sendMessage(config.telegram_owner_id, msg, { parse_mode: 'HTML' }).catch(() => {
+                                    bot.sendMessage(config.telegram_owner_id, `Ralph Self-Improvement Review\n\n${result.substring(0, 3500)}`).catch(() => {});
+                                });
+                            }
+                        }).catch(err => console.error('[RALPH] Failed:', err.message));
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, task: taskName }));
+                        return;
+                    }
 
                     // Look up task definition: built-in first, then user tasks on disk
                     let taskDef = BUILTIN_TASKS.get(taskName);
@@ -4921,6 +4995,14 @@ async function init() {
     // Initialize journal system
     await initJournal();
     console.log('[JOURNAL] Initialized');
+
+    // Create task-outputs symlink in project dir (for easy access)
+    try {
+        const symlinkPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'task-outputs');
+        const targetPath = path.join(WORKSPACE_PATH, 'tasks', 'outputs');
+        await mkdir(targetPath, { recursive: true });
+        await fsSymlink(targetPath, symlinkPath).catch(() => {});
+    } catch {}
 
     // One-time fix: ensure sensitive files have 0600 permissions
     try {

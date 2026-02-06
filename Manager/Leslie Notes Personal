@@ -1,0 +1,119 @@
+cd ~/ALEX_NAVADA/Manager                                                      
+                                         
+  ---                                                                           
+  You have 4 tools                                                              
+
+  1. view-conversations.py — see what ALEX has been saying
+
+  Quick look (terminal):
+  python3 view-conversations.py list-chats              # who's been chatting?
+  python3 view-conversations.py view | less              # scroll through
+  everything
+  python3 view-conversations.py view 6920669447 | less   # one Telegram user
+  python3 view-conversations.py view --search "stock"    # find a keyword
+  python3 view-conversations.py view --last 5            # last 5 msgs per convo
+
+  Visual HTML report (opens in browser):
+  python3 view-conversations.py view --html                          #
+  everything
+  python3 view-conversations.py view 6920669447 --html               # one user
+  python3 view-conversations.py view --search "market" --html        # keyword
+  python3 view-conversations.py view 6920669447 --search "email" --html  #
+  combine
+
+  Reports save to reports/2026-02-06/ — one folder per date, never overwritten.
+
+  ---
+  2. daily-summary.py — what happened today/any day
+
+  python3 daily-summary.py generate                      # today's summary
+  python3 daily-summary.py generate --date 2026-02-04    # specific day
+  python3 daily-summary.py generate --force              # overwrite today's
+  python3 daily-summary.py backfill                      # regenerate all days
+
+  Summaries save to ~/ALEX_NAVADA/daily/Feb-2026/Friday-06-Feb-2026.md etc.
+
+  ---
+  3. backup.sh — backup everything
+
+  bash backup.sh               # full backup: Pi + send to iPhone
+  bash backup.sh --local        # Pi only
+  bash backup.sh --iphone       # send latest backup to iPhone
+
+  Runs automatically: daily at 4am (Pi), Sunday 3am (Pi + iPhone). Keeps last 8
+  backups. Accept on iPhone via Tailscale app > Files.
+
+  ---
+  4. sessions/SESSION-LOG.md — what we built on ALEX
+
+  cat sessions/SESSION-LOG.md | less
+
+  Auto-updates every time we commit code to ALEX. Shows every day's work since
+  Jan 31.
+
+  ---
+  Typical workflows
+
+  "What did ALEX talk about today?"
+  python3 daily-summary.py generate
+  cat ~/ALEX_NAVADA/daily/Feb-2026/Friday-06-Feb-2026.md
+
+  "Show me a full visual audit"
+  python3 view-conversations.py view --html
+
+  "What did user 6920669447 ask about stocks?"
+  python3 view-conversations.py view 6920669447 --search "stock" --html
+
+  "Back everything up right now"
+  bash backup.sh
+
+  "What have we built on ALEX so far?"
+  cat sessions/SESSION-LOG.md | less
+
+Step by step
+
+  1. With your script open in Geany, click Build in the top menu bar
+  2. Click Set Build Commands
+  3. You'll see a table. Look for the Execute section at the bottom
+  4. In the Execute row, set the command to:
+
+  python3 "%f" view --html
+
+  5. Click OK
+  6. Now press F5 (or Build > Execute)
+
+  The HTML report will generate and open in your browser.
+
+  ---
+  To switch between different reports
+
+  Each time you want to run a different command, go back to Build > Set Build Commands and change
+  the Execute line:
+  ┌────────────────────┬────────────────────────────────────────────┐
+  │  Report you want   │           Set Execute command to           │
+  ├────────────────────┼────────────────────────────────────────────┤
+  │ Full HTML report   │ python3 "%f" view --html                   │
+  ├────────────────────┼────────────────────────────────────────────┤
+  │ Single user report │ python3 "%f" view 6920669447 --html        │
+  ├────────────────────┼────────────────────────────────────────────┤
+  │ Search report      │ python3 "%f" view --search "market" --html │
+  ├────────────────────┼────────────────────────────────────────────┤
+  │ List chats         │ python3 "%f" list-chats                    │
+  ├────────────────────┼────────────────────────────────────────────┤
+  │ Daily summary      │ python3 "%f" generate                      │
+  └────────────────────┴────────────────────────────────────────────┘
+  ---
+  Faster alternative
+
+  Instead of changing the execute command each time, use Geany's built-in terminal:
+
+  1. Go to View menu
+  2. Click Terminal (or tick the checkbox if it's there)
+  3. A terminal appears at the bottom of the Geany window
+  4. Type commands directly:
+
+  cd ~/ALEX_NAVADA/Manager
+  python3 view-conversations.py view --html
+
+  That way you edit at the top, run at the bottom — no config changes needed.
+

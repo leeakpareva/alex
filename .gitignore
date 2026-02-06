@@ -57,6 +57,15 @@ __pycache__/
 daily
 diary
 archive
+task-outputs
+
+# Ralph fix proposals and backups
+fixes
+backups
+logs
+uploads
+Manager/reports
+Manager/__pycache__
 
 # Misc
 Alex-Auto-Bot
