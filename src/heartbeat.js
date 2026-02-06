@@ -9,6 +9,7 @@ import os from 'os';
 import { WORKSPACE_PATH } from './config.js';
 import { archiveOldDone } from './email-filing.js';
 import { cacheFacts, cleanExpired as cleanCache } from './content-cache.js';
+import { writeDiaryEntry } from './daily-journal.js';
 
 // dashPost is set by gateway.js via setDashPost()
 let dashPost = () => {};
@@ -93,6 +94,10 @@ If no alerts are configured, skip silently.`
 4. If nothing is due, skip silently (no message needed)
 
 Be proactive but not noisy — only message if there's something actionable.`
+    }],
+    ['daily-churn', {
+        name: 'daily-churn',
+        task_description: 'Nightly journal churn: index daily files to ChromaDB, extract facts from diary, archive and clear daily files.'
     }],
     ['api-data-refresh', {
         name: 'api-data-refresh',
@@ -183,6 +188,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         // Update dashboard with task result
         dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'completed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
         dashPost('add_activity', { entry: `Heartbeat: ${task.name} completed` });
+        writeDiaryEntry(`${task.name} completed`).catch(() => {});
 
         // Post findings as news if substantive
         if (finalText.length > 100) {
@@ -218,6 +224,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
     } catch (error) {
         console.error(`[CRON] Task '${task.name}' failed:`, error.message);
         dashPost('add_task', { task: { name: task.name, category: 'heartbeat', status: 'failed', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT' } });
+        writeDiaryEntry(`${task.name} FAILED: ${error.message}`).catch(() => {});
     }
 }
 

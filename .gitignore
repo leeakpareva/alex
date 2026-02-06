@@ -48,3 +48,15 @@ test-report.html
 *.temp
 .cache/
 .vercel
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Symlinks to workspace
+daily
+diary
+archive
+
+# Misc
+Alex-Auto-Bot

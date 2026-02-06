@@ -462,7 +462,7 @@ export class CircuitBreaker {
 // CHAT SYSTEM FACTORY
 // ============================================================================
 
-export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, openrouterClient, memory, skills, executeTool, TOOLS }) {
+export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimiClient, openrouterClient, memory, skills, executeTool, TOOLS, getDailyContext }) {
     const requestQueue = new RequestQueue();
     const circuitBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'anthropic');
     const deepseekBreaker = new CircuitBreaker(5, 5 * 60 * 1000, 'deepseek');
@@ -1053,10 +1053,18 @@ You are responding to an authenticated email command from Lee (the owner).
 - Include relevant details in your response — Lee is reading this via email, not a chat interface
 ` : '');
 
+        let diaryBlock = '';
+        if (typeof getDailyContext === 'function') {
+            try {
+                const ctx = await getDailyContext();
+                if (ctx) diaryBlock = `\n\nAlex's Diary (recent actions):\n${ctx}`;
+            } catch {}
+        }
+
         const dynamicBlock = `## Current Context
 ${timeContext}
 Workspace: ${WORKSPACE_PATH}
-System: Raspberry Pi (${os.platform()} ${os.arch()})${uploadsBlock}
+System: Raspberry Pi (${os.platform()} ${os.arch()})${uploadsBlock}${diaryBlock}
 
 ${contextBlock}`;
 

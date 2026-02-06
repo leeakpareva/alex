@@ -57,6 +57,10 @@ const OPTIONAL_KEYS = {
     kimi_api_key: { type: 'string' },
     apify_api_key: { type: 'string' },
     openrouter_api_key: { type: 'string' },
+    chromadb_api_key: { type: 'string' },
+    chromadb_tenant: { type: 'string' },
+    chromadb_database: { type: 'string' },
+    local_redis_url: { type: 'string' },
 };
 
 export async function loadConfig() {

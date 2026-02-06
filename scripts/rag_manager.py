@@ -16,11 +16,44 @@ UPLOADS_DIR = "/home/head/.alex/uploads"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
+# Chroma Cloud credentials (from ~/.chroma/credentials)
+CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY", "ck-6okEKDvgvhyHGff5vpnQzcHWnXF7a72MjQEvYjcLTSmH")
+CHROMA_TENANT = os.environ.get("CHROMA_TENANT", "efc7bdaa-9d78-48bd-94f4-d7202d714f10")
+CHROMA_DATABASE = os.environ.get("CHROMA_DATABASE", "alex_knowledge")
 
-def get_collection():
+_client = None
+
+
+def get_client():
+    """Get or create ChromaDB client. Uses Cloud if API key available, falls back to local."""
+    global _client
+    if _client is not None:
+        return _client
+
     import chromadb
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
-    return client.get_or_create_collection(COLLECTION)
+
+    if CHROMA_API_KEY:
+        try:
+            _client = chromadb.CloudClient(
+                api_key=CHROMA_API_KEY,
+                tenant=CHROMA_TENANT,
+                database=CHROMA_DATABASE,
+            )
+            # Quick connectivity check
+            _client.heartbeat()
+            print("[CHROMA] Connected to Chroma Cloud", file=sys.stderr)
+            return _client
+        except Exception as e:
+            print(f"[CHROMA] Cloud connection failed ({e}), falling back to local", file=sys.stderr)
+
+    _client = chromadb.PersistentClient(path=CHROMA_PATH)
+    print("[CHROMA] Using local PersistentClient", file=sys.stderr)
+    return _client
+
+
+def get_collection(name=None):
+    client = get_client()
+    return client.get_or_create_collection(name or COLLECTION)
 
 
 def chunk_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
@@ -43,6 +76,9 @@ def cmd_index_text(args):
     parser.add_argument("--source", required=True, help="Source identifier")
     parser.add_argument("--ttl", type=int, default=5, help="TTL in days")
     parser.add_argument("--permanent", action="store_true", help="Never expires")
+    parser.add_argument("--collection", default=None, help="ChromaDB collection name (default: alex_knowledge)")
+    parser.add_argument("--chunk-size", type=int, default=CHUNK_SIZE, help="Chunk size in chars")
+    parser.add_argument("--chunk-overlap", type=int, default=CHUNK_OVERLAP, help="Chunk overlap in chars")
     parsed = parser.parse_args(args)
 
     text = sys.stdin.read().strip()
@@ -50,12 +86,12 @@ def cmd_index_text(args):
         print("No text provided on stdin", file=sys.stderr)
         sys.exit(1)
 
-    chunks = chunk_text(text)
+    chunks = chunk_text(text, size=parsed.chunk_size, overlap=parsed.chunk_overlap)
     if not chunks:
         print("No chunks generated from input", file=sys.stderr)
         sys.exit(1)
 
-    collection = get_collection()
+    collection = get_collection(parsed.collection)
     now = datetime.now(timezone.utc)
     expires = "9999-12-31" if parsed.permanent else (now + timedelta(days=parsed.ttl)).strftime("%Y-%m-%d")
 
@@ -103,9 +139,16 @@ def cmd_query(query_text):
     print(json.dumps({"results": output}))
 
 
-def cmd_cleanup():
+def cmd_cleanup(args=None):
     """Remove expired entries based on TTL metadata."""
-    collection = get_collection()
+    collection_name = None
+    if args:
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--collection", default=None, help="ChromaDB collection name")
+        parsed = parser.parse_args(args)
+        collection_name = parsed.collection
+    collection = get_collection(collection_name)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Get all entries with their metadata
@@ -222,7 +265,7 @@ def main():
         query_text = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else ""
         cmd_query(query_text)
     elif command == "cleanup":
-        cmd_cleanup()
+        cmd_cleanup(sys.argv[2:])
     elif command == "stats":
         cmd_stats()
     elif command == "index":

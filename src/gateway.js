@@ -71,8 +71,9 @@ import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDa
 import { setupInbox, startInboxPolling, setInboxChatSystem } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
-import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit } from './chat.js';
+import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit, selectModel } from './chat.js';
 import { processUploadedFile } from './document-processor.js';
+import { init as initJournal, appendExchange, writeDiaryEntry, loadShortCache, forceSaveChat, getLastDailyLines, getDiaryContext, modelLabel as journalModelLabel, setJournalRedis, runChurn } from './daily-journal.js';
 
 // ============================================================================
 // TELEGRAM MARKDOWN SAFE SEND — tries Markdown, falls back to plain text
@@ -110,6 +111,7 @@ let memory = null;
 let skills = null;
 let scheduledTasks = new Map();
 let redis = null;
+let localRedis = null;
 const learnModeChats = new Set(); // Track chats with /learn active
 const mathModeChats = new Set(); // Track chats with /mathematician active
 const strategistModeChats = new Set(); // Track chats with /strategist active
@@ -417,6 +419,20 @@ Just message me naturally — I'm here to help.
         } else {
             await bot.sendMessage(chatId, "Hello! How can I help you today?");
         }
+    });
+
+    bot.onText(/\/save/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        const result = await forceSaveChat(chatId, memory);
+        await bot.sendMessage(chatId, result);
+    });
+
+    bot.onText(/\/read/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        const lines = await getLastDailyLines(5);
+        await bot.sendMessage(chatId, `Alex's Diary (last 5):\n\n${lines}`);
     });
 
     bot.onText(/\/learn/, async (msg) => {
@@ -4117,6 +4133,15 @@ Rules for Python Mode:
                 postDashboard('add_activity', { entry: `📌 Tracked: ${taskSummary}` });
             }
 
+            // Journal: append exchange to daily file
+            appendExchange({
+                question: (typeof chatInput === 'string' ? chatInput : userMessage).substring(0, 500),
+                answer: response.substring(0, 1500),
+                source: 'telegram',
+                modelLabel: journalModelLabel(modelOverrides.get(chatId) || selectModel(userMessage)),
+                userName: msg.from.first_name || 'Leslie',
+            }).catch(err => console.error('[JOURNAL]', err.message));
+
             // Send any queued files (photos + documents)
             const files = pendingCharts.splice(0);
             for (const file of files) {
@@ -4213,6 +4238,8 @@ Rules for Python Mode:
         { command: 'projection', description: 'Monthly cost projection' },
         { command: 'python', description: 'Python data analysis mode' },
         { command: 'research', description: 'Deep research on demand' },
+        { command: 'read', description: 'Show last 5 diary entries' },
+        { command: 'save', description: 'Save current chat to daily journal' },
         { command: 'scrapers', description: 'View all Apify scrapers' },
         { command: 'security', description: 'Security scan and audit' },
         { command: 'skills', description: 'List and manage skills' },
@@ -4390,6 +4417,15 @@ Call the send_email tool now with exactly these parameters.`;
                     currentCallerUserId = config.telegram_owner_id || null;
                     const response = await chatSystem.chat(chatId, userMessage, { first_name: userName, username: isTerminal ? 'terminal' : 'claude_code' }, {}, { source: 'api' });
                     currentCallerUserId = null;
+
+                    // Journal: append control API exchange
+                    appendExchange({
+                        question: message.substring(0, 500),
+                        answer: response.substring(0, 1500),
+                        source: isTerminal ? 'terminal' : 'api',
+                        modelLabel: journalModelLabel(selectModel(message)),
+                        userName: isTerminal ? 'Leslie (Terminal)' : 'Leslie (API)',
+                    }).catch(err => console.error('[JOURNAL]', err.message));
 
                     // Send queued files
                     const files = pendingCharts.splice(0);
@@ -4583,6 +4619,14 @@ Call the send_email tool now with exactly these parameters.`;
                         res.end(JSON.stringify({ ok: true, message: 'File processing started' }));
                         return;
                     }
+                    if (taskName === 'daily-churn') {
+                        runChurn(chatSystem.callAnthropicQueued).then(() => {
+                            writeDiaryEntry('Nightly churn completed').catch(() => {});
+                        }).catch(err => console.error('[CHURN] Failed:', err.message));
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, task: taskName }));
+                        return;
+                    }
 
                     // Look up task definition: built-in first, then user tasks on disk
                     let taskDef = BUILTIN_TASKS.get(taskName);
@@ -4627,8 +4671,9 @@ Call the send_email tool now with exactly these parameters.`;
                     heap_total_mb: Math.round(memUsage.heapTotal / 1024 / 1024),
                 },
                 telegram: bot ? 'connected' : 'disconnected',
-                chromadb: (await import('./tools.js')).isRAGAvailable() ? 'available' : 'unavailable',
-                redis: redis ? 'connected' : 'disconnected',
+                chromadb: (await import('./tools.js')).isRAGAvailable() ? 'cloud' : 'unavailable',
+                redis_upstash: redis ? 'connected' : 'disconnected',
+                redis_local: localRedis ? 'connected' : 'disconnected',
                 timestamp: new Date().toISOString(),
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4686,6 +4731,14 @@ Call the send_email tool now with exactly these parameters.`;
                 currentCallerUserId = null; // Web users have no owner permissions
                 const response = await chatSystem.chat(webChatId, webMessage, { first_name: 'Web User', username: 'web' }, {}, { source: 'web' });
                 currentCallerUserId = null;
+
+                appendExchange({
+                    question: text.substring(0, 500),
+                    answer: response.substring(0, 1500),
+                    source: 'web',
+                    modelLabel: journalModelLabel(selectModel(text)),
+                    userName: 'Web User',
+                }).catch(() => {});
 
                 await redis.set(`web:chat:out:${sessionId}`, JSON.stringify({
                     response, timestamp: Date.now()
@@ -4840,15 +4893,34 @@ async function init() {
         console.log('[REDIS] No Upstash config — dashboard pushes disabled');
     }
 
+    // Initialize local Redis (Pi-side, for journal cache and local data)
+    try {
+        const { createClient } = await import('redis');
+        const redisUrl = config.local_redis_url || 'redis://127.0.0.1:6379';
+        localRedis = createClient({ url: redisUrl });
+        localRedis.on('error', err => console.error('[LOCAL-REDIS] Error:', err.message));
+        await localRedis.connect();
+        console.log('[LOCAL-REDIS] Connected to local Redis');
+    } catch (err) {
+        console.error('[LOCAL-REDIS] Connection failed:', err.message);
+        localRedis = null;
+    }
+
     // Wire up dashboard helpers for heartbeat + tools modules
     setDashPost(postDashboard);
     setRedis(redis);
     setToolsDashPost(postDashboard);
+    // Journal uses local Redis (faster, on-Pi) with Upstash fallback
+    setJournalRedis(localRedis || redis);
 
     // Initialize memory system
     memory = new MemorySystem(WORKSPACE_PATH);
     await memory.init();
     console.log('[MEMORY] Initialized');
+
+    // Initialize journal system
+    await initJournal();
+    console.log('[JOURNAL] Initialized');
 
     // One-time fix: ensure sensitive files have 0600 permissions
     try {
@@ -4879,6 +4951,7 @@ async function init() {
         skills,
         executeTool: execToolWithDeps,
         TOOLS,
+        getDailyContext: getDiaryContext,
     });
 
     // Setup Telegram
@@ -4906,6 +4979,7 @@ async function init() {
     // Notify dashboard that ALEX is online
     postDashboard('set_status', { status: 'online' });
     postDashboard('add_activity', { entry: 'ALEX started and online' });
+    writeDiaryEntry('ALEX booted, all systems online').catch(() => {});
     postDashboard('update_services', { services: [
         { name: 'ALEX Gateway', port: 'systemd', status: 'online' },
         { name: 'Upstash Redis', port: 'cloud', status: 'online' },
@@ -4987,6 +5061,11 @@ async function gracefulShutdown(signal) {
         if (bot) {
             bot.stopPolling();
             console.log('[SHUTDOWN] Telegram polling stopped');
+        }
+        // Disconnect local Redis
+        if (localRedis) {
+            await localRedis.quit().catch(() => {});
+            console.log('[SHUTDOWN] Local Redis disconnected');
         }
         // Wait briefly for dashboard push
         await new Promise(r => setTimeout(r, 1000));
