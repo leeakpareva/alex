@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  alex:
+    image: ${ALEX_IMAGE:-alex:latest}
+    container_name: alex
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    environment:
+      - ALEX_SECRET_KEY=${ALEX_SECRET_KEY}
+      - ALEX_BIND_HOST=0.0.0.0
+      - ALEX_PORT=9090
+      - NODE_ENV=production
+      - CHROMA_API_KEY=${CHROMA_API_KEY:-}
+      - CHROMA_TENANT=${CHROMA_TENANT:-}
+      - CHROMA_DATABASE=${CHROMA_DATABASE:-}
+    volumes:
+      - alex-data:/home/alex/.alex
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9090/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: alex-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  alex-data:
+    driver: local
+  redis-data:
+    driver: local

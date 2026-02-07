@@ -1,0 +1,47 @@
+# ALEX Container Cron — Heartbeat Tasks
+# Adapted from /etc/cron.d/alex for containerised deployment
+# No user column (runs as root in container, curls to localhost)
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# 8am  — Morning briefing
+0 8 * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"morning-briefing"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 11am — Mid-morning check-in
+0 11 * * *   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"midmorning-checkin"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 1pm  — Midday research
+0 13 * * *   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"midday-research"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 4pm  — Afternoon check-in
+0 16 * * *   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"afternoon-checkin"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 6pm  — Evening summary
+0 18 * * *   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"evening-summary"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# Hourly — dashboard metrics sync
+0 * * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"dashboard-sync"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# Sunday 10pm — Weekly self-review
+0 22 * * 0   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"weekly-self-review"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 10am, 3pm — Inbox review
+0 10,15 * * * curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"inbox-review"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 2am — Daily journal churn
+0 2 * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"daily-churn"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 3am — Conversation memory cleanup
+0 3 * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"cleanup"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 7am — API data refresh
+0 7 * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"api-data-refresh"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 9am — Check follow-ups and deadlines
+0 9 * * *    curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"check-followups"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 9am, 12pm, 4pm weekdays — Stock alerts (market hours)
+0 9,12,16 * * 1-5 curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"stock-alerts"}' >> /home/alex/.alex/logs/cron.log 2>&1
+
+# 9pm — Ralph self-improvement review
+0 21 * * *   curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://localhost:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"ralph-review"}' >> /home/alex/.alex/logs/cron.log 2>&1

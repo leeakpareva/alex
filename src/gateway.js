@@ -146,6 +146,7 @@ const dashState = {
     heartbeats: [],
     services: [],
     apify: { total_calls: 0, total_results: 0, last_call: null },
+    ralph: { last_run: null, status: 'pending', issues: [], fixes: [], health: '', review_date: null },
     last_updated: new Date().toISOString(),
 };
 
@@ -4284,7 +4285,7 @@ Rules for Python Mode:
 // ============================================================================
 
 function setupControlAPI() {
-    const CONTROL_PORT = 9090;
+    const CONTROL_PORT = parseInt(process.env.ALEX_PORT || '9090', 10);
     const controlChatId = 'control-api';
     const terminalChatId = 'terminal-chat';
 
@@ -4652,6 +4653,38 @@ Call the send_email tool now with exactly these parameters.`;
                             callAnthropicQueued: chatSystem.callAnthropicQueued,
                             config,
                         }).then(result => {
+                            // Parse Ralph's markdown output for dashboard
+                            const issues = [];
+                            const fixes = [];
+                            let health = '';
+                            if (result) {
+                                const issueMatch = result.match(/### Issues Found\n([\s\S]*?)(?=###|$)/);
+                                if (issueMatch) {
+                                    for (const line of issueMatch[1].split('\n')) {
+                                        const trimmed = line.replace(/^[-*]\s*/, '').trim();
+                                        if (trimmed) issues.push(trimmed);
+                                    }
+                                }
+                                const fixMatch = result.match(/### Proposed Fixes\n([\s\S]*?)(?=###|$)/);
+                                if (fixMatch) {
+                                    for (const line of fixMatch[1].split('\n')) {
+                                        const trimmed = line.replace(/^\d+\.\s*/, '').trim();
+                                        if (trimmed) fixes.push(trimmed);
+                                    }
+                                }
+                                const healthMatch = result.match(/### Overall Health\n([\s\S]*?)$/);
+                                if (healthMatch) health = healthMatch[1].trim();
+                            }
+                            dashState.ralph = {
+                                last_run: new Date().toISOString(),
+                                status: 'completed',
+                                issues,
+                                fixes,
+                                health,
+                                review_date: new Date().toISOString().split('T')[0],
+                            };
+                            scheduleDashPush();
+
                             // Notify owner if configured
                             if (config.telegram_notify_tasks && config.telegram_owner_id && bot && result) {
                                 const msg = `<b>Ralph Self-Improvement Review</b>\n\n${result.substring(0, 3500)}`;
@@ -4659,7 +4692,13 @@ Call the send_email tool now with exactly these parameters.`;
                                     bot.sendMessage(config.telegram_owner_id, `Ralph Self-Improvement Review\n\n${result.substring(0, 3500)}`).catch(() => {});
                                 });
                             }
-                        }).catch(err => console.error('[RALPH] Failed:', err.message));
+                        }).catch(err => {
+                            dashState.ralph.status = 'failed';
+                            dashState.ralph.last_run = new Date().toISOString();
+                            dashState.ralph.health = `Failed: ${err.message}`;
+                            scheduleDashPush();
+                            console.error('[RALPH] Failed:', err.message);
+                        });
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ success: true, task: taskName }));
                         return;
@@ -4744,8 +4783,9 @@ Call the send_email tool now with exactly these parameters.`;
         }
     });
 
-    server.listen(CONTROL_PORT, '127.0.0.1', () => {
-        console.log(`[CONTROL] API listening on http://127.0.0.1:${CONTROL_PORT}`);
+    const BIND_HOST = process.env.ALEX_BIND_HOST || '127.0.0.1';
+    server.listen(CONTROL_PORT, BIND_HOST, () => {
+        console.log(`[CONTROL] API listening on http://${BIND_HOST}:${CONTROL_PORT}`);
     });
 
     // ── Web chat poller — checks Upstash Redis for incoming web chat messages ──
