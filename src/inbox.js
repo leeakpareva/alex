@@ -377,7 +377,9 @@ async function generateVoiceFile(text) {
 
 async function sendReplyEmail(toAddress, originalSubject, htmlBody, attachments = []) {
     const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: config.email_smtp_host || 'smtppro.zoho.eu',
+        port: config.email_smtp_port || 465,
+        secure: true,
         auth: { user: config.gmail_address, pass: config.gmail_app_password },
     });
 
@@ -532,8 +534,8 @@ async function pollInbox() {
         const seen = await loadSeenUIDs();
 
         client = new ImapFlow({
-            host: 'imap.gmail.com',
-            port: 993,
+            host: config.email_imap_host || 'imappro.zoho.eu',
+            port: config.email_imap_port || 993,
             secure: true,
             auth: { user: config.gmail_address, pass: config.gmail_app_password },
             logger: false,

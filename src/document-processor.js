@@ -10,9 +10,10 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const RAG_SCRIPT = path.join(__dirname, '..', 'scripts', 'rag_manager.py');
+const RAG_SCRIPT = path.join(__dirname, '..', 'Alex-Scripts', 'rag_manager.py');
 
 // Supported file extensions
 const SUPPORTED = new Set(['.pdf', '.docx', '.xlsx', '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.txt', '.md']);
@@ -102,7 +103,7 @@ async function extractText(filePath, ext) {
  */
 async function extractPdfText(filePath) {
     try {
-        const { stdout } = await execAsync(`pdftotext -layout "${filePath}" -`, {
+        const { stdout } = await execFileAsync('pdftotext', ['-layout', filePath, '-'], {
             timeout: 30000,
             maxBuffer: 10 * 1024 * 1024,
         });
@@ -116,16 +117,17 @@ async function extractPdfText(filePath) {
     // Fallback: OCR via pdf2image + pytesseract
     console.log(`[UPLOAD] PDF text too short, attempting OCR...`);
     try {
-        const { stdout } = await execAsync(`python3 -c "
+        const ocrScript = `
 import sys
 from pdf2image import convert_from_path
 import pytesseract
-pages = convert_from_path('${filePath.replace(/'/g, "\\'")}', dpi=200)
+pages = convert_from_path(sys.argv[1], dpi=200)
 text = []
 for p in pages[:20]:
     text.append(pytesseract.image_to_string(p))
 print('\\n'.join(text))
-"`, { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
+`;
+        const { stdout } = await execFileAsync('python3', ['-c', ocrScript, filePath], { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
         return stdout;
     } catch (err) {
         console.error(`[UPLOAD] PDF OCR failed:`, err.message);
@@ -138,11 +140,13 @@ print('\\n'.join(text))
  */
 async function extractDocxText(filePath) {
     try {
-        const { stdout } = await execAsync(`python3 -c "
+        const docxScript = `
+import sys
 from docx import Document
-doc = Document('${filePath.replace(/'/g, "\\'")}')
+doc = Document(sys.argv[1])
 print('\\n'.join(p.text for p in doc.paragraphs))
-"`, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+`;
+        const { stdout } = await execFileAsync('python3', ['-c', docxScript, filePath], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
         return stdout;
     } catch (err) {
         console.error(`[UPLOAD] DOCX extraction failed:`, err.message);
@@ -155,9 +159,10 @@ print('\\n'.join(p.text for p in doc.paragraphs))
  */
 async function extractXlsxText(filePath) {
     try {
-        const { stdout } = await execAsync(`python3 -c "
+        const xlsxScript = `
+import sys
 from openpyxl import load_workbook
-wb = load_workbook('${filePath.replace(/'/g, "\\'")}', read_only=True, data_only=True)
+wb = load_workbook(sys.argv[1], read_only=True, data_only=True)
 lines = []
 for ws in wb.worksheets:
     lines.append(f'--- Sheet: {ws.title} ---')
@@ -167,7 +172,8 @@ for ws in wb.worksheets:
             lines.append('\\t'.join(vals))
 wb.close()
 print('\\n'.join(lines))
-"`, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+`;
+        const { stdout } = await execFileAsync('python3', ['-c', xlsxScript, filePath], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
         return stdout;
     } catch (err) {
         console.error(`[UPLOAD] XLSX extraction failed:`, err.message);
@@ -180,12 +186,14 @@ print('\\n'.join(lines))
  */
 async function extractImageText(filePath) {
     try {
-        const { stdout } = await execAsync(`python3 -c "
+        const imgScript = `
+import sys
 import pytesseract
 from PIL import Image
-img = Image.open('${filePath.replace(/'/g, "\\'")}')
+img = Image.open(sys.argv[1])
 print(pytesseract.image_to_string(img))
-"`, { timeout: 60000, maxBuffer: 5 * 1024 * 1024 });
+`;
+        const { stdout } = await execFileAsync('python3', ['-c', imgScript, filePath], { timeout: 60000, maxBuffer: 5 * 1024 * 1024 });
         return stdout;
     } catch (err) {
         console.error(`[UPLOAD] Image OCR failed:`, err.message);

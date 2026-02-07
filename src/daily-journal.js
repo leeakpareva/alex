@@ -260,7 +260,7 @@ export async function runChurn(callAnthropicQueued) {
     const { execFile: execFileCb } = await import('child_process');
     const { promisify } = await import('util');
     const execFile = promisify(execFileCb);
-    const scriptPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'scripts', 'rag_manager.py');
+    const scriptPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'Alex-Scripts', 'rag_manager.py');
 
     // 1. Index all daily/{month}/*.md files to ChromaDB
     let indexedFiles = 0;

@@ -88,6 +88,12 @@ const server = http.createServer(async (req, rawRes) => {
       }
     }
 
+    // /qr → api/qr.js redirect
+    if (pathname === '/qr') {
+      const handler = loadHandler('./api/qr.js');
+      return await handler(req, createRes(rawRes));
+    }
+
     // Page rewrites
     const rewrites = {
       '/': '/public/home.html',

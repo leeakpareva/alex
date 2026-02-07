@@ -12,6 +12,7 @@ import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { loadEncryptedConfig } from '../src/secrets.js';
 
 const CONFIG_PATH = process.env.ALEX_CONFIG || path.join(os.homedir(), '.alex/config.json');
 
@@ -31,9 +32,10 @@ async function main() {
         process.exit(1);
     }
 
-    const config = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf-8'));
+    const passphrase = process.env.ALEX_SECRET_KEY;
+    const { config } = await loadEncryptedConfig(CONFIG_PATH, passphrase);
     if (!config.gmail_address || !config.gmail_app_password) {
-        console.error('Gmail credentials not configured in', CONFIG_PATH);
+        console.error('Email credentials not configured');
         process.exit(1);
     }
 
@@ -48,7 +50,9 @@ async function main() {
     }
 
     const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: config.email_smtp_host || 'smtppro.zoho.eu',
+        port: config.email_smtp_port || 465,
+        secure: true,
         auth: { user: config.gmail_address, pass: config.gmail_app_password },
     });
 

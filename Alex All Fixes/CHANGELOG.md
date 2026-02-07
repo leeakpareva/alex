@@ -4,6 +4,10 @@ All improvements, bug fixes, and features since ALEX was born.
 
 ---
 
+## 2026-02-06 — `f3e1d76` Add Manager toolkit, Ralph self-improvement, backup system, and audit reports
+**Type:** Feature | **Areas:** Gateway, Heartbeat, Manager, Scripts, Tests
+- Add Manager toolkit, Ralph self-improvement, backup system, and audit reports (19 file(s) changed)
+
 ## 2026-02-02 — generate_webapp Tool + /fixes Command
 **Type:** Feature
 - Added `generate_webapp` tool — generates self-contained HTML web apps (dashboards, calculators, interactive reports) and sends as Telegram file attachments

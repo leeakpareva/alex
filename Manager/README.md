@@ -16,6 +16,7 @@ cd ~/ALEX_NAVADA/Manager
 | `python3 view-conversations.py list-chats` | List all chat IDs |
 | `python3 daily-summary.py generate` | Today's daily summary |
 | `bash backup.sh` | Backup Pi + send to iPhone |
+| `bash "Alex System Scan/system-scan.sh"` | Full system health & security scan |
 | `cat sessions/SESSION-LOG.md` | View all dev session plans |
 
 ---
@@ -264,6 +265,91 @@ python3 view-conversations.py view 6920669447 --search "stock" | less
 
 ---
 
+## 7. Admin Dashboards
+
+Web dashboards for managing ALEX's cloud services. Password: `Navadaonline2026!`
+
+| Service | URL | What it manages |
+|---------|-----|-----------------|
+| **Upstash Redis** | https://console.upstash.com | Dashboard data, token costs, commits, contacts, API keys |
+| **ChromaDB Cloud** | https://cloud.trychroma.com | RAG knowledge base (document embeddings for ALEX) |
+| **Vercel** | https://vercel.com/dashboard | alexnavada.xyz deployments, serverless functions, domains |
+
+### View Redis data from terminal
+
+```bash
+# Local Redis (on Pi)
+redis-cli KEYS '*'
+redis-cli GET dash:data | python3 -m json.tool
+
+# Upstash Redis (cloud)
+curl -s "https://relevant-lobster-61446.upstash.io/keys/*" \
+  -H "Authorization: Bearer AfAGAAIncDE5ZWIyNmZmYzlhNzI0Y2E2YWI4ODk4ZGE0Mzg0OTFlYnAxNjE0NDY" | python3 -m json.tool
+```
+
+### Key Redis keys
+
+| Key | Contents |
+|-----|----------|
+| `dash:data` | Dashboard activity, tasks, news, services |
+| `dash:tokens` | Today's token usage and costs |
+| `dash:commits` | Git commit history |
+| `dash:inbox` | Email inbox data |
+| `contacts:index` | Registered contacts |
+| `apikeys:index` | API keys list |
+
+---
+
+## 8. System Scan — `Alex System Scan/system-scan.sh`
+
+Full project health, security, and state audit. Checks git status, services, disk, secrets, permissions, dependencies, backups, and more. Each run saves a timestamped report.
+
+### Run Full Scan
+
+```bash
+bash "Alex System Scan/system-scan.sh"
+```
+
+### Quick Scan (skip security checks)
+
+```bash
+bash "Alex System Scan/system-scan.sh" --quick
+```
+
+### View Previous Scan Reports
+
+```bash
+ls "Alex System Scan"/scan-*.txt
+cat "Alex System Scan"/scan-2026-02-06-1830.txt
+```
+
+### What It Checks
+
+| Section | Checks |
+|---------|--------|
+| **Project Overview** | Size, file counts, lines of code, dependencies, Node/Python versions |
+| **Git Status** | Branch, commits ahead/behind, unstaged changes, untracked files, tokens in remote URL |
+| **Services** | systemd services (alex, navada-1, navada, navada-iphone), stale/rogue services |
+| **Disk & System** | Disk usage, memory, CPU temp, uptime, load average |
+| **Security Audit** | .env permissions, hardcoded secrets, command injection, CORS, auth bypass, gitignore, git history, dependencies, logging |
+| **Dashboard** | Vercel API endpoint count, config |
+| **Workspace** | ~/.alex/ conversations, memory, tasks, skills, config |
+| **Backups** | Latest backup age, count, size |
+
+### Report Storage
+
+Reports auto-save to `Alex System Scan/` with timestamp. Keeps last 20, rotates old ones.
+
+```
+Alex System Scan/
+├── system-scan.sh               ← the scanner
+├── scan-2026-02-06-1830.txt     ← saved reports
+├── scan-2026-02-07-0900.txt
+└── ...
+```
+
+---
+
 ## Folder Structure
 
 ```
@@ -272,6 +358,9 @@ Manager/
 ├── view-conversations.py      ← audit + HTML reports
 ├── daily-summary.py           ← daily markdown summaries
 ├── backup.sh                  ← Pi + iPhone backups
+├── Alex System Scan/          ← system health & security scanner
+│   ├── system-scan.sh         ← run this
+│   └── scan-*.txt             ← saved reports (auto-rotated)
 ├── reports/                   ← generated HTML reports (by date)
 │   └── 2026-02-06/
 │       ├── conversations-1555.html

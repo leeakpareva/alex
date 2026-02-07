@@ -36,7 +36,7 @@ export async function indexRAG() {
     ragIndexing = true;
     try {
         const __toolsDir = path.dirname(new URL(import.meta.url).pathname);
-        const scriptPath = path.join(__toolsDir, '..', 'scripts', 'rag_manager.py');
+        const scriptPath = path.join(__toolsDir, '..', 'Alex-Scripts', 'rag_manager.py');
         const { stdout } = await new Promise((resolve, reject) => {
             execFile('python3', [scriptPath, 'index'], { timeout: 30000 }, (err, stdout, stderr) => {
                 if (err) reject(err);
@@ -63,7 +63,7 @@ export async function queryRAG(text) {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             const __toolsDir = path.dirname(new URL(import.meta.url).pathname);
-            const scriptPath = path.join(__toolsDir, '..', 'scripts', 'rag_manager.py');
+            const scriptPath = path.join(__toolsDir, '..', 'Alex-Scripts', 'rag_manager.py');
             const { stdout } = await new Promise((resolve, reject) => {
                 execFile('python3', [scriptPath, 'query', text], { timeout: 10000 }, (err, stdout, stderr) => {
                     if (err) reject(err);
@@ -678,19 +678,7 @@ export const TOOLS = [
             required: ["action"]
         }
     },
-    {
-        name: "linkedin_post",
-        description: "Post to LinkedIn. Creates a text post on the user's LinkedIn profile. Only use when the user explicitly asks to post to LinkedIn. Max 3000 characters.",
-        input_schema: {
-            type: "object",
-            properties: {
-                text: { type: "string", description: "The post text content (max 3000 characters)" },
-                link_url: { type: "string", description: "Optional URL to attach as a link preview" },
-                image_path: { type: "string", description: "Optional absolute path to an image file to attach to the post" }
-            },
-            required: ["text"]
-        }
-    },
+    // linkedin_post removed — OAuth disabled, using Apify scrapers instead
     {
         name: "calendar_list_events",
         description: "List upcoming Google Calendar events. Returns event summaries, times, locations, and attendees.",
@@ -931,7 +919,7 @@ const OWNER_ONLY_TOOLS = new Set([
     'send_email', 'schedule_task', 'delete_task', 'confirm_delete', 'fetch_url',
     'generate_pdf', 'generate_image', 'create_skill',
     'send_file', 'send_voice_message', 'send_slack_message', 'update_dashboard', 'memory_save',
-    'manage_user', 'generate_webapp', 'linkedin_post',
+    'manage_user', 'generate_webapp',
     'calendar_list_events', 'calendar_create_event', 'calendar_update_event', 'calendar_delete_event',
     'tiktok_scrape',
     'tiktok_download',
@@ -1124,7 +1112,9 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 }
                 const ccEmail = config.auto_cc_email || 'lee@navada.info';
                 const transporter = nodemailer.createTransport({
-                    service: 'gmail',
+                    host: config.email_smtp_host || 'smtppro.zoho.eu',
+                    port: config.email_smtp_port || 465,
+                    secure: true,
                     auth: {
                         user: config.gmail_address,
                         pass: config.gmail_app_password
@@ -1542,13 +1532,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 return { success: true, message: `Event ${input.event_id} deleted.` };
             }
 
-            case 'linkedin_post': {
-                const { createPost } = await import('./linkedin.js');
-                if (input.text && input.text.length > 3000) {
-                    return { success: false, error: 'Post text exceeds 3000 character limit.' };
-                }
-                return await createPost({ text: input.text, linkUrl: input.link_url, imagePath: input.image_path }, config);
-            }
+            // linkedin_post case removed — OAuth disabled
 
             case 'fetch_url': {
                 const fetchModule = await import('node:https');

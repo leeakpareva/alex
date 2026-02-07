@@ -486,7 +486,7 @@ export async function runCleanup(memory) {
     // Clean expired RAG entries (TTL-based document chunks)
     try {
         const { execFile: execFileCb } = await import('child_process');
-        const scriptPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'scripts', 'rag_manager.py');
+        const scriptPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'Alex-Scripts', 'rag_manager.py');
         execFileCb('python3', [scriptPath, 'cleanup'], { timeout: 30000 }, (err, stdout) => {
             if (stdout?.trim()) console.log(`[CLEANUP] RAG: ${stdout.trim()}`);
             if (err) console.error('[CLEANUP] RAG cleanup failed:', err.message);

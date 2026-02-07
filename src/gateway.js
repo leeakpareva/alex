@@ -11,10 +11,11 @@ import { Redis } from '@upstash/redis';
 import os from 'os';
 import path from 'path';
 import http from 'http';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // Download a file from a URL into a Buffer
 function downloadFile(url) {
@@ -36,7 +37,7 @@ function downloadFile(url) {
 async function extractPdfForRag(pdfPath) {
     try {
         // Extract text using pdftotext
-        const { stdout } = await execAsync(`pdftotext -layout "${pdfPath}" -`, {
+        const { stdout } = await execFileAsync('pdftotext', ['-layout', pdfPath, '-'], {
             timeout: 30000,
             maxBuffer: 10 * 1024 * 1024
         });
@@ -61,7 +62,7 @@ async function extractPdfForRag(pdfPath) {
 }
 
 import { WORKSPACE_PATH, loadConfig } from './config.js';
-import { appendFile, mkdir, readFile, writeFile, unlink, symlink as fsSymlink } from 'fs/promises';
+import { access, appendFile, mkdir, readFile, writeFile, unlink, symlink as fsSymlink } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
@@ -1307,6 +1308,18 @@ Just message me naturally for anything else.`;
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
+    bot.onText(/\/qr/, async (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
+        const qrPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'dashboard-vercel', 'public', 'qr', 'alex-qr.png');
+        try {
+            await access(qrPath);
+            await bot.sendPhoto(chatId, qrPath, { caption: 'Scan to visit alexnavada.xyz' });
+        } catch {
+            await bot.sendMessage(chatId, 'QR code image not found. Run `npm run generate:qr` to generate it.');
+        }
+    });
+
     bot.onText(/\/mathematician/, async (msg) => {
         const chatId = msg.chat.id;
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
@@ -1588,7 +1601,7 @@ Just message me naturally for anything else.`;
 • tasks/ — Scheduled task JSON definitions
 • skills/ — Skill definitions (SKILL.md per skill)
 • templates/ — Email templates
-• scripts/ — Utility scripts
+• Alex-Scripts/ — All utility scripts
 • inbox/ — Email filing data
 
 <b>Flow:</b>
@@ -2109,59 +2122,8 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
     });
 
     // ========================================================================
-    // LINKEDIN OAUTH COMMAND
+    // LINKEDIN OAUTH COMMAND (disabled — using Apify scrapers instead)
     // ========================================================================
-
-    bot.onText(/\/linkedin(?:\s+(.+))?/, async (msg, match) => {
-        const chatId = msg.chat.id;
-        if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
-        if (String(msg.from.id) !== String(config.telegram_owner_id)) {
-            await bot.sendMessage(chatId, "LinkedIn connection is owner-only.");
-            return;
-        }
-
-        const { getAuthUrl, exchangeCodeForToken, getProfile } = await import('./linkedin.js');
-
-        if (!config.linkedin_client_id || !config.linkedin_client_secret) {
-            await bot.sendMessage(chatId, 'LinkedIn not configured. Add linkedin_client_id and linkedin_client_secret to config.json.');
-            return;
-        }
-
-        const arg = match?.[1]?.trim();
-        if (!arg) {
-            // Step 1: send OAuth URL
-            const url = getAuthUrl(config.linkedin_client_id);
-            await bot.sendMessage(chatId,
-                `<b>LinkedIn — Connect</b>\n\n1. Open this link in your browser:\n<code>${url}</code>\n\n2. Authorize the app\n3. You'll be redirected to a localhost URL that won't load — that's fine\n4. Copy the full URL from your browser and send it here:\n<code>/linkedin https://localhost:9090/api/linkedin/callback?code=...</code>`,
-                { parse_mode: 'HTML' });
-            return;
-        }
-
-        // Step 2: extract code from pasted URL or raw code
-        let code = arg;
-        try {
-            const parsed = new URL(arg);
-            code = parsed.searchParams.get('code') || arg;
-        } catch {
-            // arg is the raw code itself
-        }
-
-        try {
-            await exchangeCodeForToken(code, config);
-            const profile = await getProfile(config.linkedin_access_token);
-            config.linkedin_person_urn = profile.personUrn;
-            // Save URN back
-            const rawConfig = JSON.parse(await readFile(config._configPath, 'utf-8'));
-            rawConfig.linkedin_person_urn = profile.personUrn;
-            await writeFile(config._configPath, JSON.stringify(rawConfig, null, 2));
-
-            await bot.sendMessage(chatId,
-                `<b>LinkedIn connected!</b>\n\nLogged in as: ${profile.name}\nURN: <code>${profile.personUrn}</code>\n\nYou can now ask me to post on LinkedIn.`,
-                { parse_mode: 'HTML' });
-        } catch (err) {
-            await bot.sendMessage(chatId, `LinkedIn auth failed: ${err.message}`);
-        }
-    });
 
     // ========================================================================
     // GOOGLE CALENDAR OAUTH COMMAND
@@ -4282,8 +4244,8 @@ Rules for Python Mode:
         { command: 'kill', description: 'Stop all current activities instantly' },
         { command: 'leads', description: 'Google Maps lead scraper' },
         { command: 'learn', description: 'Educational mode (What/How/Why)' },
-        { command: 'linkedin', description: 'Connect or post to LinkedIn' },
         { command: 'linkedinposts', description: 'Search LinkedIn posts' },
+        { command: 'linkedinprofiles', description: 'Scrape LinkedIn profiles' },
         { command: 'logs', description: 'Recent audit log entries' },
         { command: 'mathematician', description: 'Quantitative and computational' },
         { command: 'memory', description: 'Browse memory banks' },
@@ -4294,6 +4256,7 @@ Rules for Python Mode:
         { command: 'profile', description: 'ALEX personal details' },
         { command: 'projection', description: 'Monthly cost projection' },
         { command: 'python', description: 'Python data analysis mode' },
+        { command: 'qr', description: 'ALEX QR code — scan to visit alexnavada.xyz' },
         { command: 'research', description: 'Deep research on demand' },
         { command: 'read', description: 'Show last 5 diary entries' },
         { command: 'save', description: 'Save current chat to daily journal' },

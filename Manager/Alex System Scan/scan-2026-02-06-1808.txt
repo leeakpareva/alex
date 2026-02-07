@@ -1,0 +1,157 @@
+ALEX System Scan
+Date: Friday 06 February 2026, 18:08:48
+Host: Headless | aarch64 | Debian GNU/Linux 13 (trixie)
+Report: /home/head/ALEX_NAVADA/Manager/Alex System Scan/scan-2026-02-06-1808.txt
+
+[1. PROJECT OVERVIEW]
+──────────────────────────────────────────────────────────────────────
+  INFO  ALEX_NAVADA is a symlink → /home/head/navada-1
+  INFO  Total size: 508M (core: 8.2M, node_modules: 458M)
+  INFO  Source: 21 JS files, 13421 lines | Tests: 11 suites
+  INFO  Package: alex@1.0.0 | Node required: >=22.0.0
+  INFO  Node: v22.22.0 | Python: 3.13.5
+
+[2. GIT STATUS]
+──────────────────────────────────────────────────────────────────────
+  INFO  Branch: main | Commits: 63
+  INFO  Last commit: f3e1d76 Add Manager toolkit, Ralph self-improvement, backup system, and audit reports
+  INFO  Commit date: 2026-02-06 16:22:14 +0000
+  OK  Up to date with origin/main
+  WARN  2 modified file(s) not staged
+  INFO    - Manager/README.md
+  INFO    - Manager/sessions/SESSION-LOG.md
+  WARN  2 untracked file(s)
+  INFO    - Manager/Alex System Scan/scan-2026-02-06-1808.txt
+  INFO    - Manager/Alex System Scan/system-scan.sh
+  CRIT  GitHub token embedded in git remote URL
+  INFO  Remote: https://leeakpareva:***TOKEN***@github.com/leeakpareva/alex.git
+
+[3. SERVICES & PROCESSES]
+──────────────────────────────────────────────────────────────────────
+  OK  systemd: alex.service — active (enabled: enabled)
+  OK  systemd: navada-1.service — active (enabled: enabled)
+  OK  systemd: navada.service — active (enabled: enabled)
+  OK  systemd: navada-iphone.service — active (enabled: enabled)
+  INFO  Cron files referencing ALEX: 3
+  INFO    cron: 0 4 * * *    head  /home/head/navada-1/scripts/alex-backup.sh >> /home/head/.alex/logs/backup.log 2>&1
+  INFO    cron: 0 3 * * 0  head  /home/head/ALEX_NAVADA/Manager/backup.sh >> /home/head/backups/backup.log 2>&1
+  INFO    cron: 0 4 * * *  head  /home/head/ALEX_NAVADA/Manager/backup.sh --local >> /home/head/backups/backup.log 2>&1
+
+[4. DISK & SYSTEM HEALTH]
+──────────────────────────────────────────────────────────────────────
+  OK  Disk: 27% used (82G free of 117G)
+  INFO  Memory: 1.8Gi used / 7.9Gi total (6.1Gi available)
+  INFO  Uptime: up 24 minutes | Load: 0.60, 0.66, 0.55
+  OK  CPU temp: 44.1°C
+
+[5. SECURITY AUDIT]
+──────────────────────────────────────────────────────────────────────
+  5a. Environment & Secret Files
+  CRIT  .env file world/group-readable: /home/head/navada-1/dashboard-vercel/.env.local (perms: 664)
+  CRIT  Real API keys found in /home/head/navada-1/dashboard-vercel/.env.local
+
+  5b. Hardcoded Secrets in Source
+  CRIT  Potential hardcoded secrets found in source:
+  INFO    /home/head/navada-1/src/gateway.js:704:            const gitSecrets = await execAsync(`cd /home/head/navada-1 && git ls-files | xargs grep -l "sk-ant-api03-[A-Za-z0-9]\{20\}" 2>/dev/null | grep -v test || echo "clean"`).then(r => r.stdout.trim()).catch(() => 'error');
+
+  5c. Command Injection Risks
+  WARN  31 shell exec call(s) using template strings (potential injection)
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/document-processor.js:291
+  INFO    src/document-processor.js:291
+  INFO    src/document-processor.js:291
+  INFO    src/document-processor.js:291
+  INFO    src/document-processor.js:291
+  INFO    src/daily-journal.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+
+  5d. CORS & Network Security
+  WARN  CORS wildcard (*) found:
+  INFO    dashboard-vercel/vercel.json
+
+  5e. Authentication & Auth Bypass
+  WARN  Localhost auth bypass detected in control API
+  WARN  Plaintext password comparison (timing attack risk):
+  INFO    dashboard-vercel/api/admin/login.js:344
+  WARN  Hardcoded fallback secret(s) found:
+  INFO    dashboard-vercel/api/keys/list.js:357
+  INFO    dashboard-vercel/api/keys/revoke.js:357
+  INFO    dashboard-vercel/api/admin/contacts.js:357
+  INFO    dashboard-vercel/api/admin/login.js:357
+  INFO    dashboard-vercel/api/admin/redis.js:357
+  INFO    dashboard-vercel/api/admin/stats.js:357
+
+  5f. Gitignore & Committed Secrets
+  OK  .gitignore covers: .env
+  OK  .gitignore covers: .env.local
+  OK  .gitignore covers: .env.production
+  OK  .gitignore covers: config.json
+  OK  .gitignore covers: *.pem
+  OK  .gitignore covers: *.key
+  OK  No .env files found in git history
+
+  5g. Dependencies
+  OK  package-lock.json exists (reproducible builds)
+  OK  Dependencies appear up to date (5
+0 outdated)
+
+  5h. Sensitive Data in Logs
+  WARN  16 log statement(s) may reference sensitive data
+  INFO    src/tools.js:429
+  INFO    src/google-calendar.js:429
+  INFO    src/google-calendar.js:429
+  INFO    src/google-calendar.js:429
+  INFO    src/linkedin.js:429
+
+[6. DASHBOARD (VERCEL)]
+──────────────────────────────────────────────────────────────────────
+  INFO  Serverless API endpoints: 28
+  INFO  Frontend: /home/head/navada-1/dashboard-vercel/public/index.html
+  OK  vercel.json present
+
+[7. ALEX WORKSPACE (~/.alex/)]
+──────────────────────────────────────────────────────────────────────
+  INFO  Workspace size: 131M
+  INFO  Conversations: 323 | Memory files: 7
+  INFO  Tasks: 8 | Skills: 11
+  CRIT  config.json missing — ALEX cannot start
+  OK  IDENTITY.md exists
+
+[8. BACKUPS]
+──────────────────────────────────────────────────────────────────────
+  INFO  Backups: 1 found in /home/head/backups
+  INFO  Latest: alex-backup-2026-02-06.tar.gz (70M)
+  OK  Latest backup is from today
+
+[SUMMARY]
+──────────────────────────────────────────────────────────────────────
+
+  CRITICAL: 5  |  WARNINGS: 8  |  PASSED: 19
+
+  Action required — critical issues found.
+
+Report saved: /home/head/ALEX_NAVADA/Manager/Alex System Scan/scan-2026-02-06-1808.txt
+Previous scans: ls "/home/head/ALEX_NAVADA/Manager/Alex System Scan/scan-"*

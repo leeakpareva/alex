@@ -18,6 +18,7 @@
     { "source": "/navada-admin", "destination": "/navada-admin.html" },
     { "source": "/redis-viewer", "destination": "/redis-viewer.html" },
     { "source": "/api-learn", "destination": "/api-learn.html" },
+    { "source": "/qr", "destination": "/api/qr.js" },
     { "source": "/api/v1/:endpoint", "destination": "/api/v1/[endpoint].js" }
   ],
   "headers": [

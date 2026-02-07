@@ -3,6 +3,7 @@
  */
 
 import fs from 'fs/promises';
+import { saveConfig } from './config.js';
 
 const REDIRECT_URI = 'http://localhost:9090/api/linkedin/callback';
 const SCOPES = 'openid profile w_member_social';
@@ -203,18 +204,12 @@ export async function createPost({ text, linkUrl, imagePath }, config) {
 }
 
 /**
- * Write linkedin tokens back to config.json
+ * Write linkedin tokens back to encrypted config
  */
 async function saveTokensToConfig(config) {
     try {
-        const configPath = config._configPath;
-        if (!configPath) return;
-        const raw = JSON.parse(await fs.readFile(configPath, 'utf-8'));
-        raw.linkedin_access_token = config.linkedin_access_token;
-        raw.linkedin_refresh_token = config.linkedin_refresh_token;
-        raw.linkedin_token_expires_at = config.linkedin_token_expires_at;
-        raw.linkedin_person_urn = config.linkedin_person_urn;
-        await fs.writeFile(configPath, JSON.stringify(raw, null, 2));
+        await saveConfig(config);
+        console.log('[LINKEDIN] Tokens saved to config');
     } catch (err) {
         console.error('[LINKEDIN] Failed to save tokens:', err.message);
     }

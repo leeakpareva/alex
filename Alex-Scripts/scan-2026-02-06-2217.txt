@@ -1,0 +1,183 @@
+ALEX System Scan
+Date: Friday 06 February 2026, 22:17:11
+Host: Headless | aarch64 | Debian GNU/Linux 13 (trixie)
+Report: /home/head/navada-1/Alex-Scripts/scan-2026-02-06-2217.txt
+
+[1. PROJECT OVERVIEW]
+──────────────────────────────────────────────────────────────────────
+  INFO  ALEX_NAVADA is a symlink → /home/head/navada-1
+  INFO  Total size: 508M (core: 8.3M, node_modules: 458M)
+  INFO  Source: 21 JS files, 13436 lines | Tests: 11 suites
+  INFO  Package: alex@1.0.0 | Node required: >=22.0.0
+  INFO  Node: v22.22.0 | Python: 3.13.5
+
+[2. GIT STATUS]
+──────────────────────────────────────────────────────────────────────
+  INFO  Branch: main | Commits: 63
+  INFO  Last commit: f3e1d76 Add Manager toolkit, Ralph self-improvement, backup system, and audit reports
+  INFO  Commit date: 2026-02-06 16:22:14 +0000
+  OK  Up to date with origin/main
+  WARN  26 modified file(s) not staged
+  INFO    - Fixes/CHANGELOG.md
+  INFO    - Manager/README.md
+  INFO    - Manager/backup.sh
+  INFO    - Manager/daily-summary.py
+  INFO    - Manager/sessions/SESSION-LOG.md
+  INFO    - Manager/sessions/update-session-log.sh
+  INFO    - Manager/view-conversations.py
+  INFO    - bin/alex
+  INFO    - bin/navada.js
+  INFO    - bin/setup.js
+  INFO    - dashboard/ons_dashboard.py
+  INFO    - dashboard/push_to_vercel.sh
+  INFO    - deploy/install.sh
+  INFO    - package.json
+  INFO    - scripts/alex-backup.sh
+  INFO    - scripts/rag_manager.py
+  INFO    - scripts/send-email.mjs
+  INFO    - scripts/taildrop-watcher.sh
+  INFO    - scripts/update-claude-log.sh
+  INFO    - src/daily-journal.js
+  INFO    - src/document-processor.js
+  INFO    - src/email-filing.js
+  INFO    - src/gateway.js
+  INFO    - src/heartbeat.js
+  INFO    - src/inbox.js
+  INFO    - src/tools.js
+  WARN  30 untracked file(s)
+  INFO    - Alex All Fixes/CHANGELOG.md
+  INFO    - Alex-CLI/alex
+  INFO    - Alex-CLI/navada.js
+  INFO    - Alex-CLI/setup.js
+  INFO    - Alex-Scripts/README.md
+  INFO    - Alex-Scripts/alex-backup.sh
+  INFO    - Alex-Scripts/daily-summary.py
+  INFO    - Alex-Scripts/manager-backup.sh
+  INFO    - Alex-Scripts/ons_dashboard.py
+  INFO    - Alex-Scripts/open-token-report.sh
+  OK  No tokens in git remote URL
+  INFO  Remote: https://github.com/leeakpareva/alex.git
+
+[3. SERVICES & PROCESSES]
+──────────────────────────────────────────────────────────────────────
+  OK  systemd: alex.service — active (enabled: enabled)
+  OK  systemd: navada-1.service — active (enabled: enabled)
+  OK  systemd: navada.service — active (enabled: enabled)
+  OK  systemd: navada-iphone.service — active (enabled: enabled)
+  INFO  Cron files referencing ALEX: 4
+  INFO    cron: 0 4 * * *    head  /home/head/navada-1/Alex-Scripts/alex-backup.sh >> /home/head/.alex/logs/backup.log 2>&1
+  INFO    cron: 0 3 * * 0  head  /home/head/ALEX_NAVADA/Alex-Scripts/manager-backup.sh >> /home/head/backups/backup.log 2>&1
+  INFO    cron: 0 4 * * *  head  /home/head/ALEX_NAVADA/Alex-Scripts/manager-backup.sh --local >> /home/head/backups/backup.log 2>&1
+  INFO    cron: */30 * * * *  head  /home/head/navada-1/Alex-Scripts/update-json-index.sh >> /home/head/.alex/logs/cron.log 2>&1
+
+[4. DISK & SYSTEM HEALTH]
+──────────────────────────────────────────────────────────────────────
+  OK  Disk: 27% used (82G free of 117G)
+  INFO  Memory: 3.2Gi used / 7.9Gi total (4.7Gi available)
+  INFO  Uptime: up 4 hours, 33 minutes | Load: 0.57, 0.66, 0.59
+  OK  CPU temp: 45.8°C
+
+[5. SECURITY AUDIT]
+──────────────────────────────────────────────────────────────────────
+  5a. Environment & Secret Files
+  OK  .env file properly restricted: /home/head/navada-1/dashboard-vercel/.env.local (perms: 600)
+  CRIT  Real API keys found in /home/head/navada-1/dashboard-vercel/.env.local
+
+  5b. Hardcoded Secrets in Source
+  CRIT  Potential hardcoded secrets found in source:
+  INFO    /home/head/navada-1/src/gateway.js:705:            const gitSecrets = await execAsync(`cd /home/head/navada-1 && git ls-files | xargs grep -l "sk-ant-api03-[A-Za-z0-9]\{20\}" 2>/dev/null | grep -v test || echo "clean"`).then(r => r.stdout.trim()).catch(() => 'error');
+
+  5c. Command Injection Risks
+  WARN  25 shell exec call(s) using template strings (potential injection)
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/tools.js:291
+  INFO    src/daily-journal.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+  INFO    src/gateway.js:291
+
+  5d. CORS & Network Security
+  WARN  CORS wildcard (*) found:
+  INFO    dashboard-vercel/vercel.json
+
+  5e. Authentication & Auth Bypass
+  WARN  Localhost auth bypass detected in control API
+  WARN  Plaintext password comparison (timing attack risk):
+  INFO    dashboard-vercel/api/admin/login.js:344
+  WARN  Hardcoded fallback secret(s) found:
+  INFO    dashboard-vercel/api/keys/list.js:357
+  INFO    dashboard-vercel/api/keys/revoke.js:357
+  INFO    dashboard-vercel/api/admin/contacts.js:357
+  INFO    dashboard-vercel/api/admin/login.js:357
+  INFO    dashboard-vercel/api/admin/redis.js:357
+  INFO    dashboard-vercel/api/admin/stats.js:357
+
+  5f. Gitignore & Committed Secrets
+  OK  .gitignore covers: .env
+  OK  .gitignore covers: .env.local
+  OK  .gitignore covers: .env.production
+  OK  .gitignore covers: config.json
+  OK  .gitignore covers: *.pem
+  OK  .gitignore covers: *.key
+  OK  No .env files found in git history
+
+  5g. Dependencies
+  OK  package-lock.json exists (reproducible builds)
+  WARN  60 outdated dependencies — run 'npm outdated' to review
+
+  5h. Sensitive Data in Logs
+  WARN  16 log statement(s) may reference sensitive data
+  INFO    src/tools.js:430
+  INFO    src/google-calendar.js:430
+  INFO    src/google-calendar.js:430
+  INFO    src/google-calendar.js:430
+  INFO    src/linkedin.js:430
+
+[6. DASHBOARD (VERCEL)]
+──────────────────────────────────────────────────────────────────────
+  INFO  Serverless API endpoints: 28
+  INFO  Frontend: /home/head/navada-1/dashboard-vercel/public/index.html
+  OK  vercel.json present
+
+[7. ALEX WORKSPACE (~/.alex/)]
+──────────────────────────────────────────────────────────────────────
+  INFO  Workspace size: 132M
+  INFO  Conversations: 332 | Memory files: 7
+  INFO  Tasks: 8 | Skills: 11
+  CRIT  config.json missing — ALEX cannot start
+  OK  IDENTITY.md exists
+
+[8. BACKUPS]
+──────────────────────────────────────────────────────────────────────
+  INFO  Backups: 1 found in /home/head/backups
+  INFO  Latest: alex-backup-2026-02-06.tar.gz (70M)
+  OK  Latest backup is from today
+
+[SUMMARY]
+──────────────────────────────────────────────────────────────────────
+
+  CRITICAL: 3  |  WARNINGS: 9  |  PASSED: 20
+
+  Action required — critical issues found.
+
+Report saved: /home/head/navada-1/Alex-Scripts/scan-2026-02-06-2217.txt
+Previous scans: ls "/home/head/navada-1/Alex-Scripts/scan-"*

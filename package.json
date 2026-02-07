@@ -5,18 +5,19 @@
   "main": "src/gateway.js",
   "type": "module",
   "bin": {
-    "alex": "./bin/navada.js",
-    "alex-setup": "./bin/setup.js"
+    "alex": "./Alex-CLI/navada.js",
+    "alex-setup": "./Alex-CLI/setup.js"
   },
   "scripts": {
     "start": "node src/gateway.js",
-    "setup": "node bin/setup.js",
+    "setup": "node Alex-CLI/setup.js",
     "dev": "node --watch src/gateway.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=test-report.json 2>&1; node tests/generate-report.js",
-    "test:live": "vitest run tests/integration/"
+    "test:live": "vitest run tests/integration/",
+    "generate:qr": "node scripts/generate-qr.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -47,6 +48,7 @@
   "license": "MIT",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
+    "qrcode": "^1.5.4",
     "vitest": "^4.0.18"
   }
 }

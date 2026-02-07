@@ -64,12 +64,12 @@ if [ ! -f "$INSTALL_DIR/package.json" ]; then
   "main": "src/gateway.js",
   "type": "module",
   "bin": {
-    "alex": "./bin/navada.js",
-    "alex-setup": "./bin/setup.js"
+    "alex": "./Alex-CLI/navada.js",
+    "alex-setup": "./Alex-CLI/setup.js"
   },
   "scripts": {
     "start": "node src/gateway.js",
-    "setup": "node bin/setup.js"
+    "setup": "node Alex-CLI/setup.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
