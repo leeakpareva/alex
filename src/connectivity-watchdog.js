@@ -100,6 +100,8 @@ function parseHostPortFromUrl(url, fallbackHost, fallbackPort) {
 export function startConnectivityWatchdog({
     intervalMs = Number(process.env.CONNECTIVITY_WATCHDOG_INTERVAL_MS || 60_000),
     keepalive = process.env.CONNECTIVITY_KEEPALIVE !== '0',
+    // If true, also ping the public domain (helps prevent "Sleep when idle" scale-to-zero).
+    publicKeepalive = process.env.CONNECTIVITY_PUBLIC_KEEPALIVE !== '0',
     logFile = process.env.CONNECTIVITY_LOG_FILE || path.join(os.homedir(), '.alex', 'logs', 'connectivity-watchdog.log'),
 } = {}) {
     if (process.env.CONNECTIVITY_WATCHDOG === '0') {
@@ -167,6 +169,14 @@ export function startConnectivityWatchdog({
         if (keepalive) {
             const port = process.env.ALEX_PORT || '9090';
             await httpGet(`http://127.0.0.1:${port}/api/health`, { timeoutMs: 2000 }).catch(() => {});
+        }
+
+        if (keepalive && publicKeepalive) {
+            // Generate inbound router traffic so Railway doesn't consider the service idle.
+            const pub = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || null;
+            if (pub) {
+                await httpGet(`https://${pub}/api/health`, { timeoutMs: 4000 }).catch(() => {});
+            }
         }
     }
 
