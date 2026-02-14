@@ -552,6 +552,57 @@ Just message me naturally — I'm here to help.
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
     });
 
+    // /test-scheduler — Test all scheduled tasks (owner only)
+    bot.onText(/\/test-scheduler/, async (msg) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+
+        // Owner check
+        const isOwner = !config.telegram_owner_id ||
+                       String(userId) === String(config.telegram_owner_id);
+
+        if (!isOwner) {
+            await bot.sendMessage(chatId, "This command is only available to the owner.");
+            return;
+        }
+
+        await bot.sendMessage(chatId, "🧪 Testing scheduler and task endpoints...");
+
+        try {
+            // Test if scheduler is available
+            if (global.alexScheduler) {
+                const tasks = global.alexScheduler.getScheduledTasks();
+                await bot.sendMessage(chatId, `✅ Scheduler active with ${tasks.length} tasks`);
+
+                // Test a few key tasks
+                const testResults = [];
+                const testTasks = ['dashboard-sync', 'morning-briefing'];
+
+                for (const taskName of testTasks) {
+                    const success = await global.alexScheduler.triggerManual(taskName);
+                    testResults.push(`${success ? '✅' : '❌'} ${taskName}`);
+                }
+
+                await bot.sendMessage(chatId,
+                    `<b>Task Test Results:</b>\n${testResults.join('\n')}`,
+                    { parse_mode: 'HTML' }
+                );
+            } else {
+                await bot.sendMessage(chatId, "⚠️ Scheduler not initialized. Checking external cron...");
+            }
+
+            // Also run E2E check
+            const e2e = await runE2EChecks({ includeSlow: false });
+            await bot.sendMessage(chatId,
+                `<b>E2E Status:</b> ${e2e.ok ? '✅ PASS' : '❌ FAIL'}`,
+                { parse_mode: 'HTML' }
+            );
+
+        } catch (error) {
+            await bot.sendMessage(chatId, `❌ Test failed: ${error.message}`);
+        }
+    });
+
     // /init — E2E self-check (full details for owner, basic for others)
     bot.onText(/\/init(?:\s|$|@)/, async (msg) => {
         try {
@@ -5406,6 +5457,20 @@ async function init() {
     // Start Slack polling
     await setupSlack({ config, chatSystem, postDashboard, smartSplit, learnModeChats, modelOverrides });
     startSlackPolling();
+
+    // Initialize Railway-compatible scheduler
+    let scheduler = null;
+    try {
+        const { initializeScheduler } = await import('./scheduler.js');
+        scheduler = initializeScheduler();
+        console.log('[SCHEDULER] Railway task scheduler initialized');
+
+        // Store scheduler reference globally for status checks
+        global.alexScheduler = scheduler;
+    } catch (err) {
+        console.error('[SCHEDULER] Failed to initialize scheduler:', err.message);
+        console.log('[SCHEDULER] Falling back to external cron if available');
+    }
 
     // Check for missed scheduled tasks during downtime
     await catchUpMissedTasks();
