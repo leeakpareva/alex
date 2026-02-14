@@ -18,6 +18,30 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+function writeJson(res, code, obj, extraHeaders = {}) {
+    res.writeHead(code, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        ...extraHeaders,
+    });
+    res.end(JSON.stringify(obj));
+}
+
+function withCors(req, headers = {}) {
+    const origin = req.headers.origin;
+    // Keep permissive by default for read-only dashboard endpoints.
+    // Optionally lock down via DASHBOARD_ALLOWED_ORIGINS="https://www.alexnavada.xyz,https://www.alexnavada.xyz/dashboard"
+    const allowList = (process.env.DASHBOARD_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const allowOrigin = allowList.length ? (allowList.includes(origin) ? origin : allowList[0]) : '*';
+    return {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+        'Vary': 'Origin',
+        ...headers,
+    };
+}
+
 // Download a file from a URL into a Buffer
 function downloadFile(url) {
     return new Promise((resolve, reject) => {
@@ -4319,10 +4343,9 @@ function setupControlAPI() {
 
     const server = http.createServer(async (req, res) => {
         // CORS — restrict to dashboard origin
-        res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:8080');
-        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        const cors = withCors(req);
+        for (const [k, v] of Object.entries(cors)) res.setHeader(k, v);
+        if (req.method === 'OPTIONS') { res.writeHead(200, cors); res.end(); return; }
 
         // Body size limit
         let bodySize = 0;
@@ -4358,6 +4381,18 @@ function setupControlAPI() {
                 res.writeHead(401, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Unauthorized. Provide Authorization: Bearer <token> header.' }));
                 return;
+            }
+        }
+
+        // Dashboard read token (optional). If set, require Authorization for /api/dashboard/*.
+        if ((req.url || '').startsWith('/api/dashboard/')) {
+            const required = process.env.DASHBOARD_READ_TOKEN || null;
+            if (required) {
+                const authHeader = String(req.headers['authorization'] || '');
+                const provided = authHeader.replace(/^Bearer\s+/i, '');
+                if (provided !== required) {
+                    return writeJson(res, 401, { error: 'Unauthorized' }, cors);
+                }
             }
         }
 
@@ -4736,6 +4771,33 @@ Call the send_email tool now with exactly these parameters.`;
                     res.end(JSON.stringify({ error: err.message }));
                 }
             });
+
+        } else if (req.method === 'GET' && req.url === '/api/dashboard/data') {
+            return writeJson(res, 200, dashState || {}, cors);
+
+        } else if (req.method === 'GET' && req.url === '/api/dashboard/tokens') {
+            try {
+                const stats = await getDailyTokenStats();
+                return writeJson(res, 200, stats || {}, cors);
+            } catch (e) {
+                return writeJson(res, 500, { error: e.message }, cors);
+            }
+
+        } else if (req.method === 'GET' && req.url === '/api/dashboard/commits') {
+            try {
+                const { stdout } = await execAsync('git log --max-count=30 --format=\"%H|%h|%s|%an|%aI\"', { cwd: '/app' });
+                const commits = stdout
+                    .trim()
+                    .split('\\n')
+                    .filter(Boolean)
+                    .map(line => {
+                        const [hash, short_hash, message, author, date] = line.split('|');
+                        return { hash, short_hash, message, author, date };
+                    });
+                return writeJson(res, 200, { commits }, cors);
+            } catch {
+                return writeJson(res, 200, { commits: [] }, cors);
+            }
 
         } else if (req.method === 'GET' && req.url === '/api/health') {
             const memUsage = process.memoryUsage();
