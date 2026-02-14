@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>Phase 3: Dynamic Compensation — ALEX</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .page-wrapper {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--foreground); }
+    .back-link svg { width: 16px; height: 16px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 1.5rem 0 2.5rem;
+    }
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Section headings */
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Comparison */
+    .comparison-section {
+      margin: 3rem 0;
+    }
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    .comparison-card {
+      padding: 1.75rem;
+    }
+    .comparison-card .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+    .comparison-card h3 {
+      font-size: 1.15rem;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .comparison-card p {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+    }
+    .card-traditional .label { color: var(--muted-foreground); }
+    .card-traditional { border-color: oklch(0.3 0.05 290); }
+    .card-dynamic .label { color: var(--neon-cyan); }
+    .card-dynamic { border-color: oklch(0.7 0.2 195 / 0.3); }
+
+    /* Compensation models */
+    .models-section {
+      margin: 3rem 0;
+    }
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    .model-card {
+      padding: 1.5rem;
+    }
+    .model-card .model-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid;
+      margin-bottom: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .model-card h3 {
+      font-size: 1rem;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+    }
+    .model-card p {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+    }
+
+    /* Example calculation */
+    .example-section {
+      margin: 3rem 0;
+    }
+    .example-card {
+      padding: 2rem;
+    }
+    .example-card h3 {
+      font-size: 1.15rem;
+      color: var(--foreground);
+      margin-bottom: 1.25rem;
+    }
+    .calc-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .calc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .calc-row:last-child {
+      border-bottom: none;
+    }
+    .calc-label {
+      color: var(--muted-foreground);
+    }
+    .calc-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .calc-value-pink { color: var(--neon-pink); }
+    .calc-value-cyan { color: var(--neon-cyan); }
+    .calc-value-orange { color: var(--sunset-orange); }
+    .calc-total {
+      font-size: 1.1rem;
+    }
+    .calc-total .calc-value {
+      font-size: 1.15rem;
+    }
+    .example-note {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      font-style: italic;
+    }
+
+    /* Transition Strategy */
+    .timeline-section {
+      margin: 3rem 0;
+    }
+    .timeline-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+    .timeline-step {
+      padding: 1.25rem;
+      position: relative;
+    }
+    .timeline-step .phase-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .timeline-step:nth-child(1) .phase-tag {
+      background: oklch(0.75 0.25 330 / 0.15);
+      color: var(--neon-pink);
+    }
+    .timeline-step:nth-child(2) .phase-tag {
+      background: oklch(0.7 0.2 195 / 0.15);
+      color: var(--neon-cyan);
+    }
+    .timeline-step:nth-child(3) .phase-tag {
+      background: oklch(0.75 0.2 50 / 0.15);
+      color: var(--sunset-orange);
+    }
+    .timeline-step:nth-child(4) .phase-tag {
+      background: oklch(0.75 0.25 330 / 0.15);
+      color: var(--neon-pink);
+    }
+    .timeline-step h3 {
+      font-size: 0.95rem;
+      color: var(--foreground);
+      margin-bottom: 0.35rem;
+    }
+    .timeline-step p {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    /* Navigation */
+    .page-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 2.5rem;
+      margin-top: 2.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .page-nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .page-nav a:hover { color: var(--neon-pink); }
+    .page-nav a svg { width: 16px; height: 16px; }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2.5rem;
+    }
+    .footer-name {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.3rem;
+    }
+    .footer-brand {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper { padding: 1.25rem 1rem 3rem; }
+      .hero h1 { font-size: 1.75rem; }
+      .hero p { font-size: 0.95rem; }
+      .section-title { font-size: 1.2rem; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .models-grid { grid-template-columns: 1fr; }
+      .timeline-steps { grid-template-columns: 1fr 1fr; }
+      .comparison-card { padding: 1.25rem; }
+      .model-card { padding: 1.25rem; }
+      .example-card { padding: 1.5rem; }
+    }
+
+    @media (max-width: 480px) {
+      .page-wrapper { padding: 1rem 0.75rem 2.5rem; }
+      .hero h1 { font-size: 1.5rem; }
+      .hero p { font-size: 0.9rem; }
+      .section-title { font-size: 1.1rem; }
+      .comparison-card { padding: 1rem; }
+      .comparison-card h3 { font-size: 1.05rem; }
+      .comparison-card p { font-size: 0.8rem; }
+      .model-card { padding: 1rem; }
+      .model-card h3 { font-size: 0.95rem; }
+      .model-card p { font-size: 0.8rem; }
+      .timeline-steps { grid-template-columns: 1fr; }
+      .timeline-step { padding: 1rem; }
+      .timeline-step h3 { font-size: 0.9rem; }
+      .timeline-step p { font-size: 0.75rem; }
+      .example-card { padding: 1.25rem; }
+      .example-card h3 { font-size: 1rem; }
+      .calc-row { font-size: 0.85rem; }
+      .calc-value { font-size: 0.85rem; }
+      .calc-total .calc-value { font-size: 1rem; }
+      .example-note { font-size: 0.8rem; }
+      .page-nav { flex-direction: column; gap: 1rem; align-items: flex-start; }
+      .page-nav a { font-size: 0.85rem; }
+      .site-footer { padding: 2rem 0 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="page-wrapper">
+
+      <!-- Back link -->
+      <a href="/experiment" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <path d="M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Experiment
+      </a>
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-badges">
+          <span class="badge badge-pink">Phase 3</span>
+          <span class="badge badge-cyan">2026</span>
+        </div>
+        <h1>Dynamic Compensation</h1>
+        <p>Compensation models shift from fixed monthly salaries to reward efficiency and measurable output. High performers earn more. The data is transparent.</p>
+      </div>
+
+      <!-- Traditional vs Dynamic -->
+      <div class="comparison-section">
+        <h2 class="section-title">Traditional vs Dynamic</h2>
+        <div class="comparison-grid">
+          <div class="theme-card comparison-card card-traditional">
+            <div class="label">Traditional</div>
+            <h3>100% Fixed Salary</h3>
+            <p>Pay based on role, tenure, and negotiation. No direct link to output.</p>
+          </div>
+          <div class="theme-card comparison-card card-dynamic">
+            <div class="label">Dynamic</div>
+            <h3>60% Base + 40% Variable</h3>
+            <p>Base salary for stability. Variable component tied to measurable AI-assisted output.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compensation Models -->
+      <div class="models-section">
+        <h2 class="section-title">Compensation Models</h2>
+        <div class="models-grid">
+          <div class="theme-card theme-card-pink model-card">
+            <div class="model-icon icon-box-pink">1</div>
+            <h3>Base + Performance</h3>
+            <p>60% guaranteed base salary + 40% tied to token efficiency, task completion, and quality scores. Most gradual transition.</p>
+          </div>
+          <div class="theme-card theme-card-cyan model-card">
+            <div class="model-icon icon-box-cyan">2</div>
+            <h3>Pure Value-Based</h3>
+            <p>Compensation directly proportional to measured output value. Highest earning potential for top performers. Requires mature metrics.</p>
+          </div>
+          <div class="theme-card theme-card-orange model-card">
+            <div class="model-icon icon-box-orange">3</div>
+            <h3>Team Pool Model</h3>
+            <p>Team shares a compensation pool. AI metrics determine individual allocation within the team. Encourages collaboration.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Example Calculation -->
+      <div class="example-section">
+        <h2 class="section-title">Example Calculation</h2>
+        <div class="theme-card gradient-pink-cyan example-card">
+          <h3>Monthly Compensation Example</h3>
+          <div class="calc-rows">
+            <div class="calc-row">
+              <span class="calc-label">Base Salary</span>
+              <span class="calc-value calc-value-cyan">$4,000</span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-label">60% of $6,667 target</span>
+              <span class="calc-value" style="color: var(--muted-foreground); font-size: 0.8rem;">guaranteed</span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-label">Performance Multiplier</span>
+              <span class="calc-value calc-value-orange">1.3x</span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-label">Based on efficiency score</span>
+              <span class="calc-value" style="color: var(--muted-foreground); font-size: 0.8rem;">data-driven</span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-label">Variable Component</span>
+              <span class="calc-value calc-value-pink">$2,667 &times; 1.3 = $3,467</span>
+            </div>
+            <div class="calc-row calc-total">
+              <span class="calc-label"><strong>Total Monthly Pay</strong></span>
+              <span class="calc-value calc-value-cyan">$7,467</span>
+            </div>
+          </div>
+          <p class="example-note">High performers earn 12% above target. Low performers still receive full base salary.</p>
+        </div>
+      </div>
+
+      <!-- Transition Strategy -->
+      <div class="timeline-section">
+        <h2 class="section-title">Transition Strategy</h2>
+        <div class="timeline-steps">
+          <div class="theme-card timeline-step">
+            <span class="phase-tag">Pilot (Q1)</span>
+            <h3>Pilot</h3>
+            <p>Select volunteer teams. Run parallel tracking: old compensation + new metrics.</p>
+          </div>
+          <div class="theme-card timeline-step">
+            <span class="phase-tag">Hybrid (Q2)</span>
+            <h3>Hybrid</h3>
+            <p>Introduce 10% variable component. Demonstrate correlation between metrics and value.</p>
+          </div>
+          <div class="theme-card timeline-step">
+            <span class="phase-tag">Expansion (Q3-Q4)</span>
+            <h3>Expansion</h3>
+            <p>Increase variable to 25-40%. Refine metrics based on pilot feedback.</p>
+          </div>
+          <div class="theme-card timeline-step">
+            <span class="phase-tag">Standard (Year 2)</span>
+            <h3>Standard</h3>
+            <p>Full dynamic compensation as the default model for AI-augmented roles.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="page-nav">
+        <a href="/experiment/phase-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"/>
+            <path d="M12 19l-7-7 7-7"/>
+          </svg>
+          Phase 2: Value Quantification
+        </a>
+        <a href="/experiment/phase-4">
+          Phase 4: Tokenized Economy
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

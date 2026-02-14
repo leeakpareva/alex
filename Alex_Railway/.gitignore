@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets (NEVER commit these)
+.env
+.env.*
+*.env
+.env.local
+.env.production
+*.pem
+*.key
+*.crt
+config.json
+config.json.enc
+config.json.backup
+
+# Logs
+*.log
+logs/
+dashboard/dashboard.log
+
+# Reports and generated files
+reports/*.html
+reports/*.json
+test-report.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+
+# Uploaded files (personal documents)
+uploads/
+
+# Test reports
+test-report.html
+
+# Temp files
+*.tmp
+*.temp
+.cache/
+.vercel
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Symlinks to workspace
+daily
+diary
+archive
+task-outputs
+
+# Ralph fix proposals and backups
+fixes
+backups
+logs
+uploads
+Manager/reports
+Manager/__pycache__
+
+# Misc
+Alex-Auto-Bot

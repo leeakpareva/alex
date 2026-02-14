@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>The Future of Work — ALEX Experiment</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Page-specific styles */
+    .hero-section {
+      position: relative;
+      text-align: center;
+      padding: 5rem 1rem 3rem;
+      overflow: hidden;
+    }
+
+    .hero-section::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at 50% 0%, oklch(0.75 0.25 330 / 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-desc {
+      font-size: 1.125rem;
+      color: var(--muted-foreground);
+      max-width: 600px;
+      margin: 0 auto 1.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-pills {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .pill-orange {
+      border-color: oklch(0.75 0.2 50 / 0.3);
+      color: var(--sunset-orange);
+    }
+
+    .pill-cyan {
+      border-color: oklch(0.7 0.2 195 / 0.3);
+      color: var(--neon-cyan);
+    }
+
+    @keyframes neonPulse {
+      0%, 100% {
+        text-shadow: 0 0 5px oklch(0.75 0.25 330), 0 0 10px oklch(0.75 0.25 330), 0 0 20px oklch(0.75 0.25 330);
+      }
+      50% {
+        text-shadow: 0 0 10px oklch(0.75 0.25 330), 0 0 25px oklch(0.75 0.25 330), 0 0 40px oklch(0.75 0.25 330), 0 0 60px oklch(0.75 0.25 330);
+      }
+    }
+
+    .glow-animate {
+      animation: neonPulse 3s ease-in-out infinite;
+    }
+
+    /* Section titles */
+    .section-heading {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-heading-icon {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Definition cards */
+    .def-card {
+      padding: 1.5rem;
+    }
+
+    .def-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--neon-cyan);
+      margin-bottom: 0.5rem;
+    }
+
+    .def-text {
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+    }
+
+    .def-example {
+      background: oklch(0.1 0.02 290);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    /* Workflow step cards */
+    .step-card {
+      text-align: center;
+      padding: 1.5rem;
+      position: relative;
+    }
+
+    .step-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.75rem;
+    }
+
+    .step-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-desc {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    .step-arrow {
+      display: none;
+      position: absolute;
+      right: -1.25rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted-foreground);
+      z-index: 1;
+    }
+
+    @media (min-width: 640px) {
+      .step-arrow {
+        display: block;
+      }
+    }
+
+    .workflow-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    @media (min-width: 640px) {
+      .workflow-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+      }
+    }
+
+    /* Callout box */
+    .callout-box {
+      background: linear-gradient(135deg, oklch(0.7 0.2 195 / 0.05), var(--card), oklch(0.75 0.25 330 / 0.05));
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.25rem 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .callout-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .callout-text {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      line-height: 1.7;
+    }
+
+    /* Pricing table */
+    .table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    .speed-badge {
+      display: inline-flex;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+
+    .speed-fast {
+      background: oklch(0.7 0.2 195 / 0.1);
+      color: var(--neon-cyan);
+      border: 1px solid oklch(0.7 0.2 195 / 0.3);
+    }
+
+    .speed-medium {
+      background: oklch(0.75 0.2 50 / 0.1);
+      color: var(--sunset-orange);
+      border: 1px solid oklch(0.75 0.2 50 / 0.3);
+    }
+
+    .table-note {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      margin-top: 0.75rem;
+      font-style: italic;
+    }
+
+    .model-color-cyan { color: var(--neon-cyan); }
+    .model-color-pink { color: var(--neon-pink); }
+    .model-color-orange { color: var(--sunset-orange); }
+    .price-cell {
+      font-family: 'JetBrains Mono', monospace;
+      color: oklch(0.7 0.2 145);
+    }
+
+    /* Rate limit cards */
+    .rate-card {
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .rate-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .rate-desc {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+
+    .rate-impact {
+      font-size: 0.8rem;
+      color: var(--neon-cyan);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ROI section */
+    .roi-card {
+      padding: 2rem;
+    }
+
+    .formula-block {
+      background: oklch(0.1 0.02 290);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+
+    .formula-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+
+    .formula-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--neon-cyan);
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    /* Paradigm shift cards */
+    .shift-card {
+      padding: 1.5rem;
+    }
+
+    .shift-old {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      text-decoration: line-through;
+      margin-bottom: 0.25rem;
+    }
+
+    .shift-arrow {
+      color: var(--muted-foreground);
+      margin: 0.25rem 0;
+      font-size: 1rem;
+    }
+
+    .shift-new {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--neon-cyan);
+      margin-bottom: 0.5rem;
+    }
+
+    .shift-desc {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    /* Metric cards */
+    .metric-card {
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0.75rem 0 0.25rem;
+    }
+
+    .metric-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-desc {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    /* Copilot stat items */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (min-width: 640px) {
+      .stat-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--neon-pink);
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      margin-top: 0.25rem;
+    }
+
+    /* Access role cards */
+    .role-card {
+      padding: 1.5rem;
+    }
+
+    .role-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .tool-list li {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      padding: 0.35rem 0;
+      border-bottom: 1px solid oklch(0.2 0.03 290);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tool-list li:last-child {
+      border-bottom: none;
+    }
+
+    .tool-check {
+      color: oklch(0.7 0.2 145);
+      flex-shrink: 0;
+    }
+
+    .tool-x {
+      color: oklch(0.65 0.2 25);
+      flex-shrink: 0;
+    }
+
+    /* Access grid */
+    .access-split {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (min-width: 640px) {
+      .access-split {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .access-card {
+      padding: 1.25rem;
+    }
+
+    .access-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .access-title-green { color: oklch(0.7 0.2 145); }
+    .access-title-red { color: oklch(0.65 0.2 25); }
+
+    .access-list {
+      list-style: none;
+      padding: 0;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+    }
+
+    .access-list li {
+      padding: 0.25rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* POC architecture */
+    .poc-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .poc-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .poc-num {
+      background: oklch(0.75 0.25 330 / 0.15);
+      color: var(--neon-pink);
+      min-width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .poc-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .poc-desc {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    /* Timeline */
+    .timeline-item {
+      position: relative;
+      padding-left: 1.5rem;
+      padding-bottom: 2rem;
+    }
+
+    .timeline-item:last-child {
+      padding-bottom: 0;
+    }
+
+    .phase-card {
+      padding: 1.25rem 1.5rem;
+      display: block;
+      text-decoration: none;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .phase-card:hover {
+      transform: translateX(4px);
+    }
+
+    .phase-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .phase-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.25rem;
+    }
+
+    .phase-time {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* CTA section */
+    .cta-section {
+      text-align: center;
+      padding: 4rem 1rem;
+    }
+
+    .cta-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .cta-contact {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      margin-top: 1rem;
+    }
+
+    .cta-contact a {
+      color: var(--neon-cyan);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .cta-contact a:hover {
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-name {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      margin-bottom: 0.25rem;
+    }
+
+    .footer-brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero-title { font-size: 2.25rem; }
+      .hero-desc { font-size: 1rem; }
+      .section-heading { font-size: 1.4rem; }
+      .section-heading-icon { font-size: 1.25rem; }
+      .stat-value { font-size: 2rem; }
+      .metric-value { font-size: 1.5rem; }
+      .cta-title { font-size: 1.5rem; }
+      .roi-card { padding: 1.5rem; }
+      .formula-code { font-size: 0.75rem; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-title { font-size: 1.6rem; }
+      .hero-section { padding: 3rem 0.75rem 1.5rem; }
+      .hero-desc { font-size: 0.9rem; }
+      .section-heading { font-size: 1.2rem; }
+      .section-heading-icon { font-size: 1.1rem; gap: 0.5rem; }
+      .stat-value { font-size: 1.75rem; }
+      .metric-value { font-size: 1.25rem; }
+      .cta-title { font-size: 1.3rem; }
+      .cta-buttons { flex-direction: column; align-items: center; }
+      .cta-buttons .btn { width: 100%; justify-content: center; }
+      .def-example { font-size: 0.7rem; }
+      .formula-code { font-size: 0.65rem; }
+      .roi-card { padding: 1.25rem; }
+      .rate-card { flex-direction: column; gap: 0.75rem; }
+      .poc-step { flex-direction: column; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+
+    <!-- ============================================ -->
+    <!-- 1. HERO — experiment-content                 -->
+    <!-- ============================================ -->
+    <section class="hero-section">
+      <div class="container animate-fade-in-up">
+        <span class="badge badge-pink" style="margin-bottom: 1rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44A2.5 2.5 0 0 1 2 17.5 2.5 2.5 0 0 1 4.5 15a2.5 2.5 0 0 1 1.54.54L9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44A2.5 2.5 0 0 0 22 17.5 2.5 2.5 0 0 0 19.5 15a2.5 2.5 0 0 0-1.54.54L14.5 2z"/></svg>
+          Experimental Concept
+        </span>
+        <h1 class="hero-title">
+          The <span class="text-neon-pink glow-animate">Future</span> of Work
+        </h1>
+        <p class="hero-desc">
+          A new economic paradigm where AI agents operate alongside humans in a token-based economy
+          — where every unit of value is measurable, transparent, and optimizable.
+        </p>
+        <div class="hero-pills">
+          <span class="pill pill-orange">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Token-Based Economics
+          </span>
+          <span class="pill pill-cyan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Human + AI Collaboration
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 2. TOKEN FUNDAMENTALS — token-economics      -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="animate-fade-in-up delay-100">
+          <span class="badge badge-orange" style="margin-bottom: 1rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            Foundation Knowledge
+          </span>
+          <h2 class="section-heading">Understanding Token Economics</h2>
+        </div>
+        <div class="grid-2 animate-fade-in-up delay-200">
+          <!-- Token -->
+          <div class="theme-card def-card">
+            <div class="def-title">Token</div>
+            <p class="def-text">The atomic unit of AI processing. Every word, number, and punctuation mark is broken into tokens that the model processes sequentially.</p>
+            <div class="def-example">"Hello, world!" = 4 tokens<br>"Supercalifragilistic" = 5 tokens</div>
+          </div>
+          <!-- Input Tokens -->
+          <div class="theme-card def-card">
+            <div class="def-title">Input Tokens</div>
+            <p class="def-text">Tokens sent to the model as context — your message, system prompt, conversation history, and any attached documents.</p>
+            <div class="def-example">system_prompt: ~800 tokens<br>user_message: ~50 tokens<br>conversation: ~2,000 tokens</div>
+          </div>
+          <!-- Output Tokens -->
+          <div class="theme-card def-card">
+            <div class="def-title">Output Tokens</div>
+            <p class="def-text">Tokens generated by the model in response. These are 3-5x more expensive than input tokens because they require sequential computation.</p>
+            <div class="def-example">short_reply: ~100 tokens ($0.0015)<br>full_analysis: ~2,000 tokens ($0.03)</div>
+          </div>
+          <!-- Context Window -->
+          <div class="theme-card def-card">
+            <div class="def-title">Context Window</div>
+            <p class="def-text">The maximum number of tokens a model can process in a single request — including both input and output. Larger windows allow richer context.</p>
+            <div class="def-example">Claude Sonnet: 200K tokens<br>GPT-4o: 128K tokens<br>DeepSeek: 64K tokens</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 3. AI INFERENCE WORKFLOW — token-economics    -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-heading-icon animate-fade-in-up">
+          <div class="icon-box icon-box-cyan">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          How AI Inference Works
+        </div>
+        <div class="workflow-grid animate-fade-in-up delay-100">
+          <!-- Step 1: Input -->
+          <div class="theme-card theme-card-pink step-card" style="position: relative;">
+            <div class="step-number">STEP 01</div>
+            <div class="icon-box icon-box-pink icon-box-lg" style="margin: 0 auto 0.75rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="step-title text-neon-pink">Input Processing</div>
+            <p class="step-desc">Your message is tokenized, combined with system context, and formatted for the model.</p>
+            <span class="step-arrow">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </span>
+          </div>
+          <!-- Step 2: Inference -->
+          <div class="theme-card theme-card-cyan step-card" style="position: relative;">
+            <div class="step-number">STEP 02</div>
+            <div class="icon-box icon-box-cyan icon-box-lg" style="margin: 0 auto 0.75rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h4c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><line x1="10" y1="16" x2="14" y2="16"/><line x1="10" y1="19" x2="14" y2="19"/><line x1="11" y1="22" x2="13" y2="22"/></svg>
+            </div>
+            <div class="step-title text-neon-cyan">Inference</div>
+            <p class="step-desc">The model processes all tokens through billions of parameters, generating a probability distribution for each output token.</p>
+            <span class="step-arrow">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </span>
+          </div>
+          <!-- Step 3: Output -->
+          <div class="theme-card theme-card-orange step-card">
+            <div class="step-number">STEP 03</div>
+            <div class="icon-box icon-box-orange icon-box-lg" style="margin: 0 auto 0.75rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="step-title text-sunset-orange">Output Generation</div>
+            <p class="step-desc">Tokens are decoded back into readable text, streamed to the user, and logged for analytics.</p>
+          </div>
+        </div>
+
+        <!-- Key Insight callout -->
+        <div class="callout-box animate-fade-in-up delay-200">
+          <div class="callout-label">Key Insight</div>
+          <p class="callout-text">
+            Output tokens cost 3-5x more than input tokens because each output token must be generated sequentially, requiring a full forward pass through the model. Input tokens can be processed in parallel. This asymmetry is the foundation of token economics.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 4. MODEL PRICING TABLE — token-economics     -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-heading animate-fade-in-up">Model Pricing Comparison <span class="text-muted" style="font-size: 0.875rem; font-weight: 400;">(per 1M tokens)</span></h2>
+        <div class="table-wrap animate-fade-in-up delay-100">
+          <table class="theme-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Input Cost</th>
+                <th>Output Cost</th>
+                <th>Best For</th>
+                <th>Speed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="model-color-cyan" style="font-weight: 600;">Claude 3.5 Haiku</td>
+                <td class="price-cell">$0.25</td>
+                <td class="price-cell">$1.25</td>
+                <td>Quick tasks, greetings, simple Q&amp;A</td>
+                <td><span class="speed-badge speed-fast">Fast</span></td>
+              </tr>
+              <tr>
+                <td class="model-color-pink" style="font-weight: 600;">Claude 3.5 Sonnet</td>
+                <td class="price-cell">$3.00</td>
+                <td class="price-cell">$15.00</td>
+                <td>Complex analysis, research, reports</td>
+                <td><span class="speed-badge speed-medium">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="model-color-orange" style="font-weight: 600;">DeepSeek</td>
+                <td class="price-cell">$0.14</td>
+                <td class="price-cell">$0.28</td>
+                <td>Deep research, thorough analysis</td>
+                <td><span class="speed-badge speed-medium">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="model-color-cyan" style="font-weight: 600;">GPT-4o</td>
+                <td class="price-cell">$2.50</td>
+                <td class="price-cell">$10.00</td>
+                <td>Fallback, image analysis</td>
+                <td><span class="speed-badge speed-fast">Fast</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note animate-fade-in-up delay-200">Prices as of January 2025. ALEX dynamically routes to the most cost-effective model based on query complexity.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 5. RATE LIMITS — token-economics             -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-heading animate-fade-in-up">Understanding Rate Limits</h2>
+        <div style="display: flex; flex-direction: column; gap: 1rem;" class="animate-fade-in-up delay-100">
+          <!-- RPM -->
+          <div class="theme-card rate-card">
+            <div class="icon-box icon-box-orange">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div class="rate-title">Requests Per Minute (RPM)</div>
+              <p class="rate-desc">Maximum number of API calls allowed per minute. Exceeding this triggers HTTP 429 responses and automatic retry with exponential backoff.</p>
+              <span class="rate-impact">Impact: Queue latency, request throttling</span>
+            </div>
+          </div>
+          <!-- TPM -->
+          <div class="theme-card rate-card">
+            <div class="icon-box icon-box-orange">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <div>
+              <div class="rate-title">Tokens Per Minute (TPM)</div>
+              <p class="rate-desc">Total token throughput allowed per minute across all requests. Long context conversations consume this budget quickly.</p>
+              <span class="rate-impact">Impact: Context window utilisation, conversation length</span>
+            </div>
+          </div>
+          <!-- TPD -->
+          <div class="theme-card rate-card">
+            <div class="icon-box icon-box-orange">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div>
+              <div class="rate-title">Tokens Per Day (TPD)</div>
+              <p class="rate-desc">Daily token budget across all operations. Critical for capacity planning — determines how many tasks the agent can handle in 24 hours.</p>
+              <span class="rate-impact">Impact: Daily throughput ceiling, cost projections</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 6. ROI CALCULATOR — token-economics          -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="theme-card roi-card gradient-pink-cyan animate-fade-in-up">
+          <h2 class="section-heading" style="margin-bottom: 1.25rem;">Calculating AI Investment ROI</h2>
+          <div class="grid-2">
+            <!-- Cost Formula -->
+            <div class="formula-block">
+              <div class="formula-label">Cost Formula</div>
+              <div class="formula-code">total_cost =
+  (input_tokens * input_price)
++ (output_tokens * output_price)
++ infrastructure_cost
+
+// Example: 1M input + 200K output
+// Sonnet: (1M * $3) + (200K * $15) = $6.00
+// Haiku:  (1M * $0.25) + (200K * $1.25) = $0.50</div>
+            </div>
+            <!-- Value Formula -->
+            <div class="formula-block">
+              <div class="formula-label">Value Formula</div>
+              <div class="formula-code">roi =
+  (value_generated - total_cost)
+  / total_cost * 100
+
+// If AI generates $500 in value
+// At $50/month cost:
+// ROI = ($500 - $50) / $50 * 100
+// ROI = 900%</div>
+            </div>
+          </div>
+          <!-- Why This Matters -->
+          <div class="callout-box" style="margin-top: 1.5rem;">
+            <div class="callout-label">Why This Matters</div>
+            <p class="callout-text">
+              For the first time in history, we can measure the exact cost of a unit of intellectual work. Every analysis, every research task, every report has a precise token cost attached — making ROI calculation possible at the task level, not just the department level.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 7. PARADIGM SHIFT — experiment-content       -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-heading animate-fade-in-up">The Paradigm Shift</h2>
+        <div class="grid-2 animate-fade-in-up delay-100">
+          <!-- Fixed Salaries -> Value-Based -->
+          <div class="theme-card theme-card-pink shift-card">
+            <div class="icon-box icon-box-pink" style="margin-bottom: 1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="shift-old">Fixed Salaries</div>
+            <div class="shift-arrow">&darr;</div>
+            <div class="shift-new">Value-Based Compensation</div>
+            <p class="shift-desc">Pay scales directly to measurable output. Token consumption maps precisely to work performed.</p>
+          </div>
+          <!-- Subjective Reviews -> Token Analytics -->
+          <div class="theme-card theme-card-pink shift-card">
+            <div class="icon-box icon-box-pink" style="margin-bottom: 1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <div class="shift-old">Subjective Performance Reviews</div>
+            <div class="shift-arrow">&darr;</div>
+            <div class="shift-new">Token Analytics</div>
+            <p class="shift-desc">Objective, real-time metrics replace annual reviews. Every task has a measurable cost and value attached.</p>
+          </div>
+          <!-- Individual -> Human+AI Teams -->
+          <div class="theme-card theme-card-pink shift-card">
+            <div class="icon-box icon-box-pink" style="margin-bottom: 1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="shift-old">Individual Contributors</div>
+            <div class="shift-arrow">&darr;</div>
+            <div class="shift-new">Human + AI Teams</div>
+            <p class="shift-desc">Humans focus on strategy and creativity while AI agents handle research, analysis, and execution.</p>
+          </div>
+          <!-- Time-Based -> Outcome-Based -->
+          <div class="theme-card theme-card-pink shift-card">
+            <div class="icon-box icon-box-pink" style="margin-bottom: 1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="shift-old">Time-Based Billing</div>
+            <div class="shift-arrow">&darr;</div>
+            <div class="shift-new">Outcome-Based Pricing</div>
+            <p class="shift-desc">Stop paying for hours. Start paying for results. Token economics makes outcome pricing viable at scale.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 8. TOKEN METRICS — experiment-content        -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-heading animate-fade-in-up">Quantifying Value Through Tokens</h2>
+        <div class="grid-2 animate-fade-in-up delay-100">
+          <!-- Token Consumption -->
+          <div class="theme-card theme-card-pink metric-card">
+            <div class="icon-box icon-box-pink" style="margin: 0 auto;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div class="metric-value text-neon-pink">~2.4M</div>
+            <div class="metric-label">Token Consumption</div>
+            <p class="metric-desc">Average monthly tokens processed per active agent across all models and tasks.</p>
+          </div>
+          <!-- Efficiency Score -->
+          <div class="theme-card theme-card-cyan metric-card">
+            <div class="icon-box icon-box-cyan" style="margin: 0 auto;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="metric-value text-neon-cyan">94.2%</div>
+            <div class="metric-label">Efficiency Score</div>
+            <p class="metric-desc">Ratio of useful output tokens to total tokens consumed, measuring signal vs noise.</p>
+          </div>
+          <!-- Task Completion Rate -->
+          <div class="theme-card theme-card-orange metric-card">
+            <div class="icon-box icon-box-orange" style="margin: 0 auto;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <div class="metric-value text-sunset-orange">87%</div>
+            <div class="metric-label">Task Completion Rate</div>
+            <p class="metric-desc">Percentage of tasks completed without human intervention or retry.</p>
+          </div>
+          <!-- Response Quality -->
+          <div class="theme-card theme-card-pink metric-card">
+            <div class="icon-box icon-box-pink" style="margin: 0 auto;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+            <div class="metric-value text-neon-pink">4.7/5</div>
+            <div class="metric-label">Response Quality</div>
+            <p class="metric-desc">Average quality score based on accuracy, completeness, and actionability of outputs.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 9. COPILOT WORLD — experiment-content        -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="theme-card gradient-pink-cyan animate-fade-in-up" style="padding: 2.5rem; text-align: center;">
+          <h2 class="section-heading" style="margin-bottom: 0.5rem;">The Copilot World</h2>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <div class="stat-value">10x</div>
+              <div class="stat-label">Research throughput vs solo analyst</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">24/7</div>
+              <div class="stat-label">Availability with zero downtime</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">100%</div>
+              <div class="stat-label">Measurable output per token spent</div>
+            </div>
+          </div>
+          <p style="color: var(--muted-foreground); max-width: 600px; margin: 0 auto; line-height: 1.7;">
+            The copilot model transforms every knowledge worker into a team. One human strategist paired with an AI agent that never sleeps, never forgets context, and produces measurable work tied directly to token economics.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 10. ACCESS MANAGEMENT — experiment-content   -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="animate-fade-in-up">
+          <span class="badge badge-cyan" style="margin-bottom: 1rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Enterprise Security
+          </span>
+          <h2 class="section-heading">Access Management</h2>
+        </div>
+
+        <!-- Role cards: 3-col grid -->
+        <div class="grid-3 animate-fade-in-up delay-100">
+          <!-- Admin -->
+          <div class="theme-card theme-card-pink role-card">
+            <div class="icon-box icon-box-pink" style="margin-bottom: 0.75rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="role-title text-neon-pink">Admin</div>
+            <ul class="tool-list">
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Full tool access (32 tools)</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All AI models</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> System configuration</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> File management</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Email &amp; scheduling</li>
+            </ul>
+          </div>
+          <!-- Team Member -->
+          <div class="theme-card theme-card-cyan role-card">
+            <div class="icon-box icon-box-cyan" style="margin-bottom: 0.75rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="role-title text-neon-cyan">Team Member</div>
+            <ul class="tool-list">
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Read-only tools</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Standard models</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Research queries</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Data analysis</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Charts &amp; diagrams</li>
+            </ul>
+          </div>
+          <!-- Guest -->
+          <div class="theme-card theme-card-orange role-card">
+            <div class="icon-box icon-box-orange" style="margin-bottom: 0.75rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="role-title text-sunset-orange">Guest</div>
+            <ul class="tool-list">
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Public API only</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Rate-limited access</li>
+              <li><svg class="tool-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Educational endpoints</li>
+              <li><svg class="tool-x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> No system access</li>
+              <li><svg class="tool-x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> No file management</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Allowed vs Blocked -->
+        <div class="access-split animate-fade-in-up delay-200">
+          <div class="theme-card access-card">
+            <div class="access-title access-title-green">Allowed Tools (Public)</div>
+            <ul class="access-list">
+              <li><svg class="tool-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> web_search, web_lookup, memory_recall</li>
+              <li><svg class="tool-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> stock_quote, market_news, crypto_rate</li>
+              <li><svg class="tool-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> generate_chart, generate_diagram, generate_mindmap</li>
+            </ul>
+          </div>
+          <div class="theme-card access-card">
+            <div class="access-title access-title-red">Blocked Tools (Owner Only)</div>
+            <ul class="access-list">
+              <li><svg class="tool-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> bash, read_file, write_file, edit_file, list_directory, grep, glob</li>
+              <li><svg class="tool-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> send_email, schedule_task, delete_task, confirm_delete</li>
+              <li><svg class="tool-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> fetch_url, generate_pdf, generate_image, create_skill</li>
+              <li><svg class="tool-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> send_file, send_voice_message, update_dashboard, memory_save</li>
+              <li><svg class="tool-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> tiktok_scrape</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Enterprise POC Architecture -->
+        <h3 style="font-size: 1.1rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.5rem;" class="animate-fade-in-up delay-300">Enterprise POC Architecture</h3>
+        <div class="poc-steps animate-fade-in-up delay-300">
+          <div class="theme-card poc-step">
+            <span class="poc-num">1</span>
+            <div>
+              <div class="poc-title">Provisioning</div>
+              <p class="poc-desc">Deploy a dedicated ALEX instance per team with isolated config, memory, and conversation storage.</p>
+            </div>
+          </div>
+          <div class="theme-card poc-step">
+            <span class="poc-num">2</span>
+            <div>
+              <div class="poc-title">Integration</div>
+              <p class="poc-desc">Connect via Telegram, Slack, or the Control API. Authenticate users with tiered role-based access.</p>
+            </div>
+          </div>
+          <div class="theme-card poc-step">
+            <span class="poc-num">3</span>
+            <div>
+              <div class="poc-title">Instrumentation</div>
+              <p class="poc-desc">Token usage, cost-per-task, and ROI metrics are logged to the dashboard in real-time via Redis.</p>
+            </div>
+          </div>
+          <div class="theme-card poc-step">
+            <span class="poc-num">4</span>
+            <div>
+              <div class="poc-title">Optimisation</div>
+              <p class="poc-desc">Dynamic model routing reduces cost by 60-80% by sending simple queries to Haiku and complex tasks to Sonnet.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 11. EVOLUTION / ROADMAP — experiment-content -->
+    <!-- ============================================ -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-heading animate-fade-in-up">The Evolution</h2>
+        <div class="timeline animate-fade-in-up delay-100">
+          <!-- Phase 1 -->
+          <div class="timeline-item">
+            <div class="timeline-dot" style="border-color: var(--neon-pink);">
+              <div class="timeline-dot-inner" style="background: var(--neon-pink);"></div>
+            </div>
+            <a href="/experiment/phase-1" class="theme-card theme-card-pink phase-card">
+              <div class="phase-label text-neon-pink">Phase 1</div>
+              <div class="phase-title">Copilot Integration</div>
+              <div class="phase-time">Now</div>
+            </a>
+          </div>
+          <!-- Phase 2 -->
+          <div class="timeline-item">
+            <div class="timeline-dot" style="border-color: var(--neon-cyan);">
+              <div class="timeline-dot-inner" style="background: var(--neon-cyan);"></div>
+            </div>
+            <a href="/experiment/phase-2" class="theme-card theme-card-cyan phase-card">
+              <div class="phase-label text-neon-cyan">Phase 2</div>
+              <div class="phase-title">Value Quantification</div>
+              <div class="phase-time">2025</div>
+            </a>
+          </div>
+          <!-- Phase 3 -->
+          <div class="timeline-item">
+            <div class="timeline-dot" style="border-color: var(--sunset-orange);">
+              <div class="timeline-dot-inner" style="background: var(--sunset-orange);"></div>
+            </div>
+            <a href="/experiment/phase-3" class="theme-card theme-card-orange phase-card">
+              <div class="phase-label text-sunset-orange">Phase 3</div>
+              <div class="phase-title">Dynamic Compensation</div>
+              <div class="phase-time">2026</div>
+            </a>
+          </div>
+          <!-- Phase 4 -->
+          <div class="timeline-item">
+            <div class="timeline-dot" style="border-color: var(--neon-pink);">
+              <div class="timeline-dot-inner" style="background: var(--neon-pink);"></div>
+            </div>
+            <a href="/experiment/phase-4" class="theme-card theme-card-pink phase-card">
+              <div class="phase-label text-neon-pink">Phase 4</div>
+              <div class="phase-title">Tokenized Economy</div>
+              <div class="phase-time">Future</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 12. CTA                                      -->
+    <!-- ============================================ -->
+    <section class="cta-section">
+      <div class="container animate-fade-in-up">
+        <h2 class="cta-title">Ready to Experiment?</h2>
+        <div class="cta-buttons">
+          <a href="https://t.me/ALEX_Navada_bot" target="_blank" rel="noopener" class="btn btn-pink">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            Chat on Telegram
+          </a>
+        </div>
+        <p class="cta-contact">
+          Or reach out at <a href="mailto:Alex.Ai.Navada@gmail.com">Alex.Ai.Navada@gmail.com</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- 13. FOOTER                                   -->
+    <!-- ============================================ -->
+    <footer class="site-footer">
+      <div class="container">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </div>
+    </footer>
+
+  </div><!-- .page-content -->
+
+  <!-- Scroll-triggered fade-in -->
+  <script>
+    (function() {
+      var els = document.querySelectorAll('.animate-fade-in-up, .animate-fade-in');
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              entry.target.style.animationPlayState = 'running';
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.1 });
+        els.forEach(function(el) { observer.observe(el); });
+      }
+    })();
+  </script>
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

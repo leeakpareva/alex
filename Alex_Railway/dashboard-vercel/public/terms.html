@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>Terms of Service — ALEX</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .page-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 2rem 0 2.5rem;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+    .hero .last-updated {
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 0.75rem;
+    }
+
+    /* Section blocks */
+    .terms-section {
+      margin-bottom: 2.5rem;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .section-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.5rem;
+      background: oklch(0.75 0.25 330 / 0.1);
+      border: 1px solid oklch(0.75 0.25 330 / 0.3);
+      flex-shrink: 0;
+    }
+    .section-icon svg {
+      width: 1.25rem;
+      height: 1.25rem;
+      color: var(--neon-pink);
+    }
+    .section-header h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .terms-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+    }
+    .terms-card p {
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      line-height: 1.75;
+      margin-bottom: 0.75rem;
+    }
+    .terms-card p:last-child {
+      margin-bottom: 0;
+    }
+    .terms-card strong {
+      color: var(--foreground);
+    }
+    .terms-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .terms-card h3:first-child {
+      margin-top: 0;
+    }
+    .terms-card ul, .terms-card ol {
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      line-height: 1.75;
+      padding-left: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .terms-card li {
+      margin-bottom: 0.35rem;
+    }
+    .terms-card a {
+      color: var(--neon-cyan);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .terms-card a:hover {
+      color: var(--foreground);
+    }
+
+    /* Warning box */
+    .warning-box {
+      background: oklch(0.75 0.2 50 / 0.08);
+      border: 1px solid oklch(0.75 0.2 50 / 0.3);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .warning-box svg {
+      width: 1.25rem;
+      height: 1.25rem;
+      color: var(--sunset-orange);
+      flex-shrink: 0;
+    }
+    .warning-box span {
+      color: var(--sunset-orange);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    /* Return button */
+    .return-section {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .footer-name {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.3rem;
+    }
+    .footer-brand {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper {
+        padding: 1.5rem 1.25rem 3rem;
+      }
+      .hero {
+        padding: 1.5rem 0 2rem;
+      }
+      .hero h1 {
+        font-size: 1.85rem;
+      }
+      .hero p {
+        font-size: 0.95rem;
+      }
+      .terms-card {
+        padding: 1.25rem;
+      }
+      .section-header h2 {
+        font-size: 1.1rem;
+      }
+      .terms-section {
+        margin-bottom: 2rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page-wrapper {
+        padding: 1rem 0.75rem 2.5rem;
+      }
+      .hero {
+        padding: 1rem 0 1.5rem;
+      }
+      .hero h1 {
+        font-size: 1.5rem;
+      }
+      .hero p {
+        font-size: 0.9rem;
+      }
+      .terms-card {
+        padding: 1rem;
+      }
+      .terms-card p,
+      .terms-card ul,
+      .terms-card ol {
+        font-size: 0.85rem;
+      }
+      .section-header h2 {
+        font-size: 1rem;
+      }
+      .section-icon {
+        width: 2rem;
+        height: 2rem;
+      }
+      .section-icon svg {
+        width: 1rem;
+        height: 1rem;
+      }
+      .terms-section {
+        margin-bottom: 1.75rem;
+      }
+      .warning-box {
+        padding: 0.75rem 1rem;
+        font-size: 0.8rem;
+      }
+      .return-section .btn {
+        width: 100%;
+        display: block;
+        text-align: center;
+      }
+      .site-footer {
+        padding: 2rem 0 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="page-wrapper">
+
+      <!-- Hero -->
+      <div class="hero">
+        <span class="badge badge-pink">Legal Documentation</span>
+        <h1 style="margin-top: 1rem;">Terms of Service</h1>
+        <p>Please review the following terms carefully before using ALEX or any NAVADA services.</p>
+        <p class="last-updated">Last Updated: February 2026</p>
+      </div>
+
+      <!-- 1. Introduction -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </div>
+          <h2>1. Introduction &amp; NAVADA Movement</h2>
+        </div>
+        <div class="terms-card">
+          <p>Welcome to ALEX, an AI Agent developed as part of the <strong>NAVADA</strong> movement. NAVADA is a technology consultancy and research initiative focused on building intelligent, autonomous AI systems for real-world applications.</p>
+          <p><strong>Lee Akpareva</strong> is an independent consultant, holding an MBA and MA, who designs and operates AI agent systems. Lee is the creator and sole operator of ALEX and the NAVADA platform.</p>
+          <p>By accessing or using ALEX, the NAVADA website (alexnavada.xyz), or any associated services, you agree to be bound by these Terms of Service. If you do not agree to these terms, you must not use our services.</p>
+        </div>
+      </div>
+
+      <!-- 2. Services Provided -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <h2>2. Services Provided</h2>
+        </div>
+        <div class="terms-card">
+          <h3>ALEX AI Agent</h3>
+          <p>ALEX is an AI-powered Global Economist agent that provides market analysis, financial research, data visualization, and general-purpose AI assistance via Telegram and web interfaces.</p>
+          <h3>Professional Consulting</h3>
+          <p>NAVADA also offers the following professional services:</p>
+          <ul>
+            <li>Custom AI Agent Design and Development</li>
+            <li>AI Strategy Consulting for businesses and organisations</li>
+            <li>Enterprise AI Integration and workflow automation</li>
+            <li>Token Economics, Cost Modelling, and ROI Analysis</li>
+            <li>Technical Architecture Review and Optimisation</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 3. Beta Testing -->
+      <div class="terms-section" id="testing">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <h2>3. Beta Testing Program &amp; Guidelines</h2>
+        </div>
+        <div class="terms-card">
+          <div class="warning-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>ALEX is currently in Test Phase. Features may change, and service interruptions may occur.</span>
+          </div>
+
+          <h3>How to Join</h3>
+          <ol>
+            <li>Open Telegram and search for <strong>@ALEX_Navada_bot</strong></li>
+            <li>Send the <strong>/start</strong> command to begin</li>
+            <li>Interact naturally with ALEX to explore available features</li>
+            <li>Provide feedback via Telegram or email to help improve the system</li>
+          </ol>
+
+          <h3>Beta Tester Responsibilities</h3>
+          <ul>
+            <li>Use ALEX in good faith and for legitimate purposes</li>
+            <li>Report bugs, errors, or unexpected behaviour when encountered</li>
+            <li>Do not attempt to exploit, abuse, or overload the system</li>
+            <li>Do not share API keys, access tokens, or internal system details</li>
+            <li>Understand that beta features are subject to change without notice</li>
+            <li>Provide constructive feedback to help improve ALEX</li>
+          </ul>
+
+          <h3>Beta Limitations</h3>
+          <ul>
+            <li>Service availability is not guaranteed during the testing phase</li>
+            <li>Response times may vary depending on server load and API availability</li>
+            <li>Some tools and features may be restricted or unavailable</li>
+            <li>Data generated during beta may be reset or cleared</li>
+            <li>Rate limits are enforced to ensure fair usage across all testers</li>
+            <li>Advanced features (email, file generation) are restricted to approved users</li>
+          </ul>
+
+          <h3>Feedback</h3>
+          <p>We actively encourage feedback from beta testers. You can share feedback directly via Telegram or by emailing <a href="mailto:Alex.Ai.Navada@gmail.com">Alex.Ai.Navada@gmail.com</a>. Your input is valuable in shaping the future of ALEX.</p>
+
+          <h3>No Warranty</h3>
+          <p>The beta service is provided on an <strong>"as is"</strong> and <strong>"as available"</strong> basis. NAVADA makes no warranties, expressed or implied, regarding the reliability, accuracy, or availability of the beta service. Use at your own discretion.</p>
+        </div>
+      </div>
+
+      <!-- 4. Free Tier -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          </div>
+          <h2>4. Free Tier &amp; Usage Limitations</h2>
+        </div>
+        <div class="terms-card">
+          <h3>Free Access</h3>
+          <p>ALEX is currently available free of charge during the beta testing period. This includes access to public tools such as web search, financial data, charts, diagrams, and general AI conversation.</p>
+
+          <h3>Usage Limitations</h3>
+          <ul>
+            <li>API rate limits apply to all users (requests per minute and tokens per day)</li>
+            <li>Advanced tools (shell, email, file generation) are restricted to approved users</li>
+            <li>Conversations are subject to context window limits of the underlying AI models</li>
+            <li>Generated content (charts, PDFs, images) may be subject to size and frequency limits</li>
+            <li>NAVADA reserves the right to modify, limit, or revoke free access at any time</li>
+          </ul>
+
+          <h3>Fair Use Policy</h3>
+          <p>Free tier access is intended for individual use. Automated bulk requests, API scraping, or any activity that places excessive load on the system is prohibited. NAVADA may suspend accounts that violate fair use policies.</p>
+        </div>
+      </div>
+
+      <!-- 5. Custom Agent Development -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h2>5. Custom Agent Development</h2>
+        </div>
+        <div class="terms-card">
+          <p>NAVADA offers bespoke AI agent development services for businesses and individuals. Custom agent projects are scoped, quoted, and delivered on a per-engagement basis. Services include:</p>
+          <ul>
+            <li>Custom AI agent architecture design tailored to your business needs</li>
+            <li>Tool and API integration (CRM, email, databases, internal systems)</li>
+            <li>Deployment on cloud infrastructure or edge devices (e.g., Raspberry Pi)</li>
+            <li>Ongoing maintenance, monitoring, and performance optimisation</li>
+            <li>Training and documentation for your team</li>
+            <li>Token cost analysis and efficiency optimisation</li>
+          </ul>
+          <p>Custom development engagements are governed by separate agreements specific to each project.</p>
+        </div>
+      </div>
+
+      <!-- 6. Data & Privacy -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h2>6. Data &amp; Privacy</h2>
+        </div>
+        <div class="terms-card">
+          <h3>Data Collection</h3>
+          <p>ALEX collects conversation data necessary to provide the service, including message content, timestamps, and user identifiers (Telegram user ID). This data is stored locally on the ALEX server and is not sold or shared with third parties for marketing purposes.</p>
+
+          <h3>Third-Party AI Services</h3>
+          <p>Your messages are processed through third-party AI APIs (Anthropic Claude, OpenAI, DeepSeek) to generate responses. These providers have their own privacy policies and data handling practices. Anthropic and OpenAI do not use API data for model training.</p>
+
+          <h3>Memory Systems</h3>
+          <p>ALEX stores conversation summaries and learned facts in local memory systems (ChromaDB, JSON files) to provide contextual responses over time. You can request deletion of your stored data at any time by contacting us.</p>
+
+          <h3>No Sensitive Data</h3>
+          <p>Do not share sensitive personal information, financial credentials, passwords, or confidential business data with ALEX. While we implement security measures, the service is not designed for handling regulated or highly sensitive data.</p>
+        </div>
+      </div>
+
+      <!-- 7. Acceptable Use -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h2>7. Acceptable Use Policy</h2>
+        </div>
+        <div class="terms-card">
+          <p>When using ALEX and NAVADA services, you must not:</p>
+          <ul>
+            <li>Use the service for any illegal, harmful, or fraudulent activity</li>
+            <li>Attempt to exploit, hack, or gain unauthorised access to the system</li>
+            <li>Submit prompt injection attacks or attempt to override system instructions</li>
+            <li>Use ALEX to generate harmful, abusive, discriminatory, or misleading content</li>
+            <li>Scrape, reverse-engineer, or extract proprietary system information</li>
+            <li>Impersonate ALEX, NAVADA, or any associated personnel</li>
+            <li>Overload the service with automated requests or denial-of-service attempts</li>
+          </ul>
+          <p>Violation of these policies may result in immediate suspension or permanent ban from all NAVADA services.</p>
+        </div>
+      </div>
+
+      <!-- 8. Intellectual Property -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83M16.62 12l-5.74 9.94"/></svg>
+          </div>
+          <h2>8. Intellectual Property</h2>
+        </div>
+        <div class="terms-card">
+          <h3>NAVADA &amp; ALEX</h3>
+          <p>The NAVADA brand, ALEX AI Agent, associated code, architecture, design, and documentation are the intellectual property of Lee Akpareva. All rights reserved. You may not copy, distribute, or create derivative works from the ALEX system without explicit written permission.</p>
+
+          <h3>User Content</h3>
+          <p>You retain ownership of any original content you provide to ALEX. By using the service, you grant NAVADA a limited, non-exclusive licence to process your content for the sole purpose of providing the AI service.</p>
+
+          <h3>AI-Generated Content</h3>
+          <p>Content generated by ALEX (analysis, charts, reports, text) is provided for your use. You may use AI-generated outputs for personal and commercial purposes. However, NAVADA makes no claims of originality or accuracy for AI-generated content.</p>
+        </div>
+      </div>
+
+      <!-- 9. Disclaimers -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h2>9. Disclaimers &amp; Limitation of Liability</h2>
+        </div>
+        <div class="terms-card">
+          <h3>As Is</h3>
+          <p>ALEX and all NAVADA services are provided on an <strong>"as is"</strong> and <strong>"as available"</strong> basis without warranties of any kind, whether express, implied, statutory, or otherwise.</p>
+
+          <h3>No Guarantee of Accuracy</h3>
+          <p>AI-generated content, including financial analysis, market data, and research, is for informational purposes only and should not be considered professional financial, legal, or medical advice. Always verify critical information independently and consult qualified professionals for important decisions.</p>
+
+          <h3>Limitation of Liability</h3>
+          <p>To the maximum extent permitted by law, NAVADA and Lee Akpareva shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities, arising from your use of or inability to use the service.</p>
+
+          <h3>Service Availability</h3>
+          <p>NAVADA does not guarantee uninterrupted or error-free service. ALEX may be temporarily unavailable due to maintenance, updates, API provider outages, or technical issues. We aim for high availability but cannot guarantee 100% uptime.</p>
+        </div>
+      </div>
+
+      <!-- 10. Changes to Terms -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+          <h2>10. Changes to Terms</h2>
+        </div>
+        <div class="terms-card">
+          <p>NAVADA reserves the right to update or modify these Terms of Service at any time. Changes will be reflected on this page with an updated "Last Updated" date. Continued use of ALEX or any NAVADA services after changes are posted constitutes acceptance of the revised terms.</p>
+          <p>For significant changes, we will make reasonable efforts to notify users via Telegram or email. It is your responsibility to review these terms periodically.</p>
+        </div>
+      </div>
+
+      <!-- 11. Governing Law -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </div>
+          <h2>11. Governing Law</h2>
+        </div>
+        <div class="terms-card">
+          <p>These Terms of Service shall be governed by and construed in accordance with the laws of <strong>England and Wales</strong>. Any disputes arising from or relating to these terms or your use of the service shall be subject to the exclusive jurisdiction of the courts of England and Wales.</p>
+        </div>
+      </div>
+
+      <!-- 12. Contact Information -->
+      <div class="terms-section">
+        <div class="section-header">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h2>12. Contact Information</h2>
+        </div>
+        <div class="terms-card">
+          <p><strong>Lee Akpareva MBA, MA</strong></p>
+          <p>NAVADA -- AI Agent Research &amp; Consulting</p>
+          <p>Email: <a href="mailto:Alex.Ai.Navada@gmail.com">Alex.Ai.Navada@gmail.com</a></p>
+          <p>Website: <a href="https://www.alexnavada.xyz" target="_blank" rel="noopener">www.alexnavada.xyz</a></p>
+          <p>LinkedIn: <a href="https://www.linkedin.com/in/lee-akpareva" target="_blank" rel="noopener">linkedin.com/in/lee-akpareva</a></p>
+        </div>
+      </div>
+
+      <!-- Return to Home -->
+      <div class="return-section">
+        <a href="/" class="btn btn-pink">Return to Home</a>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>

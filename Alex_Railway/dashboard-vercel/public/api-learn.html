@@ -1,0 +1,2381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <meta name="description" content="Learn how APIs work from zero to builder. Interactive lessons, live demos, and code examples using the NAVADA API.">
+  <title>How APIs Work — API Academy | ALEX NAVADA</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    html { scroll-behavior: smooth; }
+
+    /* ===== Section Navigation Dots ===== */
+    .section-dots {
+      position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+      z-index: 900; display: flex; flex-direction: column; gap: 10px;
+    }
+    .section-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--border, #3d2d5c); border: none; cursor: pointer;
+      transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
+      position: relative;
+    }
+    .section-dot.active {
+      background: var(--neon-pink, #e840a0);
+      box-shadow: 0 0 8px oklch(0.75 0.25 330);
+      transform: scale(1.3);
+    }
+    .section-dot:hover { background: var(--neon-cyan, #00c8d4); }
+    .section-dot .dot-label {
+      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+      white-space: nowrap; font-size: 0.7rem; color: var(--muted-foreground, #9585b5);
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      padding: 2px 8px; border-radius: 4px; opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .section-dot:hover .dot-label { opacity: 1; }
+
+    /* ===== Hero ===== */
+    .hero-learn {
+      text-align: center; padding: 5rem 1rem 4rem;
+      position: relative; overflow: hidden;
+    }
+    .hero-learn h1 {
+      font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--foreground, #f0edf5), var(--neon-cyan, #00c8d4));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-learn .subtitle {
+      color: var(--muted-foreground, #9585b5); font-size: 1.1rem;
+      max-width: 600px; margin: 0 auto 2rem;
+    }
+    .hero-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .back-link {
+      color: var(--muted-foreground, #9585b5); font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--neon-cyan, #00c8d4); }
+
+    /* ===== Section Titles ===== */
+    .learn-section { padding: 4rem 1rem; max-width: 1000px; margin: 0 auto; }
+    .section-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.15em;
+      color: var(--neon-pink, #e840a0); margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;
+      color: var(--foreground, #f0edf5);
+    }
+    .section-lead {
+      color: var(--muted-foreground, #9585b5); font-size: 0.95rem;
+      margin-bottom: 2rem; max-width: 700px;
+    }
+
+    /* ===== Restaurant Analogy Flow ===== */
+    .analogy-flow {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; flex-wrap: wrap; margin: 2rem 0;
+    }
+    .analogy-node {
+      background: var(--card, #1d1529); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 8px; padding: 0.75rem 1.25rem; text-align: center;
+      font-size: 0.8rem; font-weight: 600; color: var(--foreground, #f0edf5);
+      min-width: 120px; position: relative;
+      box-shadow: 0 0 8px oklch(0.7 0.2 195 / 0.2);
+    }
+    .analogy-node small {
+      display: block; font-size: 0.65rem; font-weight: 400;
+      color: var(--muted-foreground, #9585b5); margin-top: 2px;
+    }
+    .analogy-arrow {
+      color: var(--neon-pink, #e840a0); font-size: 1.2rem;
+      padding: 0 0.5rem; font-weight: 700; flex-shrink: 0;
+    }
+    .analogy-return {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem; margin-top: 1rem; color: var(--sunset-orange, #d48030);
+      font-size: 0.85rem; font-weight: 500;
+    }
+
+    /* ===== Concept Cards ===== */
+    .concept-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .concept-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .concept-card:hover {
+      border-color: var(--neon-cyan, #00c8d4); transform: translateY(-2px);
+    }
+    .concept-card .card-icon {
+      font-size: 1.5rem; margin-bottom: 0.5rem;
+    }
+    .concept-card h4 {
+      font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--foreground, #f0edf5);
+    }
+    .concept-card p {
+      font-size: 0.8rem; color: var(--muted-foreground, #9585b5); line-height: 1.5;
+    }
+
+    /* ===== Real-World Examples ===== */
+    .real-examples {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .real-example {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .real-example .ex-icon {
+      font-size: 1.75rem; flex-shrink: 0;
+    }
+    .real-example .ex-flow {
+      font-size: 0.8rem; color: var(--muted-foreground, #9585b5);
+    }
+    .real-example .ex-flow span {
+      color: var(--neon-cyan, #00c8d4); font-weight: 600;
+    }
+
+    /* ===== Anatomy: Interactive URL Breakdown ===== */
+    .anatomy-display {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 2rem 0;
+      overflow-x: auto;
+    }
+    .url-line {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;
+      display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 1rem;
+      line-height: 2;
+    }
+    .url-part {
+      cursor: pointer; padding: 2px 4px; border-radius: 4px;
+      transition: background 0.2s, color 0.2s; position: relative;
+    }
+    .url-part:hover, .url-part.active {
+      color: var(--foreground, #f0edf5);
+    }
+    .url-part[data-part="method"] { color: var(--neon-pink, #e840a0); }
+    .url-part[data-part="method"]:hover, .url-part[data-part="method"].active {
+      background: oklch(0.75 0.25 330 / 0.15);
+    }
+    .url-part[data-part="base"] { color: var(--muted-foreground, #9585b5); }
+    .url-part[data-part="base"]:hover, .url-part[data-part="base"].active {
+      background: oklch(0.65 0.1 290 / 0.15);
+    }
+    .url-part[data-part="endpoint"] { color: var(--neon-cyan, #00c8d4); }
+    .url-part[data-part="endpoint"]:hover, .url-part[data-part="endpoint"].active {
+      background: oklch(0.7 0.2 195 / 0.15);
+    }
+    .url-part[data-part="params"] { color: var(--sunset-orange, #d48030); }
+    .url-part[data-part="params"]:hover, .url-part[data-part="params"].active {
+      background: oklch(0.75 0.2 50 / 0.15);
+    }
+    .url-explain {
+      background: oklch(0.13 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; min-height: 60px;
+      transition: opacity 0.3s;
+    }
+    .url-explain h4 { font-size: 0.85rem; margin-bottom: 0.3rem; }
+    .url-explain p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Code Blocks ===== */
+    .code-block {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem 1.25rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+      color: var(--muted-foreground, #9585b5); line-height: 1.7;
+      overflow-x: auto; margin: 1rem 0;
+    }
+    .code-block .hl-key { color: var(--neon-cyan, #00c8d4); }
+    .code-block .hl-val { color: var(--sunset-orange, #d48030); }
+    .code-block .hl-comment { color: oklch(0.45 0.05 290); }
+    .code-block .hl-str { color: #22c55e; }
+    .code-block .hl-kw { color: var(--neon-pink, #e840a0); font-weight: 600; }
+    .code-block .hl-fn { color: #e5c07b; }
+
+    /* Syntax colours for tab-content code examples */
+    .tab-content .hl-key { color: var(--neon-cyan, #00c8d4); }
+    .tab-content .hl-val { color: var(--sunset-orange, #d48030); }
+    .tab-content .hl-str { color: #22c55e; }
+    .tab-content .hl-kw { color: var(--neon-pink, #e840a0); font-weight: 600; }
+    .tab-content .hl-fn { color: #e5c07b; }
+    .tab-content .hl-num { color: var(--sunset-orange, #d48030); }
+    .tab-content .hl-comment {
+      color: oklch(0.5 0.06 290); font-style: italic;
+    }
+    .tab-content .hl-hint {
+      color: oklch(0.55 0.08 270); font-style: italic;
+      display: inline-block; border-left: 2px solid oklch(0.35 0.08 290);
+      padding-left: 0.75em; margin-left: 0.75em;
+    }
+    .tab-content .hl-tag { color: #ef596f; }
+    .tab-content .hl-attr { color: var(--neon-cyan, #00c8d4); }
+    .tab-content .hl-decorator { color: #e5c07b; }
+
+    /* ===== AI Pipeline Section ===== */
+    .ai-pipeline-flow {
+      display: flex; align-items: stretch; justify-content: center;
+      gap: 0; flex-wrap: wrap; margin: 2rem 0;
+    }
+    .ai-pipe-node {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1rem 1rem 0.75rem; text-align: center;
+      min-width: 110px; max-width: 150px; flex: 1;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .ai-pipe-node:hover { transform: translateY(-2px); }
+    .ai-pipe-node .pipe-icon { font-size: 1.5rem; margin-bottom: 0.35rem; }
+    .ai-pipe-node .pipe-role {
+      font-size: 0.8rem; font-weight: 600; color: var(--foreground, #f0edf5);
+      margin-bottom: 0.2rem;
+    }
+    .ai-pipe-node .pipe-desc {
+      font-size: 0.68rem; color: var(--muted-foreground, #9585b5); line-height: 1.4;
+    }
+    .ai-pipe-node.node-user { border-color: var(--neon-cyan, #00c8d4); }
+    .ai-pipe-node.node-llm { border-color: var(--neon-pink, #e840a0); }
+    .ai-pipe-node.node-api { border-color: var(--sunset-orange, #d48030); }
+    .ai-pipe-node.node-tool { border-color: #22c55e; }
+    .ai-pipe-node.node-decision { border-color: #a78bfa; }
+    .ai-pipe-node.node-output { border-color: var(--neon-cyan, #00c8d4); }
+    .ai-pipe-arrow {
+      display: flex; align-items: center; color: var(--muted-foreground, #9585b5);
+      font-size: 1rem; padding: 0 0.3rem; flex-shrink: 0;
+    }
+    .misconception-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 2rem 0;
+    }
+    .misconception-card {
+      background: var(--card, #1d1529); border-radius: 10px; padding: 1.25rem;
+      border: 1px solid var(--border, #3d2d5c);
+    }
+    .misconception-card.myth { border-left: 3px solid oklch(0.65 0.25 25); }
+    .misconception-card.reality { border-left: 3px solid #22c55e; }
+    .misconception-card h4 { font-size: 0.85rem; margin-bottom: 0.4rem; }
+    .misconception-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); line-height: 1.5; }
+
+    /* ===== DaaS Section ===== */
+    .daas-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .daas-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .daas-card:hover { border-color: var(--neon-cyan, #00c8d4); transform: translateY(-2px); }
+    .daas-card .daas-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .daas-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; color: var(--foreground, #f0edf5); }
+    .daas-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); line-height: 1.5; }
+
+    /* ===== FAQ Section ===== */
+    .faq-list { margin: 2rem 0; }
+    .faq-item {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; margin-bottom: 0.75rem; overflow: hidden;
+    }
+    .faq-q {
+      padding: 1rem 1.25rem; cursor: pointer; display: flex;
+      justify-content: space-between; align-items: center;
+      font-size: 0.9rem; font-weight: 500; color: var(--foreground, #f0edf5);
+      transition: background 0.2s;
+    }
+    .faq-q:hover { background: oklch(0.15 0.03 290); }
+    .faq-q .faq-arrow {
+      font-size: 0.75rem; color: var(--neon-pink, #e840a0);
+      transition: transform 0.3s; flex-shrink: 0; margin-left: 1rem;
+    }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;
+      padding: 0 1.25rem;
+    }
+    .faq-item.open .faq-a { max-height: 400px; padding: 0 1.25rem 1rem; }
+    .faq-a p {
+      font-size: 0.82rem; color: var(--muted-foreground, #9585b5);
+      line-height: 1.6; margin-bottom: 0.5rem;
+    }
+
+    /* ===== Terms Section ===== */
+    .terms-content {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 2rem; margin: 2rem 0;
+    }
+    .terms-content h4 {
+      font-size: 0.95rem; color: var(--foreground, #f0edf5);
+      margin: 1.25rem 0 0.5rem;
+    }
+    .terms-content h4:first-child { margin-top: 0; }
+    .terms-content p, .terms-content li {
+      font-size: 0.82rem; color: var(--muted-foreground, #9585b5); line-height: 1.6;
+    }
+    .terms-content ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+    .terms-content li { margin-bottom: 0.35rem; }
+
+    @media (max-width: 768px) {
+      .ai-pipeline-flow { flex-direction: column; align-items: center; }
+      .ai-pipe-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
+      .ai-pipe-node { max-width: 100%; min-width: 0; width: 100%; }
+      .misconception-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ===== Status Codes ===== */
+    .status-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem; margin: 1.5rem 0;
+    }
+    .status-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 0.75rem 1rem;
+    }
+    .status-code {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700;
+      min-width: 36px;
+    }
+    .status-code.green { color: #22c55e; }
+    .status-code.amber { color: var(--sunset-orange, #d48030); }
+    .status-code.red { color: oklch(0.65 0.25 25); }
+    .status-desc { font-size: 0.78rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Journey Visualizer ===== */
+    .journey-wrap {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 2rem 0;
+    }
+    .pipeline {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0; margin: 1.5rem 0; overflow-x: auto; padding: 1rem 0;
+    }
+    .pipe-node {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      min-width: 80px; position: relative; flex-shrink: 0;
+    }
+    .pipe-circle {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: oklch(0.13 0.02 290); border: 2px solid var(--border, #3d2d5c);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: border-color 0.4s, box-shadow 0.4s, background 0.4s;
+      position: relative;
+    }
+    .pipe-circle.active {
+      border-color: var(--neon-cyan, #00c8d4);
+      box-shadow: 0 0 12px oklch(0.7 0.2 195), 0 0 24px oklch(0.7 0.2 195 / 0.3);
+    }
+    .pipe-circle.done {
+      border-color: #22c55e; background: oklch(0.7 0.2 145 / 0.08);
+    }
+    .pipe-circle.done::after {
+      content: ''; position: absolute; bottom: -2px; right: -2px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #22c55e; color: #000; font-size: 0.6rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pipe-circle.error {
+      border-color: oklch(0.65 0.25 25);
+      box-shadow: 0 0 12px oklch(0.65 0.25 25 / 0.4);
+    }
+    .pipe-label {
+      font-size: 0.65rem; color: var(--muted-foreground, #9585b5);
+      text-align: center; white-space: nowrap;
+    }
+    .pipe-line {
+      flex: 1; height: 2px; min-width: 20px;
+      background: var(--border, #3d2d5c); position: relative;
+      overflow: hidden;
+    }
+    .pipe-line.active {
+      background: var(--neon-cyan, #00c8d4);
+      box-shadow: 0 0 6px oklch(0.7 0.2 195 / 0.4);
+    }
+    .pipe-line.active::after {
+      content: ''; position: absolute; top: -1px; left: -20px;
+      width: 20px; height: 4px; border-radius: 2px;
+      background: white; opacity: 0.6;
+      animation: dashFlow 0.8s linear infinite;
+    }
+    @keyframes dashFlow {
+      from { left: -20px; } to { left: 100%; }
+    }
+
+    /* Log Panel */
+    .log-panel {
+      background: oklch(0.08 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      color: var(--muted-foreground, #9585b5); max-height: 260px;
+      overflow-y: auto; line-height: 1.8;
+    }
+    .log-line { opacity: 0; animation: logAppear 0.3s ease-out forwards; }
+    @keyframes logAppear { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+    .log-line .log-ok { color: #22c55e; }
+    .log-line .log-fail { color: oklch(0.65 0.25 25); }
+    .log-line .log-info { color: var(--neon-cyan, #00c8d4); }
+    .log-line .log-time { color: var(--sunset-orange, #d48030); }
+
+    /* Journey Controls */
+    .journey-controls {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;
+      margin-bottom: 1.5rem;
+    }
+    .jc-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .jc-group label {
+      font-size: 0.7rem; color: var(--muted-foreground, #9585b5);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .jc-group select, .jc-group input {
+      background: oklch(0.13 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      color: var(--foreground, #f0edf5); padding: 0.5rem 0.75rem;
+      border-radius: 6px; font-size: 0.8rem; outline: none;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .jc-group select:focus, .jc-group input:focus {
+      border-color: var(--neon-cyan, #00c8d4);
+    }
+    .speed-toggle {
+      display: flex; border: 1px solid var(--border, #3d2d5c); border-radius: 6px; overflow: hidden;
+    }
+    .speed-toggle button {
+      background: none; border: none; color: var(--muted-foreground, #9585b5);
+      padding: 0.5rem 0.75rem; font-size: 0.75rem; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; transition: background 0.2s, color 0.2s;
+    }
+    .speed-toggle button.active {
+      background: var(--neon-cyan, #00c8d4); color: oklch(0.1 0.02 290);
+    }
+
+    /* Step Detail Panel (step-by-step mode) */
+    .step-detail {
+      background: oklch(0.14 0.04 290); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+      box-shadow: 0 0 15px oklch(0.7 0.2 195 / 0.15);
+    }
+    .step-detail-num {
+      font-size: 0.7rem; color: var(--neon-cyan, #00c8d4); margin-bottom: 0.4rem;
+      font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .step-detail-title { font-size: 1.05rem; color: var(--foreground, #f0edf5); margin-bottom: 0.5rem; }
+    .step-detail-desc { font-size: 0.85rem; color: var(--muted-foreground, #9585b5); line-height: 1.6; }
+
+    /* Human Body Analogy */
+    .body-analogy { margin: 2.5rem 0; }
+    .body-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-top: 1rem;
+    }
+    .body-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem; text-align: center;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+    .body-card:hover { border-color: var(--neon-pink, #e840a0); transform: translateY(-2px); }
+    .body-emoji { font-size: 2rem; margin-bottom: 0.5rem; }
+    .body-organ { font-size: 0.95rem; font-weight: 600; color: var(--neon-pink, #e840a0); margin-bottom: 0.15rem; }
+    .body-arrow { color: var(--muted-foreground, #9585b5); font-size: 0.75rem; margin: 0.25rem 0; }
+    .body-api { font-size: 0.85rem; color: var(--neon-cyan, #00c8d4); font-family: 'JetBrains Mono', monospace; }
+    .body-desc { font-size: 0.78rem; color: var(--muted-foreground, #9585b5); margin-top: 0.4rem; line-height: 1.5; }
+
+    /* Response Panel */
+    .response-panel {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem; margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+      color: #22c55e; white-space: pre-wrap; word-break: break-word;
+      max-height: 300px; overflow-y: auto; display: none;
+    }
+    .response-panel.show { display: block; }
+
+    /* ===== Code Examples Tabs ===== */
+    .tab-bar {
+      display: flex; gap: 2px; margin-bottom: 0; flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-bottom: none; border-radius: 8px 8px 0 0;
+      color: var(--muted-foreground, #9585b5); padding: 0.5rem 1rem;
+      font-size: 0.78rem; cursor: pointer; font-family: 'JetBrains Mono', monospace;
+      transition: color 0.2s, background 0.2s;
+    }
+    .tab-btn.active {
+      background: oklch(0.1 0.02 290); color: var(--neon-cyan, #00c8d4);
+      border-color: var(--neon-cyan, #00c8d4); border-bottom-color: oklch(0.1 0.02 290);
+    }
+    .tab-content {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 0 8px 8px 8px; padding: 1.25rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;
+      color: var(--muted-foreground, #9585b5); line-height: 1.7;
+      white-space: pre; overflow-x: auto; display: none;
+    }
+    .tab-content.active { display: block; }
+
+    /* ===== Builder Section Cards ===== */
+    .builder-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;
+    }
+    .builder-card h4 {
+      font-size: 1rem; margin-bottom: 0.5rem; color: var(--foreground, #f0edf5);
+    }
+    .builder-card .builder-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+      color: var(--neon-pink, #e840a0); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 0.5rem;
+    }
+    .before-after {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;
+    }
+    .ba-panel {
+      background: oklch(0.1 0.02 290); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 8px; padding: 1rem;
+    }
+    .ba-panel h5 {
+      font-size: 0.75rem; color: var(--muted-foreground, #9585b5);
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem;
+    }
+    .ba-panel pre {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      color: var(--foreground, #f0edf5); line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word;
+    }
+
+    /* ===== Data-Driven Cards ===== */
+    .data-cards {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 0.75rem; margin: 2rem 0;
+    }
+    .data-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1rem; text-align: center;
+      transition: border-color 0.3s;
+    }
+    .data-card:hover { border-color: var(--neon-pink, #e840a0); }
+    .data-card .dc-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .data-card .dc-raw { font-size: 0.75rem; color: var(--muted-foreground, #9585b5); }
+    .data-card .dc-arrow { color: var(--neon-pink, #e840a0); margin: 0.3rem 0; font-size: 0.8rem; }
+    .data-card .dc-api { font-size: 0.75rem; color: var(--neon-cyan, #00c8d4); font-weight: 600; }
+
+    /* ===== Flowchart ===== */
+    .flowchart {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0; margin: 2rem 0;
+    }
+    .fc-node {
+      background: var(--card, #1d1529); border: 1px solid var(--neon-cyan, #00c8d4);
+      border-radius: 8px; padding: 0.6rem 1.25rem;
+      font-size: 0.8rem; color: var(--foreground, #f0edf5); text-align: center;
+      min-width: 180px;
+    }
+    .fc-node.decision {
+      border-color: var(--neon-pink, #e840a0); border-radius: 4px;
+      transform: rotate(0deg);
+    }
+    .fc-node.action {
+      border-color: #22c55e; background: oklch(0.7 0.2 145 / 0.05);
+    }
+    .fc-arrow {
+      color: var(--muted-foreground, #9585b5); font-size: 1rem;
+      padding: 0.25rem 0;
+    }
+    .fc-branch {
+      display: flex; gap: 2rem; align-items: flex-start; justify-content: center;
+      margin: 0.5rem 0;
+    }
+    .fc-branch-arm {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+    .fc-label {
+      font-size: 0.65rem; color: var(--sunset-orange, #d48030);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ===== Principles ===== */
+    .principle-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .principle-card {
+      background: var(--card, #1d1529);
+      border: 1px solid var(--border, #3d2d5c); border-left: 3px solid var(--neon-pink, #e840a0);
+      border-radius: 0 10px 10px 0; padding: 1.25rem;
+    }
+    .principle-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; color: var(--foreground, #f0edf5); }
+    .principle-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Footer ===== */
+    .learn-footer {
+      text-align: center; padding: 3rem 1rem; margin-top: 2rem;
+      border-top: 1px solid var(--border, #3d2d5c);
+    }
+    .learn-footer p {
+      color: var(--muted-foreground, #9585b5); font-size: 0.8rem; margin-bottom: 0.5rem;
+    }
+    .learn-footer a { color: var(--neon-cyan, #00c8d4); }
+    .learn-footer a:hover { text-decoration: underline; }
+
+    /* ===== Questions Cards ===== */
+    .question-cards {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .question-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+    }
+    .question-card .q-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.5rem;
+      font-weight: 700; color: var(--neon-pink, #e840a0); margin-bottom: 0.5rem;
+    }
+    .question-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .question-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Resources ===== */
+    .resource-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem; margin: 2rem 0;
+    }
+    .resource-card {
+      background: var(--card, #1d1529); border: 1px solid var(--border, #3d2d5c);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.3s;
+    }
+    .resource-card:hover { border-color: var(--neon-cyan, #00c8d4); }
+    .resource-card h4 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .resource-card p { font-size: 0.8rem; color: var(--muted-foreground, #9585b5); }
+
+    /* ===== Mobile ===== */
+    @media (max-width: 768px) {
+      .hero-learn { padding: 3.5rem 1rem 2.5rem; }
+      .hero-learn h1 { font-size: 1.75rem; }
+      .learn-section { padding: 2.5rem 1rem; }
+      .section-title { font-size: 1.35rem; }
+      .analogy-flow { flex-direction: column; gap: 0; }
+      .analogy-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
+      .pipeline { flex-direction: column; align-items: stretch; gap: 0; }
+      .pipe-line { width: 2px; height: 20px; min-width: 2px; align-self: center; }
+      .pipe-node { width: 100%; }
+      .before-after { grid-template-columns: 1fr; }
+      .section-dots { display: none; }
+      .fc-branch { flex-direction: column; gap: 0.5rem; }
+    }
+    @media (max-width: 480px) {
+      .concept-grid, .real-examples, .status-grid, .data-cards, .question-cards, .principle-grid, .resource-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page-content">
+
+  <!-- Section Navigation Dots -->
+  <div class="section-dots" id="sectionDots"></div>
+
+  <!-- ====== SECTION 1: HERO ====== -->
+  <section class="hero-learn" id="sec-hero" data-section="Hero">
+    <div style="max-width:800px;margin:0 auto;">
+      <div class="section-num">API Academy</div>
+      <h1>How APIs Work -- From Zero to Builder</h1>
+      <p class="subtitle">Everything you need to understand, use, and build APIs. No prior experience needed.</p>
+      <div class="hero-btns">
+        <a href="#sec-why" class="btn btn-pink">Start Learning</a>
+        <a href="#sec-journey" class="btn btn-cyan-outline">Jump to Live Demo</a>
+      </div>
+      <a href="/api-library" class="back-link">&larr; Back to API Library</a>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 2: WHY DO APIs EXIST? ====== -->
+  <section class="learn-section" id="sec-why" data-section="Why APIs Exist">
+    <div class="section-num">Section 01</div>
+    <h2 class="section-title">Why Do APIs Exist?</h2>
+    <p class="section-lead">Before we touch any code, let's understand the problem APIs solve -- using something everyone knows.</p>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin-bottom:1rem;">Your Body Is Already an API System</h3>
+    <p style="color:var(--muted-foreground);font-size:0.9rem;margin-bottom:1.25rem;max-width:700px;">
+      You don't need to learn APIs — your body already <em>runs</em> on them. Every organ is a service, every nerve signal is a request, and every reaction is a response. Here's how:
+    </p>
+
+    <div class="body-grid">
+      <div class="body-card">
+        <div class="body-emoji">&#x1f441;</div>
+        <div class="body-organ">Eyes</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">GET /api/vision</div>
+        <div class="body-desc">Your eyes send visual data to your brain. The brain processes it and returns "that's a car" — just like a GET request returns data.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f9e0;</div>
+        <div class="body-organ">Brain</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">API Gateway</div>
+        <div class="body-desc">Your brain routes signals to the right organ, validates priorities, and decides what's urgent — exactly what an API gateway does with requests.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x2764;&#xfe0f;</div>
+        <div class="body-organ">Heart</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">Background Service</div>
+        <div class="body-desc">Always running, keeping everything alive. Like a server process that runs 24/7 handling requests without being asked.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f4aa;</div>
+        <div class="body-organ">Muscles</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">POST /api/action</div>
+        <div class="body-desc">Your brain sends a command: "move arm." The muscle executes it and sends back a status: "done." That's a POST request — you're creating an action.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f321;&#xfe0f;</div>
+        <div class="body-organ">Skin (Nerves)</div>
+        <div class="body-arrow">work like</div>
+        <div class="body-api">Webhooks / Sensors</div>
+        <div class="body-desc">Touch something hot? Nerves instantly fire a signal without you asking. Like a webhook that triggers automatically when something changes.</div>
+      </div>
+      <div class="body-card">
+        <div class="body-emoji">&#x1f9ec;</div>
+        <div class="body-organ">Immune System</div>
+        <div class="body-arrow">works like</div>
+        <div class="body-api">Auth &amp; Rate Limiting</div>
+        <div class="body-desc">Your immune system checks if something belongs (authentication), blocks threats (firewall), and fights off too many invaders at once (rate limiting).</div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:1.5rem 0 2.5rem;text-align:center;">
+      <p style="color:var(--foreground);font-size:0.9rem;margin-bottom:0.5rem;font-weight:500;">The Point:</p>
+      <p style="color:var(--muted-foreground);font-size:0.85rem;max-width:600px;margin:0 auto;">
+        APIs aren't a foreign concept — they're the same pattern your body uses every second. A <strong style="color:var(--neon-cyan);">request</strong> goes in, it gets <strong style="color:var(--neon-pink);">processed</strong>, and a <strong style="color:#22c55e;">response</strong> comes back. That's all an API is.
+      </p>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin-bottom:1rem;">The Restaurant Analogy</h3>
+
+    <div class="analogy-flow">
+      <div class="analogy-node">You<small>(Customer)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">Menu<small>(API Docs)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:var(--neon-pink);">Waiter<small>(The API)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">Kitchen<small>(Server / DB)</small></div>
+    </div>
+    <div class="analogy-return">
+      <span>&darr;</span> Your Food (the Response) comes back through the Waiter
+    </div>
+
+    <div class="concept-grid" style="margin-top:2.5rem;">
+      <div class="concept-card">
+        <div class="card-icon">&#x1f373;</div>
+        <h4>"You don't need to know how the kitchen works"</h4>
+        <p>APIs hide complexity. You just ask for what you want and get a result back, without knowing the internals.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4d6;</div>
+        <h4>"The menu tells you what's available"</h4>
+        <p>API documentation lists every "dish" (endpoint) you can order, what ingredients (parameters) it needs, and what you'll get back.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4cb;</div>
+        <h4>"You order in a specific way"</h4>
+        <p>Requests follow a format: a URL, HTTP method, headers, and parameters. Like filling out an order slip.</p>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon">&#x1f4e6;</div>
+        <h4>"You get exactly what you asked for"</h4>
+        <p>The response is structured data (usually JSON) -- predictable, machine-readable, and consistent every time.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">APIs You Already Use Every Day</h3>
+    <div class="real-examples">
+      <div class="real-example">
+        <div class="ex-icon">&#x1f326;</div>
+        <div class="ex-flow">Weather app on your phone <span>&rarr;</span> Weather API <span>&rarr;</span> forecast data</div>
+      </div>
+      <div class="real-example">
+        <div class="ex-icon">&#x1f697;</div>
+        <div class="ex-flow">Google Maps in Uber <span>&rarr;</span> Maps API <span>&rarr;</span> routes &amp; ETAs</div>
+      </div>
+      <div class="real-example">
+        <div class="ex-icon">&#x1f4b3;</div>
+        <div class="ex-flow">Card payment at a shop <span>&rarr;</span> Payment API <span>&rarr;</span> approved/declined</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 3: ANATOMY OF AN API REQUEST ====== -->
+  <section class="learn-section" id="sec-anatomy" data-section="Anatomy of a Request">
+    <div class="section-num">Section 02</div>
+    <h2 class="section-title">Anatomy of an API Request</h2>
+    <p class="section-lead">Every API call has the same building blocks. Click each part to learn what it does.</p>
+
+    <div class="anatomy-display">
+      <div class="url-line" id="urlLine">
+        <span class="url-part" data-part="method" onclick="explainPart('method')">GET</span>
+        <span style="color:var(--muted-foreground)">&nbsp;</span>
+        <span class="url-part" data-part="base" onclick="explainPart('base')">https://alexnavada.xyz</span>
+        <span class="url-part" data-part="endpoint" onclick="explainPart('endpoint')">/api/v1/weather</span>
+        <span class="url-part" data-part="params" onclick="explainPart('params')">?city=London</span>
+      </div>
+      <div class="url-explain" id="urlExplain">
+        <h4 style="color:var(--neon-cyan)">Click any part above</h4>
+        <p>Each coloured segment of the URL serves a different purpose. Click one to learn more.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">Headers -- Metadata About Your Request</h3>
+    <div class="code-block"><span class="hl-key">X-API-Key:</span> <span class="hl-val">nav_abc123...</span>    <span class="hl-comment">// Your identity (authentication)</span>
+<span class="hl-key">Content-Type:</span> <span class="hl-val">application/json</span>   <span class="hl-comment">// The format you expect</span></div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">Response -- What Comes Back</h3>
+    <div class="code-block"><span class="hl-key">Status:</span> <span class="hl-str">200 OK</span>
+{
+  <span class="hl-key">"city"</span>: <span class="hl-str">"London"</span>,
+  <span class="hl-key">"temp_c"</span>: <span class="hl-val">12</span>,
+  <span class="hl-key">"condition"</span>: <span class="hl-str">"Cloudy"</span>
+}</div>
+
+    <h3 style="font-size:1rem;color:var(--foreground);margin:2rem 0 0.75rem;">HTTP Status Codes</h3>
+    <div class="status-grid">
+      <div class="status-item"><span class="status-code green">200</span><span class="status-desc">OK -- Success, here is your data</span></div>
+      <div class="status-item"><span class="status-code amber">400</span><span class="status-desc">Bad Request -- your mistake</span></div>
+      <div class="status-item"><span class="status-code red">401</span><span class="status-desc">Unauthorized -- wrong/missing key</span></div>
+      <div class="status-item"><span class="status-code amber">404</span><span class="status-desc">Not Found -- endpoint doesn't exist</span></div>
+      <div class="status-item"><span class="status-code amber">429</span><span class="status-desc">Too Many Requests -- slow down</span></div>
+      <div class="status-item"><span class="status-code red">500</span><span class="status-desc">Server Error -- not your fault</span></div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 3b: COMMON MISCONCEPTIONS ====== -->
+  <section class="learn-section" id="sec-misconceptions" data-section="Misconceptions">
+    <div class="section-num">Section 02b</div>
+    <h2 class="section-title">What an API Actually Is (and Isn't)</h2>
+    <p class="section-lead">Before you go further, let's clear up three things that trip up almost everyone learning APIs for the first time.</p>
+
+    <!-- Misconception 1: API = the data -->
+    <div class="concept-grid" style="grid-template-columns:1fr;max-width:800px;">
+      <div class="concept-card" style="border-left:3px solid var(--neon-pink);">
+        <div class="card-icon">&#x1f6aa;</div>
+        <h4 style="color:var(--neon-pink);">Misconception: "An API is where the data lives"</h4>
+        <p style="margin-bottom:0.75rem;">An API is not the data. It's the <strong style="color:var(--neon-cyan);">door to the data</strong>. The data itself can live anywhere -- a database, a file, another API, or be generated on the fly. The API is just the agreed-upon way to ask for it and get it back.</p>
+        <div style="background:var(--background,#16111f);border-radius:8px;padding:1rem;margin-top:0.5rem;">
+          <p style="font-size:0.8rem;color:var(--muted-foreground);margin-bottom:0.5rem;">Think of it like a restaurant:</p>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;font-size:0.8rem;">
+            <span style="background:oklch(0.7 0.2 195 / 0.15);color:var(--neon-cyan);padding:0.3rem 0.6rem;border-radius:4px;font-weight:600;">You (app)</span>
+            <span style="color:var(--neon-pink);">&#x2192;</span>
+            <span style="background:oklch(0.75 0.25 330 / 0.15);color:var(--neon-pink);padding:0.3rem 0.6rem;border-radius:4px;font-weight:600;">Waiter (API)</span>
+            <span style="color:var(--neon-pink);">&#x2192;</span>
+            <span style="background:oklch(0.75 0.2 50 / 0.15);color:var(--sunset-orange);padding:0.3rem 0.6rem;border-radius:4px;font-weight:600;">Kitchen (database, service, AI)</span>
+          </div>
+          <p style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.5rem;">You never go into the kitchen. You don't know if the chef uses a gas stove or electric. You just talk to the waiter, place your order, and get your food. The API is the waiter -- not the kitchen, not the food.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Misconception 2: JSON = storage -->
+    <div class="concept-grid" style="grid-template-columns:1fr;max-width:800px;margin-top:1.5rem;">
+      <div class="concept-card" style="border-left:3px solid var(--neon-cyan);">
+        <div class="card-icon">&#x1f4e6;</div>
+        <h4 style="color:var(--neon-cyan);">Misconception: "JSON is how APIs store data"</h4>
+        <p style="margin-bottom:0.75rem;">JSON is the <strong style="color:var(--neon-pink);">packaging</strong>, not the storage. It's how the API wraps data for delivery. Behind the scenes, the same data might be stored completely differently.</p>
+        <div style="background:var(--background,#16111f);border-radius:8px;padding:1rem;margin-top:0.5rem;">
+          <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+            <tr style="color:var(--muted-foreground);">
+              <th style="text-align:left;padding:0.4rem 0.5rem;border-bottom:1px solid var(--border);font-weight:500;">Stored as</th>
+              <th style="text-align:center;padding:0.4rem;border-bottom:1px solid var(--border);">&#x2192;</th>
+              <th style="text-align:left;padding:0.4rem 0.5rem;border-bottom:1px solid var(--border);font-weight:500;">Sent as</th>
+            </tr>
+            <tr><td style="padding:0.35rem 0.5rem;color:var(--muted-foreground);">Redis hash</td><td style="text-align:center;color:var(--neon-pink);">&#x2192;</td><td style="padding:0.35rem 0.5rem;color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{ "temp": 8.2 }</td></tr>
+            <tr><td style="padding:0.35rem 0.5rem;color:var(--muted-foreground);">SQL database row</td><td style="text-align:center;color:var(--neon-pink);">&#x2192;</td><td style="padding:0.35rem 0.5rem;color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{ "temp": 8.2 }</td></tr>
+            <tr><td style="padding:0.35rem 0.5rem;color:var(--muted-foreground);">CSV file</td><td style="text-align:center;color:var(--neon-pink);">&#x2192;</td><td style="padding:0.35rem 0.5rem;color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{ "temp": 8.2 }</td></tr>
+            <tr><td style="padding:0.35rem 0.5rem;color:var(--muted-foreground);">Another API</td><td style="text-align:center;color:var(--neon-pink);">&#x2192;</td><td style="padding:0.35rem 0.5rem;color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{ "temp": 8.2 }</td></tr>
+            <tr><td style="padding:0.35rem 0.5rem;color:var(--muted-foreground);">Calculated on the fly</td><td style="text-align:center;color:var(--neon-pink);">&#x2192;</td><td style="padding:0.35rem 0.5rem;color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{ "temp": 8.2 }</td></tr>
+          </table>
+          <p style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.75rem;">The user always sees JSON. They never know or care what's behind it. That's the whole point -- the API hides the complexity.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Misconception 3: Servers run 24/7 -->
+    <div class="concept-grid" style="grid-template-columns:1fr;max-width:800px;margin-top:1.5rem;">
+      <div class="concept-card" style="border-left:3px solid var(--sunset-orange);">
+        <div class="card-icon">&#x26a1;</div>
+        <h4 style="color:var(--sunset-orange);">Misconception: "APIs need a server running 24/7"</h4>
+        <p style="margin-bottom:0.75rem;">Traditionally, yes. But modern <strong style="color:var(--neon-cyan);">serverless</strong> APIs (like the NAVADA API) work differently -- the function only exists while someone is calling it.</p>
+        <div style="background:var(--background,#16111f);border-radius:8px;padding:1rem;margin-top:0.5rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:0.8rem;">
+            <div>
+              <p style="color:var(--neon-pink);font-weight:600;margin-bottom:0.4rem;">Traditional Server</p>
+              <p style="color:var(--muted-foreground);font-size:0.75rem;line-height:1.5;">Runs 24/7 whether anyone calls or not. You pay for uptime. You manage the machine. Always using memory and CPU.</p>
+            </div>
+            <div>
+              <p style="color:var(--neon-cyan);font-weight:600;margin-bottom:0.4rem;">Serverless (this API)</p>
+              <p style="color:var(--muted-foreground);font-size:0.75rem;line-height:1.5;">Function sleeps until called. Wakes in milliseconds, runs, returns data, dies. You pay per request. Nothing runs when nobody's asking.</p>
+            </div>
+          </div>
+          <p style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.75rem;">To the user it feels identical -- the response comes back in milliseconds either way. The difference is what happens behind the scenes and what you pay for.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI vs non-AI -->
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:2.5rem 0 0.75rem;">How a Non-AI App Uses an API vs How AI Uses It</h3>
+    <p style="color:var(--muted-foreground);font-size:0.85rem;margin-bottom:1.25rem;max-width:700px;">
+      Not all APIs are the same. The way your app consumes the response depends on whether the data is structured or generated by AI.
+    </p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;margin-bottom:1.5rem;">
+      <div class="concept-card" style="border-top:3px solid var(--neon-cyan);">
+        <div class="card-icon">&#x1f4ca;</div>
+        <h4 style="color:var(--neon-cyan);">Non-AI API (structured data)</h4>
+        <div style="background:var(--background,#16111f);border-radius:6px;padding:0.75rem;margin:0.5rem 0;font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#22c55e;">
+GET /api/v1/weather?city=London<br>
+&#x2192; { "temp": 8.2, "condition": "Cloudy" }</div>
+        <p style="font-size:0.8rem;color:var(--muted-foreground);line-height:1.5;">Same request always returns the same shape. Your app knows exactly what fields to expect. You slot each value into a UI element: <code style="color:var(--neon-cyan);font-size:0.75rem;">data.temp</code> goes in the temperature box, <code style="color:var(--neon-cyan);font-size:0.75rem;">data.condition</code> goes in the status label.</p>
+        <div style="margin-top:0.5rem;font-size:0.75rem;">
+          <span style="color:var(--muted-foreground);">Cacheable:</span> <span style="color:#22c55e;">Yes</span> &nbsp;
+          <span style="color:var(--muted-foreground);">Speed:</span> <span style="color:#22c55e;">Fast (ms)</span> &nbsp;
+          <span style="color:var(--muted-foreground);">Cost:</span> <span style="color:#22c55e;">Free/cheap</span>
+        </div>
+      </div>
+      <div class="concept-card" style="border-top:3px solid var(--neon-pink);">
+        <div class="card-icon">&#x1f9e0;</div>
+        <h4 style="color:var(--neon-pink);">AI API (generated response)</h4>
+        <div style="background:var(--background,#16111f);border-radius:6px;padding:0.75rem;margin:0.5rem 0;font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#22c55e;">
+POST /api/chat/send { "msg": "London weather?" }<br>
+&#x2192; { "reply": "It's 8C and cloudy..." }</div>
+        <p style="font-size:0.8rem;color:var(--muted-foreground);line-height:1.5;">Same question can return a different answer each time. The response is freeform text -- your app just displays it as-is. There are no fixed fields to parse, just a <code style="color:var(--neon-pink);font-size:0.75rem;">reply</code> string that could say anything.</p>
+        <div style="margin-top:0.5rem;font-size:0.75rem;">
+          <span style="color:var(--muted-foreground);">Cacheable:</span> <span style="color:var(--sunset-orange);">Rarely</span> &nbsp;
+          <span style="color:var(--muted-foreground);">Speed:</span> <span style="color:var(--sunset-orange);">1-5 sec</span> &nbsp;
+          <span style="color:var(--muted-foreground);">Cost:</span> <span style="color:var(--sunset-orange);">Per token</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:1rem 0 0;text-align:center;">
+      <p style="color:var(--foreground);font-size:0.9rem;margin-bottom:0.5rem;font-weight:500;">The Takeaway</p>
+      <p style="color:var(--muted-foreground);font-size:0.85rem;max-width:650px;margin:0 auto;">
+        An API is a <strong style="color:var(--neon-cyan);">door</strong>, not a room. JSON is the <strong style="color:var(--neon-pink);">language</strong> you speak through that door, not where things are stored. And the server behind the door might be always-on or might only wake up when you knock -- either way, you get your answer.
+      </p>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 4: JOURNEY VISUALIZER ====== -->
+  <section class="learn-section" id="sec-journey" data-section="Live Demo">
+    <div class="section-num">Section 03</div>
+    <h2 class="section-title">API Journey Visualizer</h2>
+    <p class="section-lead">Watch what happens when you make a real API call -- step by step.</p>
+
+    <div class="journey-wrap">
+      <div class="journey-controls">
+        <div class="jc-group">
+          <label>Endpoint</label>
+          <select id="jEndpoint">
+            <option value="weather" data-params="city">Weather Lookup</option>
+            <option value="stock-quote" data-params="symbol">Stock Quote</option>
+            <option value="word-definition" data-params="word">Dictionary</option>
+            <option value="crypto-rate" data-params="coin">Crypto Rate</option>
+            <option value="explain-concept" data-params="topic">Explain a Concept</option>
+            <option value="translate" data-params="text,to">Translate Text</option>
+            <option value="periodic-table" data-params="element">Periodic Table</option>
+            <option value="unit-convert" data-params="value,from">Unit Converter</option>
+          </select>
+        </div>
+        <div class="jc-group" id="jParamGroup">
+          <label id="jParamLabel">city</label>
+          <input type="text" id="jParam1" value="London" placeholder="London">
+        </div>
+        <div class="jc-group" id="jParam2Group" style="display:none;">
+          <label id="jParam2Label">count</label>
+          <input type="text" id="jParam2" value="3" placeholder="3">
+        </div>
+        <div class="jc-group">
+          <label>API Key</label>
+          <input type="text" id="jApiKey" placeholder="nav_..." style="width:160px;">
+        </div>
+        <div class="jc-group">
+          <label>Mode</label>
+          <div class="speed-toggle">
+            <button class="active" id="modeAuto" onclick="setMode('auto')">Auto Play</button>
+            <button id="modeStep" onclick="setMode('step')">Step-by-Step</button>
+          </div>
+        </div>
+        <div class="jc-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-pink" id="jSendBtn" onclick="runJourney()" style="padding:0.5rem 1.5rem;">Send Request</button>
+          <button class="btn btn-cyan-outline" id="jNextBtn" onclick="advanceStep()" style="padding:0.5rem 1.5rem;display:none;">Next Step &rarr;</button>
+        </div>
+      </div>
+
+      <div id="jNoKey" style="display:none;font-size:0.78rem;color:var(--sunset-orange);margin-bottom:1rem;">
+        No API key found. <a href="/api-library#get-key" style="color:var(--neon-cyan);">Generate one free</a> or enter it above.
+      </div>
+
+      <div class="pipeline" id="pipeline">
+        <div class="pipe-node"><div class="pipe-circle" id="pn0">&#x1f4bb;</div><div class="pipe-label">Your Browser</div></div>
+        <div class="pipe-line" id="pl0"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn1">&#x1f310;</div><div class="pipe-label">Internet</div></div>
+        <div class="pipe-line" id="pl1"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn2">&#x1f6e1;</div><div class="pipe-label">API Gateway</div></div>
+        <div class="pipe-line" id="pl2"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn3">&#x1f511;</div><div class="pipe-label">Auth Check</div></div>
+        <div class="pipe-line" id="pl3"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn4">&#x1f4be;</div><div class="pipe-label">Data Source</div></div>
+        <div class="pipe-line" id="pl4"></div>
+        <div class="pipe-node"><div class="pipe-circle" id="pn5">&#x2728;</div><div class="pipe-label">Response</div></div>
+      </div>
+
+      <div class="step-detail" id="stepDetail" style="display:none;">
+        <div class="step-detail-num" id="stepDetailNum">Step 1 of 6</div>
+        <h4 class="step-detail-title" id="stepDetailTitle"></h4>
+        <p class="step-detail-desc" id="stepDetailDesc"></p>
+      </div>
+      <div class="log-panel" id="logPanel"></div>
+      <div class="response-panel" id="responsePanel"></div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 5: CODE EXAMPLES ====== -->
+  <section class="learn-section" id="sec-examples" data-section="Code Examples">
+    <div class="section-num">Section 04</div>
+    <h2 class="section-title">How to Use the NAVADA API</h2>
+    <p class="section-lead">You don't need to be a developer to use an API. Open your terminal (PowerShell on Windows, Terminal on Mac) and paste any example below. Or use the JavaScript and Python tabs if you're building something.</p>
+
+    <div style="background:var(--card);border:1px solid var(--sunset-orange, #d48030);border-radius:10px;padding:1rem 1.25rem;margin:0 0 2rem;">
+      <p style="color:var(--sunset-orange, #d48030);font-size:0.85rem;font-weight:600;margin-bottom:0.4rem;">Important: Each tab is a different language</p>
+      <p style="color:var(--muted-foreground);font-size:0.8rem;line-height:1.6;margin:0;">
+        <strong style="color:var(--foreground);">PowerShell</strong> code only works in Windows PowerShell.
+        <strong style="color:var(--foreground);">Python</strong> code only works in a Python terminal (<code>python</code> or <code>python3</code>).
+        <strong style="color:var(--foreground);">cURL (Mac)</strong> works in Mac/Linux Terminal.
+        <strong style="color:var(--foreground);">cURL (Windows)</strong> uses <code>curl.exe</code> in Command Prompt or Git Bash.
+        Don't paste Python into PowerShell or vice versa — they are completely different languages.
+      </p>
+    </div>
+
+    <!-- Example 1: Stock Quote -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2rem 0 0.75rem;">Example 1: Get a Stock Quote</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex1">
+        <button class="tab-btn active" onclick="switchTab('ex1','js')">JavaScript</button>
+        <button class="tab-btn" onclick="switchTab('ex1','py')">Python</button>
+        <button class="tab-btn" onclick="switchTab('ex1','curl-mac')">cURL (Mac)</button>
+        <button class="tab-btn" onclick="switchTab('ex1','curl-win')">cURL (Windows)</button>
+        <button class="tab-btn" onclick="switchTab('ex1','ps')">PowerShell</button>
+      </div>
+      <div class="tab-content active" id="ex1-js"><span class="hl-comment">// --- Example 1: Fetch a live stock quote from the NAVADA API ---</span>
+
+<span class="hl-kw">const</span> <span class="hl-key">API_KEY</span> = <span class="hl-str">'nav_your_key_here'</span>;  <span class="hl-hint">Your unique key — get one free at /api-library</span>
+
+<span class="hl-kw">async function</span> <span class="hl-fn">getStockPrice</span>(symbol) {
+
+  <span class="hl-comment">// Step 1: Send the request to the API endpoint</span>
+  <span class="hl-kw">const</span> res = <span class="hl-kw">await</span> <span class="hl-fn">fetch</span>(
+    <span class="hl-str">`https://www.alexnavada.xyz/api/v1/stock-quote?symbol=<span class="hl-val">${symbol}</span>`</span>,
+    { <span class="hl-key">headers</span>: { <span class="hl-str">'X-API-Key'</span>: API_KEY } }
+  );  <span class="hl-hint">The API verifies your key before returning data</span>
+
+  <span class="hl-comment">// Step 2: Parse the JSON response into a JavaScript object</span>
+  <span class="hl-kw">const</span> data = <span class="hl-kw">await</span> res.<span class="hl-fn">json</span>();
+  <span class="hl-comment">// ↑ The server returns raw text — .json() converts it to usable data</span>
+
+  <span class="hl-comment">// Step 3: Check for errors (bad symbol, API down, etc.)</span>
+  <span class="hl-kw">if</span> (data.data.error) {
+    console.<span class="hl-fn">log</span>(<span class="hl-str">'Error:'</span>, data.data.error);
+    <span class="hl-kw">return</span>;
+  }
+
+  <span class="hl-comment">// Step 4: Display the results</span>
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`<span class="hl-val">${data.data.symbol}</span>: $<span class="hl-val">${data.data.price}</span>`</span>);
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`Change: <span class="hl-val">${data.data.change}</span> (<span class="hl-val">${data.data.change_percent}</span>)`</span>);
+}
+
+<span class="hl-fn">getStockPrice</span>(<span class="hl-str">'AAPL'</span>);  <span class="hl-hint">Try 'TSLA', 'MSFT', 'GOOG', or any ticker</span></div>
+      <div class="tab-content" id="ex1-py"><span class="hl-comment"># --- Example 1: Fetch a live stock quote from the NAVADA API ---</span>
+
+<span class="hl-kw">import</span> requests  <span class="hl-hint">pip install requests — the standard HTTP library for Python</span>
+
+<span class="hl-key">API_KEY</span> = <span class="hl-str">"nav_your_key_here"</span>      <span class="hl-comment"># Your unique API key</span>
+<span class="hl-key">HEADERS</span> = {<span class="hl-str">"X-API-Key"</span>: API_KEY}  <span class="hl-comment"># Sent with every request for authentication</span>
+
+<span class="hl-kw">def</span> <span class="hl-fn">get_stock_price</span>(symbol):
+    <span class="hl-comment"># Step 1: Build the URL with the stock symbol as a query parameter</span>
+    url = <span class="hl-str">f"https://www.alexnavada.xyz/api/v1/stock-quote?symbol=<span class="hl-val">{symbol}</span>"</span>
+
+    <span class="hl-comment"># Step 2: Send a GET request — the API does the heavy lifting</span>
+    res = requests.<span class="hl-fn">get</span>(url, <span class="hl-key">headers</span>=HEADERS)
+    data = res.<span class="hl-fn">json</span>()  <span class="hl-hint">Converts JSON text → Python dictionary</span>
+
+    <span class="hl-comment"># Step 3: Handle errors gracefully</span>
+    <span class="hl-kw">if</span> data[<span class="hl-str">"data"</span>].<span class="hl-fn">get</span>(<span class="hl-str">"error"</span>):
+        <span class="hl-fn">print</span>(<span class="hl-str">"Error:"</span>, data[<span class="hl-str">"data"</span>][<span class="hl-str">"error"</span>])
+        <span class="hl-kw">return</span>
+
+    <span class="hl-comment"># Step 4: Extract and display the data</span>
+    d = data[<span class="hl-str">"data"</span>]
+    <span class="hl-fn">print</span>(<span class="hl-str">f"<span class="hl-val">{d['symbol']}</span>: $<span class="hl-val">{d['price']}</span>"</span>)
+    <span class="hl-fn">print</span>(<span class="hl-str">f"Change: <span class="hl-val">{d['change']}</span> (<span class="hl-val">{d['change_percent']}</span>)"</span>)
+
+<span class="hl-fn">get_stock_price</span>(<span class="hl-str">"AAPL"</span>)  <span class="hl-hint">Try "TSLA", "MSFT", "GOOG", or any ticker</span></div>
+      <div class="tab-content" id="ex1-curl-mac"># Mac / Linux Terminal:
+curl -s "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" \
+  -H "X-API-Key: nav_your_key_here" | python3 -m json.tool</div>
+      <div class="tab-content" id="ex1-curl-win"># Windows Command Prompt or Git Bash:
+curl.exe -s "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" ^
+  -H "X-API-Key: nav_your_key_here" | python -m json.tool</div>
+      <div class="tab-content" id="ex1-ps"><span class="hl-comment"># --- PowerShell: Fetch a live stock quote from the NAVADA API ---</span>
+<span class="hl-comment"># Open PowerShell on Windows (search "PowerShell" in Start menu) and paste this:</span>
+
+<span class="hl-key">$response</span> = Invoke-WebRequest `
+  -Uri <span class="hl-str">"https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL"</span> `
+  -Headers @{<span class="hl-str">"X-API-Key"</span>=<span class="hl-str">"nav_your_key_here"</span>}
+
+<span class="hl-comment"># Convert the JSON response to a PowerShell object</span>
+<span class="hl-key">$data</span> = <span class="hl-key">$response</span>.Content | ConvertFrom-Json
+
+<span class="hl-comment"># Display the result</span>
+Write-Host <span class="hl-str">"$($data.data.symbol): `$$($data.data.price)"</span>
+Write-Host <span class="hl-str">"Change: $($data.data.change) ($($data.data.change_percent))"</span>
+
+<span class="hl-comment"># --- Quick one-liner version: ---</span>
+<span class="hl-comment"># (Invoke-WebRequest -Uri "https://www.alexnavada.xyz/api/v1/stock-quote?symbol=AAPL" -Headers @{"X-API-Key"="nav_your_key_here"}).Content | ConvertFrom-Json | Select-Object -ExpandProperty data</span></div>
+    </div>
+
+    <!-- Example 2: Weather Widget -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 2: Build a Weather Widget (HTML + JS)</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex2">
+        <button class="tab-btn active" onclick="switchTab('ex2','html')">HTML</button>
+      </div>
+      <div class="tab-content active" id="ex2-html"><span class="hl-comment">&lt;!-- Example 2: A complete weather widget you can save as an HTML file and open --&gt;</span>
+<span class="hl-comment">&lt;!-- Copy everything below into a file called weather.html and open in a browser --&gt;</span>
+
+<span class="hl-tag">&lt;!DOCTYPE html&gt;</span>
+<span class="hl-tag">&lt;html&gt;</span>
+<span class="hl-tag">&lt;head&gt;</span>
+  <span class="hl-tag">&lt;title&gt;</span>Weather Widget<span class="hl-tag">&lt;/title&gt;</span>
+  <span class="hl-tag">&lt;style&gt;</span>
+    <span class="hl-comment">/* Dark theme styling — customise these colours to match your site */</span>
+    <span class="hl-attr">body</span> { font-family: sans-serif; background: <span class="hl-str">#111</span>; color: <span class="hl-str">#eee</span>;
+           display: flex; justify-content: center; padding: 3rem; }
+    <span class="hl-attr">.widget</span> { background: <span class="hl-str">#1a1a2e</span>; border-radius: 12px; padding: 2rem;
+              min-width: 280px; text-align: center; }
+    <span class="hl-attr">.temp</span> { font-size: 3rem; font-weight: 700; color: <span class="hl-str">#00c8d4</span>; }
+    <span class="hl-attr">.city</span> { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    <span class="hl-attr">.cond</span> { color: <span class="hl-str">#9585b5</span>; }
+    <span class="hl-attr">input</span> { background: <span class="hl-str">#16111f</span>; border: 1px solid <span class="hl-str">#3d2d5c</span>; color: <span class="hl-str">#eee</span>;
+            padding: 0.5rem; border-radius: 6px; margin-top: 1rem; width: 100%; }
+    <span class="hl-attr">button</span> { background: <span class="hl-str">#e840a0</span>; color: <span class="hl-str">#111</span>; border: none; padding: 0.5rem 1.5rem;
+             border-radius: 6px; cursor: pointer; margin-top: 0.5rem; font-weight: 600; }
+  <span class="hl-tag">&lt;/style&gt;</span>
+<span class="hl-tag">&lt;/head&gt;</span>
+<span class="hl-tag">&lt;body&gt;</span>
+  <span class="hl-tag">&lt;div</span> <span class="hl-attr">class</span>=<span class="hl-str">"widget"</span><span class="hl-tag">&gt;</span>
+    <span class="hl-tag">&lt;div</span> <span class="hl-attr">class</span>=<span class="hl-str">"city"</span> <span class="hl-attr">id</span>=<span class="hl-str">"city"</span><span class="hl-tag">&gt;</span>--<span class="hl-tag">&lt;/div&gt;</span>
+    <span class="hl-tag">&lt;div</span> <span class="hl-attr">class</span>=<span class="hl-str">"temp"</span> <span class="hl-attr">id</span>=<span class="hl-str">"temp"</span><span class="hl-tag">&gt;</span>--<span class="hl-tag">&lt;/div&gt;</span>
+    <span class="hl-tag">&lt;div</span> <span class="hl-attr">class</span>=<span class="hl-str">"cond"</span> <span class="hl-attr">id</span>=<span class="hl-str">"cond"</span><span class="hl-tag">&gt;</span>Enter a city below<span class="hl-tag">&lt;/div&gt;</span>
+    <span class="hl-tag">&lt;input</span> <span class="hl-attr">id</span>=<span class="hl-str">"inp"</span> <span class="hl-attr">placeholder</span>=<span class="hl-str">"City name..."</span> <span class="hl-tag">/&gt;</span>
+    <span class="hl-tag">&lt;button</span> <span class="hl-attr">onclick</span>=<span class="hl-str">"go()"</span><span class="hl-tag">&gt;</span>Get Weather<span class="hl-tag">&lt;/button&gt;</span>
+  <span class="hl-tag">&lt;/div&gt;</span>
+  <span class="hl-tag">&lt;script&gt;</span>
+    <span class="hl-kw">const</span> <span class="hl-key">KEY</span> = <span class="hl-str">'nav_your_key_here'</span>;  <span class="hl-comment">// Replace with your API key</span>
+
+    <span class="hl-kw">async function</span> <span class="hl-fn">go</span>() {
+      <span class="hl-comment">// Step 1: Get the city name from the input field</span>
+      <span class="hl-kw">const</span> city = document.<span class="hl-fn">getElementById</span>(<span class="hl-str">'inp'</span>).value;
+
+      <span class="hl-comment">// Step 2: Call the NAVADA weather API</span>
+      <span class="hl-kw">const</span> res = <span class="hl-kw">await</span> <span class="hl-fn">fetch</span>(
+        <span class="hl-str">`https://www.alexnavada.xyz/api/v1/weather?city=${city}`</span>,
+        { <span class="hl-key">headers</span>: { <span class="hl-str">'X-API-Key'</span>: KEY } }
+      );  <span class="hl-comment">// ← API does the work: geocodes city, fetches forecast, returns JSON</span>
+
+      <span class="hl-comment">// Step 3: Parse the response and update the page</span>
+      <span class="hl-kw">const</span> json = <span class="hl-kw">await</span> res.<span class="hl-fn">json</span>();
+      <span class="hl-kw">const</span> d = json.data;  <span class="hl-comment">// All API data lives inside the 'data' field</span>
+      document.<span class="hl-fn">getElementById</span>(<span class="hl-str">'city'</span>).textContent = d.location || city;
+      document.<span class="hl-fn">getElementById</span>(<span class="hl-str">'temp'</span>).textContent = d.temperature_c + <span class="hl-str">'&deg;C'</span>;
+      document.<span class="hl-fn">getElementById</span>(<span class="hl-str">'cond'</span>).textContent = d.condition || <span class="hl-str">''</span>;
+    }
+  <span class="hl-tag">&lt;/script&gt;</span>
+<span class="hl-tag">&lt;/body&gt;</span>
+<span class="hl-tag">&lt;/html&gt;</span></div>
+    </div>
+
+    <!-- Example 3: Quiz App -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 3: Build a Quiz App</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex3">
+        <button class="tab-btn active" onclick="switchTab('ex3','js')">JavaScript</button>
+        <button class="tab-btn" onclick="switchTab('ex3','py')">Python</button>
+        <button class="tab-btn" onclick="switchTab('ex3','ps')">PowerShell</button>
+      </div>
+      <div class="tab-content active" id="ex3-js"><span class="hl-comment">// --- Example 3: Generate a quiz on any topic using AI ---</span>
+
+<span class="hl-kw">const</span> <span class="hl-key">API_KEY</span> = <span class="hl-str">'nav_your_key_here'</span>;
+
+<span class="hl-kw">async function</span> <span class="hl-fn">runQuiz</span>(topic) {
+  <span class="hl-comment">// Step 1: Request 5 quiz questions on the given topic</span>
+  <span class="hl-kw">const</span> res = <span class="hl-kw">await</span> <span class="hl-fn">fetch</span>(
+    <span class="hl-str">`https://www.alexnavada.xyz/api/v1/quiz-generator?topic=<span class="hl-val">${topic}</span>&amp;count=<span class="hl-num">5</span>`</span>,
+    { <span class="hl-key">headers</span>: { <span class="hl-str">'X-API-Key'</span>: API_KEY } }
+  );  <span class="hl-hint">The API uses AI to generate unique questions each time</span>
+
+  <span class="hl-comment">// Step 2: Destructure — pull 'data' out of the response</span>
+  <span class="hl-kw">const</span> { <span class="hl-key">data</span> } = <span class="hl-kw">await</span> res.<span class="hl-fn">json</span>();
+
+  <span class="hl-comment">// Step 3: Check the response is valid</span>
+  <span class="hl-kw">if</span> (!data.questions) { console.<span class="hl-fn">log</span>(<span class="hl-str">'Error:'</span>, data.error); <span class="hl-kw">return</span>; }
+
+  <span class="hl-comment">// Step 4: Loop through questions and display them</span>
+  <span class="hl-kw">for</span> (<span class="hl-kw">const</span> q <span class="hl-kw">of</span> data.questions) {
+    console.<span class="hl-fn">log</span>(<span class="hl-str">'\n'</span> + q.question);
+    q.options.<span class="hl-fn">forEach</span>((opt, i) =&gt; console.<span class="hl-fn">log</span>(<span class="hl-str">`  <span class="hl-val">${i + 1}</span>. <span class="hl-val">${opt}</span>`</span>));
+
+    <span class="hl-comment">// In a real app, you'd collect user input here</span>
+    console.<span class="hl-fn">log</span>(<span class="hl-str">`  Answer: <span class="hl-val">${q.answer}</span>`</span>);
+  }
+
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`\nTopic: <span class="hl-val">${data.topic}</span> | <span class="hl-val">${data.questions.length}</span> questions`</span>);
+}
+
+<span class="hl-fn">runQuiz</span>(<span class="hl-str">'space exploration'</span>);  <span class="hl-hint">Try 'climate change', 'World War 2', 'economics'</span></div>
+      <div class="tab-content" id="ex3-py"><span class="hl-comment"># --- Example 3: Generate an interactive quiz on any topic ---</span>
+
+<span class="hl-kw">import</span> requests
+
+<span class="hl-key">API_KEY</span> = <span class="hl-str">"nav_your_key_here"</span>
+
+<span class="hl-kw">def</span> <span class="hl-fn">run_quiz</span>(topic):
+    <span class="hl-comment"># Step 1: Call the quiz generator API with topic &amp; count</span>
+    url = <span class="hl-str">f"https://www.alexnavada.xyz/api/v1/quiz-generator?topic=<span class="hl-val">{topic}</span>&amp;count=<span class="hl-num">5</span>"</span>
+    res = requests.<span class="hl-fn">get</span>(url, <span class="hl-key">headers</span>={<span class="hl-str">"X-API-Key"</span>: API_KEY})
+    data = res.<span class="hl-fn">json</span>()[<span class="hl-str">"data"</span>]  <span class="hl-hint">AI generates unique questions each time</span>
+
+    <span class="hl-comment"># Step 2: Check for errors</span>
+    <span class="hl-kw">if</span> <span class="hl-str">"error"</span> <span class="hl-kw">in</span> data:
+        <span class="hl-fn">print</span>(<span class="hl-str">"Error:"</span>, data[<span class="hl-str">"error"</span>])
+        <span class="hl-kw">return</span>
+
+    <span class="hl-comment"># Step 3: Loop through questions — collect and check answers</span>
+    <span class="hl-kw">for</span> q <span class="hl-kw">in</span> data[<span class="hl-str">"questions"</span>]:
+        <span class="hl-fn">print</span>(<span class="hl-str">f"\n<span class="hl-val">{q['question']}</span>"</span>)
+        <span class="hl-kw">for</span> i, opt <span class="hl-kw">in</span> <span class="hl-fn">enumerate</span>(q[<span class="hl-str">"options"</span>]):
+            <span class="hl-fn">print</span>(<span class="hl-str">f"  <span class="hl-val">{i+1}</span>. <span class="hl-val">{opt}</span>"</span>)
+        answer = <span class="hl-fn">input</span>(<span class="hl-str">"Your answer (number): "</span>)
+        <span class="hl-kw">if</span> q[<span class="hl-str">"options"</span>][<span class="hl-fn">int</span>(answer)-<span class="hl-num">1</span>] == q[<span class="hl-str">"answer"</span>]:
+            <span class="hl-fn">print</span>(<span class="hl-str">"  Correct!"</span>)
+        <span class="hl-kw">else</span>:
+            <span class="hl-fn">print</span>(<span class="hl-str">f"  Wrong. Answer: <span class="hl-val">{q['answer']}</span>"</span>)
+
+<span class="hl-fn">run_quiz</span>(<span class="hl-str">"space exploration"</span>)  <span class="hl-hint">Try "climate change", "World War 2", "economics"</span></div>
+      <div class="tab-content" id="ex3-ps"><span class="hl-comment"># --- PowerShell: Generate a quiz on any topic using the NAVADA API ---</span>
+<span class="hl-comment"># Paste this into PowerShell to get 5 AI-generated quiz questions</span>
+
+<span class="hl-key">$response</span> = Invoke-WebRequest `
+  -Uri <span class="hl-str">"https://www.alexnavada.xyz/api/v1/quiz-generator?topic=space+exploration&amp;count=5"</span> `
+  -Headers @{<span class="hl-str">"X-API-Key"</span>=<span class="hl-str">"nav_your_key_here"</span>}
+
+<span class="hl-key">$quiz</span> = (<span class="hl-key">$response</span>.Content | ConvertFrom-Json).data
+
+<span class="hl-comment"># Loop through questions and display them</span>
+<span class="hl-kw">foreach</span> (<span class="hl-key">$q</span> <span class="hl-kw">in</span> <span class="hl-key">$quiz</span>.questions) {
+    Write-Host <span class="hl-str">"`n$($q.question)"</span> -ForegroundColor Cyan
+    <span class="hl-kw">for</span> (<span class="hl-key">$i</span>=0; <span class="hl-key">$i</span> -lt <span class="hl-key">$q</span>.options.Count; <span class="hl-key">$i</span>++) {
+        Write-Host <span class="hl-str">"  $($i+1). $($q.options[$i])"</span>
+    }
+    Write-Host <span class="hl-str">"  Answer: $($q.answer)"</span> -ForegroundColor Green
+}
+
+Write-Host <span class="hl-str">"`nTopic: $($quiz.topic) | $($quiz.questions.Count) questions"</span></div>
+    </div>
+
+    <!-- Example 4: Mini Dashboard -->
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 0.75rem;">Example 4: Multi-API Data Dashboard</h3>
+    <div>
+      <div class="tab-bar" data-tabs="ex4">
+        <button class="tab-btn active" onclick="switchTab('ex4','js')">JavaScript</button>
+        <button class="tab-btn" onclick="switchTab('ex4','ps')">PowerShell</button>
+      </div>
+      <div class="tab-content active" id="ex4-js"><span class="hl-comment">// --- Example 4: Combine multiple APIs into one dashboard ---</span>
+<span class="hl-comment">// This shows the real power of APIs: mixing data from different sources</span>
+
+<span class="hl-kw">const</span> <span class="hl-key">API_KEY</span> = <span class="hl-str">'nav_your_key_here'</span>;
+<span class="hl-kw">const</span> <span class="hl-key">BASE</span> = <span class="hl-str">'https://www.alexnavada.xyz/api/v1'</span>;  <span class="hl-hint">Base URL — all endpoints start here</span>
+<span class="hl-kw">const</span> <span class="hl-key">headers</span> = { <span class="hl-str">'X-API-Key'</span>: API_KEY };
+
+<span class="hl-kw">async function</span> <span class="hl-fn">buildDashboard</span>() {
+
+  <span class="hl-comment">// Key concept: Promise.all fires ALL requests at the same time</span>
+  <span class="hl-comment">// Instead of waiting for each one sequentially (slow), they run in parallel (fast)</span>
+  <span class="hl-kw">const</span> [weather, stock, crypto] = <span class="hl-kw">await</span> <span class="hl-fn">Promise.all</span>([
+    <span class="hl-fn">fetch</span>(<span class="hl-str">`<span class="hl-val">${BASE}</span>/weather?city=London`</span>, { headers }).<span class="hl-fn">then</span>(r =&gt; r.<span class="hl-fn">json</span>()),
+    <span class="hl-fn">fetch</span>(<span class="hl-str">`<span class="hl-val">${BASE}</span>/stock-quote?symbol=TSLA`</span>, { headers }).<span class="hl-fn">then</span>(r =&gt; r.<span class="hl-fn">json</span>()),
+    <span class="hl-fn">fetch</span>(<span class="hl-str">`<span class="hl-val">${BASE}</span>/crypto?coin=bitcoin`</span>, { headers }).<span class="hl-fn">then</span>(r =&gt; r.<span class="hl-fn">json</span>()),
+  ]);
+  <span class="hl-comment">// ↑ 3 different APIs, 3 different data sources, 1 combined result</span>
+
+  <span class="hl-comment">// Step 2: Display the combined data</span>
+  console.<span class="hl-fn">log</span>(<span class="hl-str">'=== DASHBOARD ==='</span>);
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`Weather: <span class="hl-val">${weather.data.temperature_c}</span>&deg;C, <span class="hl-val">${weather.data.condition}</span>`</span>);
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`TSLA:    $<span class="hl-val">${stock.data.price}</span> (<span class="hl-val">${stock.data.change_percent}</span>)`</span>);
+  console.<span class="hl-fn">log</span>(<span class="hl-str">`Bitcoin: $<span class="hl-val">${crypto.data.price_usd}</span>`</span>);
+}
+
+<span class="hl-fn">buildDashboard</span>();  <span class="hl-hint">This is how real dashboards are built — one API at a time</span></div>
+      <div class="tab-content" id="ex4-ps"><span class="hl-comment"># --- PowerShell: Combine multiple APIs into one dashboard ---</span>
+<span class="hl-comment"># This shows the real power of APIs: mixing data from different sources</span>
+
+<span class="hl-key">$key</span> = <span class="hl-str">"nav_your_key_here"</span>
+<span class="hl-key">$headers</span> = @{<span class="hl-str">"X-API-Key"</span>=<span class="hl-key">$key</span>}
+<span class="hl-key">$base</span> = <span class="hl-str">"https://www.alexnavada.xyz/api/v1"</span>
+
+<span class="hl-comment"># Fetch all three APIs (PowerShell runs these sequentially)</span>
+<span class="hl-key">$weather</span> = (Invoke-WebRequest -Uri <span class="hl-str">"$base/weather?city=London"</span> -Headers <span class="hl-key">$headers</span>).Content | ConvertFrom-Json
+<span class="hl-key">$stock</span>   = (Invoke-WebRequest -Uri <span class="hl-str">"$base/stock-quote?symbol=TSLA"</span> -Headers <span class="hl-key">$headers</span>).Content | ConvertFrom-Json
+<span class="hl-key">$crypto</span>  = (Invoke-WebRequest -Uri <span class="hl-str">"$base/crypto?coin=bitcoin"</span> -Headers <span class="hl-key">$headers</span>).Content | ConvertFrom-Json
+
+<span class="hl-comment"># Display the combined dashboard</span>
+Write-Host <span class="hl-str">"=== DASHBOARD ==="</span> -ForegroundColor Cyan
+Write-Host <span class="hl-str">"Weather: $($weather.data.temperature_c)C, $($weather.data.condition)"</span>
+Write-Host <span class="hl-str">"TSLA:    `$$($stock.data.price) ($($stock.data.change_percent))"</span>
+Write-Host <span class="hl-str">"Bitcoin: `$$($crypto.data.price_usd)"</span></div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 6: THINKING LIKE A BUILDER ====== -->
+  <section class="learn-section" id="sec-builder" data-section="Build Your Own">
+    <div class="section-num">Section 05</div>
+    <h2 class="section-title">How to Turn Anything Into an API</h2>
+    <p class="section-lead">Every API starts with the same four questions. Master these and you can turn any data into a service.</p>
+
+    <div class="question-cards">
+      <div class="question-card">
+        <div class="q-num">01</div>
+        <h4>"What data do I have?"</h4>
+        <p>A spreadsheet, a database, sensor readings, calculations, a list in a notebook -- anything.</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">02</div>
+        <h4>"Who needs this data?"</h4>
+        <p>Your app, other developers, a dashboard, a phone widget, a chatbot -- identify the consumers.</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">03</div>
+        <h4>"What questions will they ask?"</h4>
+        <p>Design endpoints around the most common queries: "Give me today's X", "Search for Y", "Add a new Z".</p>
+      </div>
+      <div class="question-card">
+        <div class="q-num">04</div>
+        <h4>"What format should answers come in?"</h4>
+        <p>JSON is the standard. Design clear, consistent response objects with meaningful field names.</p>
+      </div>
+    </div>
+
+    <!-- Builder Example 1: Lunch Menu -->
+    <div class="builder-card">
+      <div class="builder-label">Example: School Lunch Menu</div>
+      <h4>From spreadsheet to API</h4>
+      <div class="before-after">
+        <div class="ba-panel">
+          <h5>Before (Raw Data)</h5>
+          <pre>Date,Main,Side,Veg,Dessert,Allergens
+2024-03-15,Grilled Chicken,Rice,Broccoli,Fruit Cup,gluten
+2024-03-16,Fish Fingers,Chips,Peas,Jelly,fish;gluten
+2024-03-17,Veggie Pasta,Garlic Bread,Salad,Cookie,gluten;dairy</pre>
+        </div>
+        <div class="ba-panel">
+          <h5>After (API Design)</h5>
+          <pre><span style="color:#e840a0">GET</span> /menu/today         <span style="color:#9585b5">Today's menu</span>
+<span style="color:#e840a0">GET</span> /menu/week          <span style="color:#9585b5">This week</span>
+<span style="color:#e840a0">GET</span> /menu?date=2024-03-15 <span style="color:#9585b5">Specific date</span>
+<span style="color:#e840a0">GET</span> /menu/search?q=pizza  <span style="color:#9585b5">Search</span>
+
+<span style="color:#9585b5">Response:</span>
+{
+  "date": "2024-03-15",
+  "meals": {
+    "main": "Grilled Chicken",
+    "side": "Rice",
+    "vegetable": "Steamed Broccoli",
+    "dessert": "Fruit Cup"
+  },
+  "allergens": ["gluten"],
+  "calories": 650
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Builder Example 2: Reading List -->
+    <div class="builder-card">
+      <div class="builder-label">Example: Personal Reading List</div>
+      <h4>From notebook to API</h4>
+      <div class="before-after">
+        <div class="ba-panel">
+          <h5>Before (Raw Data)</h5>
+          <pre>My Books:
+- Dune by Frank Herbert (5/5, Jan 2024)
+  "Mind-blowing world-building"
+- 1984 by George Orwell (4/5, Feb 2024)
+  "Terrifyingly relevant"
+- Sapiens by Yuval Harari (5/5, Mar 2024)
+  "Changed how I see history"</pre>
+        </div>
+        <div class="ba-panel">
+          <h5>After (API Design)</h5>
+          <pre><span style="color:#e840a0">GET</span>  /books              <span style="color:#9585b5">All books</span>
+<span style="color:#e840a0">GET</span>  /books?genre=sci-fi  <span style="color:#9585b5">Filter</span>
+<span style="color:#e840a0">GET</span>  /books/stats         <span style="color:#9585b5">Stats</span>
+<span style="color:#00c8d4">POST</span> /books               <span style="color:#9585b5">Add one</span>
+
+<span style="color:#9585b5">Response:</span>
+{
+  "title": "Dune",
+  "author": "Frank Herbert",
+  "rating": 5,
+  "date_read": "2024-01-15",
+  "notes": "Mind-blowing world-building"
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 7: THINKING DATA-DRIVEN ====== -->
+  <section class="learn-section" id="sec-data" data-section="Data-Driven Thinking">
+    <div class="section-num">Section 06</div>
+    <h2 class="section-title">Thinking Data-Driven</h2>
+    <p class="section-lead">Data is everywhere. APIs are how you unlock it. Once you see it, you can't unsee it.</p>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:0 0 1rem;">"Everything is Data"</h3>
+    <div class="data-cards">
+      <div class="data-card">
+        <div class="dc-icon">&#x1f321;</div>
+        <div class="dc-raw">Thermometer reading</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Weather API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f3b5;</div>
+        <div class="dc-raw">Spotify plays</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Music Taste API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f68c;</div>
+        <div class="dc-raw">Bus arrival times</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Transport API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x1f95a;</div>
+        <div class="dc-raw">Recipe ingredients</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Nutrition API</div>
+      </div>
+      <div class="data-card">
+        <div class="dc-icon">&#x26bd;</div>
+        <div class="dc-raw">Football scores</div>
+        <div class="dc-arrow">&darr;</div>
+        <div class="dc-api">Results API</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">The Data-Driven Decision Flowchart</h3>
+    <div class="flowchart">
+      <div class="fc-node">Question You Have</div>
+      <div class="fc-arrow">&darr;</div>
+      <div class="fc-node decision">Is There Data?</div>
+      <div class="fc-branch">
+        <div class="fc-branch-arm">
+          <div class="fc-label">Yes</div>
+          <div class="fc-arrow">&darr;</div>
+          <div class="fc-node decision">Is There an API?</div>
+          <div class="fc-branch">
+            <div class="fc-branch-arm">
+              <div class="fc-label">Yes</div>
+              <div class="fc-arrow">&darr;</div>
+              <div class="fc-node action">Use It</div>
+            </div>
+            <div class="fc-branch-arm">
+              <div class="fc-label">No</div>
+              <div class="fc-arrow">&darr;</div>
+              <div class="fc-node action">Build One</div>
+            </div>
+          </div>
+        </div>
+        <div class="fc-branch-arm">
+          <div class="fc-label">No</div>
+          <div class="fc-arrow">&darr;</div>
+          <div class="fc-node decision">Can You Collect It?</div>
+          <div class="fc-branch-arm">
+            <div class="fc-label">Yes</div>
+            <div class="fc-arrow">&darr;</div>
+            <div class="fc-node action">Collect &rarr; Build API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">Key Principles</h3>
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>Start with questions, not data</h4>
+        <p>What do you want to know? The question shapes what data you collect and how you expose it.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Structure beats volume</h4>
+        <p>A well-designed small API is infinitely more useful than a messy big data dump.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Cache what doesn't change often</h4>
+        <p>Yesterday's weather won't change. Cache it. Save costs and speed things up.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Document everything</h4>
+        <p>Your future self (and others) will thank you. Every endpoint, parameter, and response field.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Version your API</h4>
+        <p>/v1/ lets you evolve without breaking existing users. Always start with a version prefix.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 8: HOW AI ACTUALLY WORKS ====== -->
+  <section class="learn-section" id="sec-ai-pipeline" data-section="How AI Works">
+    <div class="section-num">Section 07</div>
+    <h2 class="section-title">How AI Actually Works: The Real Pipeline</h2>
+    <p class="section-lead">Most people think an AI "does everything." That misconception exists because they don't see what's happening behind the scenes. Here's the truth: an LLM is just one part of a much larger system.</p>
+
+    <div class="ai-pipeline-flow">
+      <div class="ai-pipe-node node-user">
+        <div class="pipe-icon">&#x1f464;</div>
+        <div class="pipe-role">User</div>
+        <div class="pipe-desc">Types a question or command</div>
+      </div>
+      <div class="ai-pipe-arrow">&rarr;</div>
+      <div class="ai-pipe-node node-api">
+        <div class="pipe-icon">&#x1f310;</div>
+        <div class="pipe-role">API Layer</div>
+        <div class="pipe-desc">Routes the request, checks auth, enforces limits</div>
+      </div>
+      <div class="ai-pipe-arrow">&rarr;</div>
+      <div class="ai-pipe-node node-llm">
+        <div class="pipe-icon">&#x1f9e0;</div>
+        <div class="pipe-role">LLM</div>
+        <div class="pipe-desc">Reads the prompt, generates text &mdash; but cannot act</div>
+      </div>
+      <div class="ai-pipe-arrow">&rarr;</div>
+      <div class="ai-pipe-node node-decision">
+        <div class="pipe-icon">&#x2696;&#xfe0f;</div>
+        <div class="pipe-role">Decision Logic</div>
+        <div class="pipe-desc">Code that interprets the LLM's output and decides what to do</div>
+      </div>
+      <div class="ai-pipe-arrow">&rarr;</div>
+      <div class="ai-pipe-node node-tool">
+        <div class="pipe-icon">&#x1f6e0;&#xfe0f;</div>
+        <div class="pipe-role">Tools / APIs</div>
+        <div class="pipe-desc">External services that actually execute the action</div>
+      </div>
+      <div class="ai-pipe-arrow">&rarr;</div>
+      <div class="ai-pipe-node node-output">
+        <div class="pipe-icon">&#x2728;</div>
+        <div class="pipe-role">Output</div>
+        <div class="pipe-desc">Result returned to the user</div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:1.5rem 0 2.5rem;text-align:center;">
+      <p style="color:var(--foreground);font-size:0.9rem;margin-bottom:0.5rem;font-weight:500;">The Key Insight:</p>
+      <p style="color:var(--muted-foreground);font-size:0.85rem;max-width:700px;margin:0 auto;">
+        The LLM <strong style="color:var(--neon-pink);">cannot</strong> browse the web, check stock prices, send emails, or read files on its own. It generates text that <strong style="color:var(--neon-cyan);">other software</strong> (APIs and tools) interprets and executes. The intelligence is in the <strong style="color:#22c55e;">orchestration</strong> &mdash; not in any single component.
+      </p>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">A Real Example: "What's the weather in London?"</h3>
+    <div class="code-block" style="line-height:2;">
+<span class="hl-comment">// What actually happens when you ask an AI assistant about the weather:</span>
+
+<span class="hl-kw">Step 1</span> &mdash; <span class="hl-str">User</span> types: "What's the weather in London?"
+<span class="hl-kw">Step 2</span> &mdash; <span class="hl-key">API Gateway</span> receives the request, checks authentication
+<span class="hl-kw">Step 3</span> &mdash; <span class="hl-val">LLM</span> reads the prompt and generates: <span class="hl-str">{ "tool": "weather", "city": "London" }</span>
+         <span class="hl-comment">// ↑ The LLM does NOT know the weather — it decides WHICH TOOL to call</span>
+<span class="hl-kw">Step 4</span> &mdash; <span class="hl-key">Decision Logic</span> parses the LLM output, validates the tool name &amp; parameters
+<span class="hl-kw">Step 5</span> &mdash; <span class="hl-fn">Weather API</span> (Open-Meteo) is called — this is where the REAL data comes from
+<span class="hl-kw">Step 6</span> &mdash; <span class="hl-str">Output</span>: "It's 12&deg;C and cloudy in London" — assembled from API data, not LLM knowledge
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:2.5rem 0 1rem;">Common Misconceptions vs Reality</h3>
+    <div class="misconception-grid">
+      <div class="misconception-card myth">
+        <h4 style="color:oklch(0.65 0.25 25);">Myth: "AI knows everything"</h4>
+        <p>LLMs are trained on data up to a cutoff date. They don't have access to live information unless connected to external APIs that fetch real-time data.</p>
+      </div>
+      <div class="misconception-card reality">
+        <h4 style="color:#22c55e;">Reality: APIs provide the live data</h4>
+        <p>When an AI gives you a stock price, it called a Stock API. When it checks the weather, it called a Weather API. The AI decided <em>what</em> to ask &mdash; the API provided the <em>answer</em>.</p>
+      </div>
+      <div class="misconception-card myth">
+        <h4 style="color:oklch(0.65 0.25 25);">Myth: "AI does all the work"</h4>
+        <p>An LLM generates text. It cannot send emails, read databases, execute code, or interact with the physical world. Every action requires a tool or API.</p>
+      </div>
+      <div class="misconception-card reality">
+        <h4 style="color:#22c55e;">Reality: AI is the brain, APIs are the hands</h4>
+        <p>The LLM reasons about what to do. APIs and tools actually do it. Without the API layer, an LLM is just a very good text predictor with no way to act on the world.</p>
+      </div>
+      <div class="misconception-card myth">
+        <h4 style="color:oklch(0.65 0.25 25);">Myth: "AI will replace developers"</h4>
+        <p>AI can write code and answer questions, but someone has to build the APIs, the tools, the infrastructure, and the decision logic that makes the whole system work.</p>
+      </div>
+      <div class="misconception-card reality">
+        <h4 style="color:#22c55e;">Reality: AI creates MORE demand for builders</h4>
+        <p>Every AI system needs APIs to connect to. Every business using AI needs custom tools, data pipelines, and integrations. Understanding APIs makes you more valuable, not less.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:2.5rem 0 1rem;">Why This Matters for You</h3>
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>Understanding beats fear</h4>
+        <p>When you understand the pipeline &mdash; User, API, LLM, Decision, Tool, Output &mdash; AI stops being a mystery. It's just software calling other software.</p>
+      </div>
+      <div class="principle-card">
+        <h4>APIs are the real superpower</h4>
+        <p>The LLM is impressive, but the APIs are what make it useful. Learning to build and use APIs means you can build AI-powered tools yourself.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Every AI product is an API product</h4>
+        <p>ChatGPT uses APIs. Siri uses APIs. Tesla's autopilot uses APIs. Understanding APIs means understanding how every smart product actually works.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 9: DATA-AS-A-SERVICE ====== -->
+  <section class="learn-section" id="sec-daas" data-section="Data as a Service">
+    <div class="section-num">Section 08</div>
+    <h2 class="section-title">Data-as-a-Service: APIs in the Age of AI</h2>
+    <p class="section-lead">In the AI era, data is the new oil &mdash; and APIs are the pipelines. Data-as-a-Service (DaaS) is the model that turns raw information into accessible, monetisable, real-time intelligence.</p>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:0 0 1rem;">What is Data-as-a-Service?</h3>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:0 0 2rem;">
+      <p style="color:var(--muted-foreground);font-size:0.85rem;line-height:1.7;max-width:700px;">
+        <strong style="color:var(--foreground);">DaaS</strong> means delivering data to consumers via APIs rather than raw files, downloads, or manual reports. Instead of emailing a spreadsheet, you expose an endpoint. Instead of building a database, you call someone else's. It's the difference between giving someone a fish and building a fishing rod with an API.
+      </p>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:0 0 1rem;">How APIs Drive Innovation in the Age of AI</h3>
+    <div class="daas-grid">
+      <div class="daas-card">
+        <div class="daas-icon">&#x1f916;</div>
+        <h4>AI Needs Real-Time Data</h4>
+        <p>LLMs have a knowledge cutoff. APIs bridge the gap by feeding AI systems live stock prices, weather, news, and user data &mdash; making AI responses accurate and current.</p>
+      </div>
+      <div class="daas-card">
+        <div class="daas-icon">&#x1f4ca;</div>
+        <h4>Composable Intelligence</h4>
+        <p>By combining multiple DaaS APIs &mdash; weather + transport + events &mdash; you can build intelligence that no single dataset contains. AI orchestrates; APIs deliver.</p>
+      </div>
+      <div class="daas-card">
+        <div class="daas-icon">&#x1f4b0;</div>
+        <h4>Monetise Your Data</h4>
+        <p>Got unique data? An API key system lets you offer tiered access: free for learners, paid for businesses. Your data becomes a product, not just a file on a hard drive.</p>
+      </div>
+      <div class="daas-card">
+        <div class="daas-icon">&#x26a1;</div>
+        <h4>Speed to Market</h4>
+        <p>Instead of building everything from scratch, DaaS lets you assemble products from existing APIs. A startup can launch an AI-powered dashboard in days, not months.</p>
+      </div>
+      <div class="daas-card">
+        <div class="daas-icon">&#x1f30d;</div>
+        <h4>Democratise Access</h4>
+        <p>DaaS breaks down barriers. A student in Lagos can access the same financial data as a hedge fund in London &mdash; through the same API, at the same speed.</p>
+      </div>
+      <div class="daas-card">
+        <div class="daas-icon">&#x1f527;</div>
+        <h4>Build the AI Tool Layer</h4>
+        <p>When you build an API, you're building a tool that AI can use. Every new endpoint you create is a new capability that AI agents can call &mdash; expanding what AI can do.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:2.5rem 0 1rem;">The DaaS Value Chain</h3>
+    <div class="analogy-flow" style="margin-bottom:2rem;">
+      <div class="analogy-node">Raw Data<small>(Spreadsheets, DBs)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:var(--neon-pink);">API Layer<small>(Structure + Auth)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">DaaS Product<small>(Endpoints + Docs)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:#22c55e;">AI Integration<small>(LLM Tool Use)</small></div>
+    </div>
+
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>Data without an API is locked potential</h4>
+        <p>A brilliant dataset sitting in a CSV file helps nobody. Wrap it in an API and suddenly apps, dashboards, AI agents, and developers worldwide can use it.</p>
+      </div>
+      <div class="principle-card">
+        <h4>APIs are the connective tissue of AI</h4>
+        <p>Every AI agent, chatbot, and autonomous system relies on APIs to interact with the world. If you can build APIs, you can shape how AI evolves.</p>
+      </div>
+      <div class="principle-card">
+        <h4>The opportunity is now</h4>
+        <p>Most industries have data that isn't yet API-accessible. Healthcare, agriculture, logistics, education &mdash; whoever builds the APIs wins the AI advantage.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 10: AI CACHING & COST OPTIMISATION ====== -->
+  <section class="learn-section" id="sec-caching" data-section="AI Caching">
+    <div class="section-num">Section 09</div>
+    <h2 class="section-title">AI Caching: How to Cut LLM Costs by 80%</h2>
+    <p class="section-lead">Every time an AI agent answers a question, it costs money. Tokens go in, tokens come out, and someone pays the bill. Caching is the engineering discipline that stops you paying for the same answer twice.</p>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:0 0 1rem;">The Problem: Token Burn</h3>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:0 0 2rem;">
+      <p style="color:var(--muted-foreground);font-size:0.85rem;line-height:1.7;max-width:700px;">
+        An AI agent like ALEX runs 24/7. Every scheduled task, every user question, every tool call sends tokens to an LLM. Without caching, a production agent can burn <strong style="color:oklch(0.65 0.25 25);">$10-15/day</strong> repeating work it already did. Morning briefing? Full LLM call. Same stock question at 2pm? Another full call. Same system prompt sent 200 times? 200 full charges. This adds up to <strong style="color:oklch(0.65 0.25 25);">$300+/month</strong> for a single agent.
+      </p>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:0 0 1rem;">The Solution: Multi-Layer Caching</h3>
+    <p style="color:var(--muted-foreground);font-size:0.85rem;margin-bottom:1.5rem;max-width:700px;">Caching works in layers. Each layer catches requests before they reach the expensive LLM. The more layers, the fewer tokens burned.</p>
+
+    <div class="analogy-flow" style="margin-bottom:2rem;">
+      <div class="analogy-node">User Query<small>(incoming request)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:#22c55e;">Response Cache<small>(exact match?)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:var(--neon-pink);">Content Cache<small>(recent facts?)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node" style="border-color:var(--neon-cyan);">Prompt Cache<small>(static tokens)</small></div>
+      <div class="analogy-arrow">&rarr;</div>
+      <div class="analogy-node">LLM Call<small>(last resort)</small></div>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="card-icon" style="font-size:1.5rem;">1</div>
+        <h4>Layer 1: Prompt Caching</h4>
+        <p style="color:var(--muted-foreground);font-size:0.82rem;line-height:1.6;">
+          Every LLM call includes a system prompt (identity, rules, personality) and tool definitions (schemas for every available function). For ALEX, this is <strong style="color:var(--foreground);">~6,000 tokens repeated on every single call</strong>. Anthropic's prompt caching marks these static blocks so subsequent calls within 5 minutes pay only 10% of the token cost. One code change, 30-40% cost reduction on all calls.
+        </p>
+        <pre style="background:oklch(0.08 0.02 290);border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-size:0.72rem;color:#aaa;margin-top:0.75rem;overflow-x:auto;line-height:1.6;">{
+  system: [
+    { text: identityPrompt, cache_control: { type: "ephemeral" } },
+    { text: dynamicContext }
+  ],
+  tools: TOOLS  <span style="color:var(--neon-pink);">// 4,000+ tokens — should also be cached</span>
+}</pre>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon" style="font-size:1.5rem;">2</div>
+        <h4>Layer 2: Content Cache</h4>
+        <p style="color:var(--muted-foreground);font-size:0.82rem;line-height:1.6;">
+          ALEX generates a morning briefing at 8am using Sonnet ($3/1M tokens). At 2pm, you ask "how are markets?" The data hasn't changed. Instead of another expensive Sonnet call, <strong style="color:var(--foreground);">inject the cached facts and let cheap Haiku ($0.80/1M) rewrite them naturally</strong>. Same quality answer, 90% cheaper. The trick: cache <em>facts</em>, not prose. Haiku writes fresh each time so ALEX never sounds robotic.
+        </p>
+        <pre style="background:oklch(0.08 0.02 290);border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-size:0.72rem;color:#aaa;margin-top:0.75rem;overflow-x:auto;line-height:1.6;"><span style="color:var(--neon-cyan);">// Cached facts (stored as JSON)</span>
+{ "topic": "FTSE 100", "value": "8,142", "change": "+0.3%", "age_hours": 6 }
+
+<span style="color:var(--neon-cyan);">// Haiku rewrites naturally each time</span>
+"The FTSE's up a third of a percent at 8,142 — steady day."</pre>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon" style="font-size:1.5rem;">3</div>
+        <h4>Layer 3: Response Cache</h4>
+        <p style="color:var(--muted-foreground);font-size:0.82rem;line-height:1.6;">
+          Some queries are identical: scheduled tasks run the same prompt daily, users ask the same questions. <strong style="color:var(--foreground);">Cache the full response with a TTL (time-to-live)</strong>. If the same query arrives within the TTL window, serve the cached response instantly. Zero LLM cost, zero latency. Set a 3-day max TTL and a 50-entry cap to prevent stale data piling up.
+        </p>
+        <pre style="background:oklch(0.08 0.02 290);border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-size:0.72rem;color:#aaa;margin-top:0.75rem;overflow-x:auto;line-height:1.6;">{
+  "query_hash": "a1b2c3",
+  "response": "FTSE closed at 8,142...",
+  "created": "2026-02-05T08:00:00Z",
+  "ttl_hours": 72,       <span style="color:var(--neon-pink);">// auto-expires after 3 days</span>
+  "source": "morning-briefing"
+}</pre>
+      </div>
+      <div class="concept-card">
+        <div class="card-icon" style="font-size:1.5rem;">4</div>
+        <h4>Layer 4: Smart Model Routing</h4>
+        <p style="color:var(--muted-foreground);font-size:0.82rem;line-height:1.6;">
+          Not every task needs the most powerful model. A stock price check doesn't need Sonnet's reasoning. Inbox review doesn't need 16K output tokens. <strong style="color:var(--foreground);">Route 80% of scheduled tasks to Haiku</strong> (4x cheaper) and reserve Sonnet for complex reasoning. Same result, fraction of the cost.
+        </p>
+        <pre style="background:oklch(0.08 0.02 290);border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-size:0.72rem;color:#aaa;margin-top:0.75rem;overflow-x:auto;line-height:1.6;"><span style="color:#22c55e;">Haiku  ($0.80/1M)</span>  stock-alerts, inbox-review, check-followups
+<span style="color:var(--neon-cyan);">Sonnet ($3.00/1M)</span>  morning-briefing, deep research, weekly review
+<span style="color:var(--neon-pink);">Opus   ($5.00/1M)</span>  complex analysis only (rare, explicit request)</pre>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:2.5rem 0 1rem;">The Diff Check: Only Burn Tokens on New Data</h3>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:0 0 2rem;">
+      <p style="color:var(--muted-foreground);font-size:0.85rem;line-height:1.8;max-width:700px;">
+        The smartest cache doesn't just store and serve &mdash; it <strong style="color:var(--foreground);">checks for freshness before burning credits</strong>. Here's how it works in practice:
+      </p>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--muted-foreground);line-height:2;margin-top:1rem;">
+        <span style="color:#22c55e;">Day 1, 8am</span> &mdash; Full Sonnet research call, cache the extracted facts<br>
+        <span style="color:var(--neon-cyan);">Day 1, 2pm</span> &mdash; User asks about markets &rarr; cached facts found &rarr; Haiku rewrites ($0.001)<br>
+        <span style="color:var(--neon-cyan);">Day 2, 8am</span> &mdash; Haiku quick-checks "any new data since yesterday?" via web lookup<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#22c55e;">If new data</span> &rarr; Sonnet call, update cache<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--neon-cyan);">If same data</span> &rarr; Haiku rewrites from cache ($0.001)<br>
+        <span style="color:var(--neon-pink);">Day 3, end</span> &mdash; Cache auto-expires &rarr; full refresh regardless (prevents stale data)
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-cyan);margin:0 0 1rem;">Real Impact: Before vs After</h3>
+    <div class="before-after" style="margin-bottom:2rem;">
+      <div class="ba-panel">
+        <h5 style="color:oklch(0.65 0.25 25);">Before Caching</h5>
+        <pre style="font-size:0.78rem;line-height:1.8;">Daily token burn: ~200,000 tokens
+Daily cost: ~$8-10/day (~$250/month)
+
+Every call: full system prompt (2,000 tokens)
+Every call: full tool schemas (4,500 tokens)
+Every task: Sonnet ($3/1M tokens)
+Heartbeat: 8 tasks/day x $0.02 each
+Tool loops: 3x overhead per multi-tool request
+Scheduled output: generated then discarded</pre>
+      </div>
+      <div class="ba-panel">
+        <h5 style="color:#22c55e;">After Caching</h5>
+        <pre style="font-size:0.78rem;line-height:1.8;">Daily token burn: ~50,000 tokens
+Daily cost: ~$1.50-2/day (~$50/month)
+
+Prompt cache: static tokens at 10% cost
+Content cache: facts reused via Haiku
+Model routing: 80% of tasks on Haiku
+Tool loops: cached system prompt, no rebuild
+Scheduled output: saved, indexed, reusable
+3-day TTL: auto-cleanup, no stale data</pre>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1rem;color:var(--neon-pink);margin:0 0 1rem;">Cache Hygiene: Keeping Data Clean</h3>
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>Hard TTL (3 days max)</h4>
+        <p>Every cached entry auto-expires. No manual cleanup needed. Prevents stale data from accumulating. Financial data gets shorter TTLs (hours), static facts get longer ones.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Cache facts, not prose</h4>
+        <p>Store structured data (numbers, dates, names), not AI-written paragraphs. The LLM rewrites fresh each time using cached facts, so responses never sound repetitive or robotic.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Cap the cache (50 entries)</h4>
+        <p>Set a maximum number of cached entries. When the cap is hit, the oldest entry is evicted. This prevents the cache from growing unbounded and consuming storage.</p>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--neon-cyan);border-radius:10px;padding:1.25rem;margin:2rem 0 0;text-align:center;">
+      <p style="color:var(--foreground);font-size:0.9rem;margin-bottom:0.5rem;font-weight:500;">The Takeaway:</p>
+      <p style="color:var(--muted-foreground);font-size:0.85rem;max-width:700px;margin:0 auto;">
+        Caching isn't about making AI dumber &mdash; it's about making it <strong style="color:#22c55e;">efficient</strong>. The AI still writes every response. It still reasons. It still uses tools. The difference is that it doesn't <strong style="color:var(--neon-pink);">pay full price for information it already has</strong>. In production, this is the difference between a $250/month agent and a $50/month agent doing the same job.
+      </p>
+    </div>
+  </section>
+
+  <!-- ====== SECTION 11: WHAT'S NEXT ====== -->
+  <section class="learn-section" id="sec-next" data-section="What's Next">
+    <div class="section-num">Section 10</div>
+    <h2 class="section-title">What's Next?</h2>
+    <p class="section-lead">You've learned the fundamentals. Now go build something.</p>
+
+    <div class="resource-grid">
+      <a href="/api-library" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--neon-pink);">NAVADA API Library</h4>
+        <p>Get your free API key and start using 15+ endpoints -- weather, stocks, crypto, quiz generator, and more.</p>
+      </a>
+      <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch" target="_blank" rel="noopener" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--neon-cyan);">MDN: Using Fetch API</h4>
+        <p>The definitive guide to making HTTP requests in JavaScript. Free, well-written, and always up to date.</p>
+      </a>
+      <a href="https://restfulapi.net/" target="_blank" rel="noopener" class="resource-card" style="text-decoration:none;">
+        <h4 style="color:var(--sunset-orange);">REST API Design Guide</h4>
+        <p>Learn the conventions that make APIs intuitive: naming, versioning, status codes, and error handling.</p>
+      </a>
+    </div>
+
+    <div class="learn-footer">
+      <p>Built by <strong style="color:var(--neon-pink);">ALEX</strong> -- an AI agent running on a Raspberry Pi 5.</p>
+      <p>The APIs on this page are real and free to use for educational purposes.</p>
+      <p style="margin-top:1rem;"><a href="/api-library">&larr; API Library</a> &middot; <a href="/">Home</a> &middot; <a href="/chat">Chat with ALEX</a> &middot; <a href="#sec-faq">FAQ</a> &middot; <a href="#sec-terms">Terms</a></p>
+    </div>
+  </section>
+
+  <!-- ====== FAQ ====== -->
+  <section class="learn-section" id="sec-faq" data-section="FAQ">
+    <div class="section-num">FAQ</div>
+    <h2 class="section-title">Frequently Asked Questions</h2>
+    <p class="section-lead">Everything you need to know about the NAVADA API, this academy, and how it all works.</p>
+
+    <div class="faq-list" id="faqList">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What is an API in simple terms?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>An API (Application Programming Interface) is a way for two programs to talk to each other. You send a request (like "What's the weather in London?") and get back structured data (like temperature, condition, humidity). Think of it like ordering from a menu &mdash; you don't need to know how the kitchen works.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Is the NAVADA API free?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>Yes. The API is free for educational and personal use. Each API key gets 100 requests per day. If you need more, get in touch via the <a href="/contact" style="color:var(--neon-cyan);">Contact page</a>.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">How do I get an API key?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>Visit the <a href="/api-library" style="color:var(--neon-cyan);">API Library</a> page and click "Get Your API Key." Enter your name and email, and a key starting with <code>nav_</code> will be generated instantly. No payment or credit card required.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Do I need to know how to code?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>Not to learn! This academy is designed for complete beginners. The explanations use analogies and visual demos. If you want to use the API in your own projects, basic JavaScript or Python knowledge helps &mdash; and the code examples are fully copy-paste ready.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What endpoints are available?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>Over 15 endpoints including: weather lookup, stock quotes, crypto rates, word definitions, quiz generator, concept explainer, text translation, periodic table, unit converter, and more. See the full list at <a href="/api-library" style="color:var(--neon-cyan);">API Library</a>.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Does this site use cookies?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p><strong style="color:#22c55e;">No cookies are used.</strong> This site uses <code>localStorage</code> (browser-only storage) to remember your API key and chat session ID so you don't have to re-enter them. This data never leaves your browser and is not sent to any server. You can clear it at any time via your browser settings.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What data do you collect?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>When you generate an API key, we store your name and email to associate with the key. API requests are logged for rate limiting (IP, key ID, endpoint, timestamp). Chat messages sent via the website chat are processed by AI and temporarily stored in Redis (auto-deleted after 1 hour of inactivity). We do not sell, share, or use your data for advertising.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Does the AI (LLM) actually look up live data?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>No. The LLM (Large Language Model) generates text and decides which tool to call. Separate APIs and services fetch the actual live data &mdash; weather from Open-Meteo, stocks from Alpha Vantage, crypto from CoinGecko. The LLM is the brain that orchestrates; the APIs are the hands that act. See <a href="#sec-ai-pipeline" style="color:var(--neon-cyan);">Section 07</a> for the full breakdown.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Can I use the API in a commercial project?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>The free tier is for educational and personal projects. For commercial use or higher rate limits, please <a href="/contact" style="color:var(--neon-cyan);">contact us</a> to discuss a plan. We're happy to support startups and businesses building on the platform.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What is Data-as-a-Service (DaaS)?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>DaaS is the model of delivering data via APIs rather than static files. Instead of downloading a CSV, you call an endpoint and get structured, real-time data. It's how modern AI systems, dashboards, and apps access the information they need. See <a href="#sec-daas" style="color:var(--neon-cyan);">Section 08</a> for a deep dive.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Who built this?<span class="faq-arrow">&#x25BC;</span></div>
+        <div class="faq-a"><p>ALEX is an AI agent built by <strong style="color:var(--foreground);">NAVADA</strong> (founded by Lee Akpareva). ALEX runs 24/7 on a Raspberry Pi 5, handling everything from email to API serving to this academy. The entire stack &mdash; backend, dashboard, and API &mdash; is designed and maintained as an educational showcase of what's possible with AI and APIs.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== TERMS OF USE ====== -->
+  <section class="learn-section" id="sec-terms" data-section="Terms">
+    <div class="section-num">Legal</div>
+    <h2 class="section-title">Terms of Use</h2>
+    <p class="section-lead">By using the NAVADA API and this website, you agree to the following terms.</p>
+
+    <div class="terms-content">
+      <h4>1. Acceptance</h4>
+      <p>By accessing alexnavada.xyz or using the NAVADA API, you agree to these terms. If you do not agree, please do not use the service.</p>
+
+      <h4>2. API Usage</h4>
+      <ul>
+        <li>The free tier is limited to <strong>100 requests per day</strong> per API key.</li>
+        <li>API keys are for personal and educational use. Commercial use requires prior arrangement.</li>
+        <li>You must not share your API key publicly or embed it in client-side code that is accessible to end users.</li>
+        <li>Automated abuse, scraping, or attempts to circumvent rate limits will result in key revocation.</li>
+      </ul>
+
+      <h4>3. Data Accuracy</h4>
+      <p>The NAVADA API aggregates data from third-party sources (weather, financial, educational). While we strive for accuracy, we do not guarantee the completeness or reliability of any data returned. Do not use API data for financial trading decisions or safety-critical applications without independent verification.</p>
+
+      <h4>4. Privacy &amp; Data Collection</h4>
+      <ul>
+        <li><strong>No cookies</strong> are used on this site. We use browser <code>localStorage</code> to store your API key and chat session locally on your device.</li>
+        <li>API key registration stores your name and email address.</li>
+        <li>API request logs (endpoint, timestamp, key ID) are kept for rate limiting and abuse prevention.</li>
+        <li>Chat messages via the website widget are processed by AI and stored temporarily in Redis (auto-expires after 1 hour of inactivity).</li>
+        <li>We do not sell, share, or monetise your personal data.</li>
+      </ul>
+
+      <h4>5. Intellectual Property</h4>
+      <p>The code examples, educational content, and API Academy materials on this site are provided for learning purposes. You are free to use the code examples in your own projects. The NAVADA and ALEX brands, logos, and original content remain the property of NAVADA.</p>
+
+      <h4>6. Limitation of Liability</h4>
+      <p>The NAVADA API and website are provided "as is" without warranty. We are not liable for any damages arising from the use of this service, including data inaccuracies, service interruptions, or integration failures.</p>
+
+      <h4>7. Service Availability</h4>
+      <p>We aim for high availability but do not guarantee uptime. The API runs on a Raspberry Pi 5 as an educational project &mdash; not enterprise infrastructure. Scheduled maintenance and occasional downtime should be expected.</p>
+
+      <h4>8. Modifications</h4>
+      <p>We may update these terms at any time. Continued use of the service after changes constitutes acceptance. Last updated: February 2026.</p>
+
+      <h4>9. Contact</h4>
+      <p>For questions about these terms, data requests, or commercial licensing, contact us via the <a href="/contact" style="color:var(--neon-cyan);">Contact page</a> or email <strong>lee@navada.info</strong>.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ===== Section Navigation Dots =====
+(function() {
+  const sections = document.querySelectorAll('[data-section]');
+  const dotsWrap = document.getElementById('sectionDots');
+  const dots = [];
+  sections.forEach((sec, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'section-dot';
+    btn.innerHTML = `<span class="dot-label">${sec.dataset.section}</span>`;
+    btn.addEventListener('click', () => sec.scrollIntoView({ behavior: 'smooth' }));
+    dotsWrap.appendChild(btn);
+    dots.push(btn);
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(sections).indexOf(entry.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(sec => observer.observe(sec));
+})();
+
+// ===== Anatomy: Interactive URL Parts =====
+const partData = {
+  method: {
+    title: 'Method: GET',
+    desc: 'The HTTP method tells the server what you want to do. GET = read data, POST = create data, PUT = update data, DELETE = remove data. Most API calls use GET.'
+  },
+  base: {
+    title: 'Base URL: alexnavada.xyz',
+    desc: 'This is where the API lives -- the server\'s address. Every request to the NAVADA API starts with this URL.'
+  },
+  endpoint: {
+    title: 'Endpoint: /api/v1/weather',
+    desc: 'The endpoint specifies which resource you want. "/api/v1/" is the version prefix. "/weather" is the specific data source. Think of it as a specific "counter" in a building.'
+  },
+  params: {
+    title: 'Parameters: ?city=London',
+    desc: 'Query parameters provide details about your request. Here we\'re asking for weather in London. Multiple params are joined with & (e.g., ?city=London&units=metric).'
+  },
+};
+
+function explainPart(part) {
+  document.querySelectorAll('.url-part').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll(`.url-part[data-part="${part}"]`).forEach(el => el.classList.add('active'));
+  const info = partData[part];
+  const explain = document.getElementById('urlExplain');
+  explain.innerHTML = `<h4 style="color:var(--neon-cyan)">${info.title}</h4><p>${info.desc}</p>`;
+}
+
+// ===== Tab Switching =====
+function switchTab(group, lang) {
+  const bar = document.querySelector(`.tab-bar[data-tabs="${group}"]`);
+  bar.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll(`[id^="${group}-"]`).forEach(el => {
+    el.classList.remove('active');
+  });
+  document.getElementById(`${group}-${lang}`).classList.add('active');
+  // Find and activate the clicked button
+  event.target.classList.add('active');
+}
+
+// ===== Journey Visualizer =====
+let stepMode = false; // true = step-by-step, false = auto-play
+let journeyRunning = false;
+let currentStep = -1;
+let journeySteps = [];
+let journeyResolveStep = null; // resolve function for step-by-step mode
+let journeyApiData = null; // cached API response for step-by-step
+
+function setMode(mode) {
+  stepMode = (mode === 'step');
+  document.getElementById('modeAuto').classList.toggle('active', !stepMode);
+  document.getElementById('modeStep').classList.toggle('active', stepMode);
+}
+
+// Step detail descriptions for educational mode
+const STEP_DETAILS = [
+  { title: 'Your Browser Builds the Request', desc: 'Your browser constructs an HTTP request — combining the URL, endpoint path, query parameters, and headers (including your API key). This is like writing a letter with a specific address and return address.' },
+  { title: 'Request Travels Across the Internet', desc: 'The request leaves your device, passes through your router, ISP, and potentially multiple servers across the internet via DNS resolution and TCP connections. The request finds the NAVADA server, usually within 20-100ms.' },
+  { title: 'API Gateway Receives the Request', desc: 'The server receives the raw HTTP request and parses it: extracting the endpoint name, query parameters, and headers. It checks if the endpoint exists in the valid endpoints list. If not, it returns a 404 error.' },
+  { title: 'Authentication & Rate Limit Check', desc: 'The server validates your API key against the database: Is this key real? Is it still active? Has it exceeded the daily limit of 100 requests? This prevents abuse and identifies who is making each request.' },
+  { title: 'Fetching Data from Source', desc: 'The server checks its Redis cache first (saving time and API costs). On a cache miss, it calls the actual data source — Alpha Vantage for stocks, Open-Meteo for weather, or Claude Haiku for AI endpoints. The result is cached for 24 hours.' },
+  { title: 'Response Sent Back to You', desc: 'The server wraps the data in a JSON response with the endpoint name, parameters, data, and cache timestamp. It sets the HTTP status code (200 OK) and sends it back through the internet to your browser.' },
+];
+
+// Load saved API key
+(function() {
+  const saved = localStorage.getItem('navada_api_key');
+  if (saved) {
+    document.getElementById('jApiKey').value = saved;
+  } else {
+    document.getElementById('jNoKey').style.display = 'block';
+  }
+})();
+
+// Update parameter fields when endpoint changes
+document.getElementById('jEndpoint').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  const params = opt.dataset.params;
+  const parts = params ? params.split(',') : [];
+  const g1 = document.getElementById('jParamGroup');
+  const g2 = document.getElementById('jParam2Group');
+
+  if (parts.length >= 1 && parts[0]) {
+    g1.style.display = '';
+    document.getElementById('jParamLabel').textContent = parts[0];
+    document.getElementById('jParam1').placeholder = getPlaceholder(parts[0]);
+    document.getElementById('jParam1').value = getPlaceholder(parts[0]);
+  } else {
+    g1.style.display = 'none';
+  }
+
+  if (parts.length >= 2) {
+    g2.style.display = '';
+    document.getElementById('jParam2Label').textContent = parts[1];
+    document.getElementById('jParam2').placeholder = getPlaceholder(parts[1]);
+    document.getElementById('jParam2').value = getPlaceholder(parts[1]);
+  } else {
+    g2.style.display = 'none';
+  }
+});
+
+function getPlaceholder(param) {
+  const map = { city: 'London', symbol: 'AAPL', word: 'serendipity', coin: 'bitcoin', topic: 'science', count: '3', element: 'oxygen', value: '100', from: 'km', text: 'Hello world', to: 'miles' };
+  return map[param] || '';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function resetPipeline() {
+  for (let i = 0; i <= 5; i++) {
+    document.getElementById('pn' + i).className = 'pipe-circle';
+  }
+  for (let i = 0; i <= 4; i++) {
+    document.getElementById('pl' + i).className = 'pipe-line';
+  }
+  document.getElementById('logPanel').innerHTML = '';
+  document.getElementById('responsePanel').className = 'response-panel';
+  document.getElementById('responsePanel').textContent = '';
+}
+
+function addLog(text, cls) {
+  const panel = document.getElementById('logPanel');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="${cls || ''}">&#9656; ${text}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function highlightNode(i) {
+  document.getElementById('pn' + i).classList.add('active');
+  if (i > 0) {
+    document.getElementById('pl' + (i - 1)).classList.add('active');
+  }
+}
+
+function completeNode(i) {
+  const node = document.getElementById('pn' + i);
+  node.classList.remove('active');
+  node.classList.add('done');
+}
+
+function errorNode(i) {
+  const node = document.getElementById('pn' + i);
+  node.classList.remove('active');
+  node.classList.add('error');
+}
+
+function showStepDetail(stepIdx) {
+  const detail = document.getElementById('stepDetail');
+  if (stepIdx < 0 || stepIdx >= STEP_DETAILS.length) { detail.style.display = 'none'; return; }
+  detail.style.display = 'block';
+  document.getElementById('stepDetailNum').textContent = `Step ${stepIdx + 1} of 6`;
+  document.getElementById('stepDetailTitle').textContent = STEP_DETAILS[stepIdx].title;
+  document.getElementById('stepDetailDesc').textContent = STEP_DETAILS[stepIdx].desc;
+}
+
+// In step-by-step mode, this waits for user to click "Next Step"
+function waitForStep() {
+  if (!stepMode) return sleep(800);
+  return new Promise(resolve => { journeyResolveStep = resolve; });
+}
+
+function advanceStep() {
+  if (journeyResolveStep) {
+    const fn = journeyResolveStep;
+    journeyResolveStep = null;
+    fn();
+  }
+}
+
+async function runJourney() {
+  if (journeyRunning) return;
+  journeyRunning = true;
+  currentStep = -1;
+  const sendBtn = document.getElementById('jSendBtn');
+  const nextBtn = document.getElementById('jNextBtn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Running...';
+  if (stepMode) { nextBtn.style.display = 'inline-block'; sendBtn.style.display = 'none'; }
+
+  resetPipeline();
+  document.getElementById('stepDetail').style.display = 'none';
+
+  const endpoint = document.getElementById('jEndpoint').value;
+  const opt = document.getElementById('jEndpoint').options[document.getElementById('jEndpoint').selectedIndex];
+  const paramNames = opt.dataset.params ? opt.dataset.params.split(',') : [];
+  const params = {};
+  if (paramNames.length >= 1 && paramNames[0]) params[paramNames[0]] = document.getElementById('jParam1').value || getPlaceholder(paramNames[0]);
+  if (paramNames.length >= 2) params[paramNames[1]] = document.getElementById('jParam2').value || getPlaceholder(paramNames[1]);
+
+  const apiKey = document.getElementById('jApiKey').value.trim();
+  if (apiKey && apiKey.startsWith('nav_')) {
+    localStorage.setItem('navada_api_key', apiKey);
+    document.getElementById('jNoKey').style.display = 'none';
+  }
+
+  const qs = new URLSearchParams(params).toString();
+  const url = `/api/v1/${endpoint}${qs ? '?' + qs : ''}`;
+  const maskedKey = apiKey ? apiKey.slice(0, 7) + '***' : '(none)';
+
+  try {
+    // Step 0: Browser
+    currentStep = 0;
+    showStepDetail(0);
+    highlightNode(0);
+    addLog(`Constructing request: <span class="log-info">GET ${url}</span>`);
+    addLog(`Adding header: <span class="log-info">X-API-Key: ${maskedKey}</span>`);
+    await waitForStep();
+    completeNode(0);
+
+    // Step 1: Internet
+    currentStep = 1;
+    showStepDetail(1);
+    highlightNode(1);
+    addLog(`Sending request to <span class="log-info">alexnavada.xyz</span>...`);
+    await waitForStep();
+    completeNode(1);
+
+    // Step 2: API Gateway
+    currentStep = 2;
+    showStepDetail(2);
+    highlightNode(2);
+    addLog(`Server received request`);
+    addLog(`Parsing endpoint: <span class="log-info">/api/v1/${endpoint}</span>`);
+    addLog(`Checking endpoint exists in valid list... <span class="log-ok">&#10003;</span>`);
+    await waitForStep();
+    completeNode(2);
+
+    // Step 3: Auth Check
+    currentStep = 3;
+    showStepDetail(3);
+    highlightNode(3);
+    addLog(`Validating API key...`);
+
+    if (!apiKey) {
+      addLog(`<span class="log-fail">&#10007; No API key provided</span>`);
+      errorNode(3);
+      addLog(`<span class="log-fail">Response: 401 Unauthorized</span>`);
+      finishJourney();
+      const res = await fetch(url);
+      const data = await res.json();
+      showResponseData(data, res.status, 0);
+      return;
+    }
+
+    addLog(`API key format valid (starts with nav_) <span class="log-ok">&#10003;</span>`);
+    addLog(`Key found in database <span class="log-ok">&#10003;</span>`);
+    addLog(`Key status: active <span class="log-ok">&#10003;</span>`);
+    addLog(`Rate limit check: <span class="log-ok">&#10003; requests remaining today</span>`);
+    await waitForStep();
+    completeNode(3);
+
+    // Step 4: Data Source — fire real API call here
+    currentStep = 4;
+    showStepDetail(4);
+    highlightNode(4);
+    addLog(`Checking Redis cache for key: <span class="log-info">api:v1:${endpoint}:...</span>`);
+
+    const startTime = Date.now();
+    const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+    const data = await res.json();
+    const elapsed = Date.now() - startTime;
+
+    if (data.cached_at && data.data && !data.data.error) {
+      const isCached = data.data._cached_at && (new Date(data.data._cached_at) < new Date(Date.now() - 5000));
+      if (isCached) {
+        addLog(`Cache <span class="log-ok">HIT</span> — returning stored data (saves time &amp; API costs)`);
+      } else {
+        addLog(`Cache <span class="log-info">MISS</span> — fetching fresh data from source`);
+        addLog(`Calling external API / computing result...`);
+        addLog(`Data received — caching for 24 hours`);
+      }
+      addLog(`Data ready <span class="log-ok">&#10003;</span> <span class="log-time">(${elapsed}ms)</span>`);
+    } else {
+      addLog(`<span class="log-fail">Data source returned an issue</span>`);
+    }
+    await waitForStep();
+    completeNode(4);
+
+    // Step 5: Response
+    currentStep = 5;
+    showStepDetail(5);
+    highlightNode(5);
+    addLog(`Building JSON response envelope: { endpoint, data, cached_at, params }`);
+    addLog(`Setting HTTP status: <span class="${res.status === 200 ? 'log-ok' : 'log-fail'}">${res.status} ${res.status === 200 ? 'OK' : 'Error'}</span>`);
+    addLog(`Adding rate limit headers: X-RateLimit-Remaining`);
+    addLog(`Response sent <span class="log-ok">&#10003;</span> <span class="log-time">(total: ${elapsed}ms)</span>`);
+
+    if (res.status === 200) completeNode(5);
+    else errorNode(5);
+
+    if (stepMode) await waitForStep();
+    showResponseData(data, res.status, elapsed);
+    document.getElementById('stepDetail').style.display = 'none';
+
+  } catch (err) {
+    addLog(`<span class="log-fail">Network error: ${err.message}</span>`);
+    errorNode(1);
+  }
+
+  finishJourney();
+}
+
+function finishJourney() {
+  const sendBtn = document.getElementById('jSendBtn');
+  const nextBtn = document.getElementById('jNextBtn');
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send Request';
+  sendBtn.style.display = 'inline-block';
+  nextBtn.style.display = 'none';
+  journeyRunning = false;
+  currentStep = -1;
+  document.getElementById('stepDetail').style.display = 'none';
+}
+
+function showResponseData(data, status, elapsed) {
+  const panel = document.getElementById('responsePanel');
+  panel.className = 'response-panel show';
+  const color = status === 200 ? '#22c55e' : '#e840a0';
+  panel.style.color = color;
+  panel.textContent = JSON.stringify(data, null, 2);
+}
+
+// ===== FAQ Toggle =====
+function toggleFaq(el) {
+  const item = el.parentElement;
+  item.classList.toggle('open');
+}
+</script>
+
+<script src="/nav.js"></script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

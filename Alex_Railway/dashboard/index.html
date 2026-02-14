@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ALEX — NAVADA VC Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #12121a;
+      --card-hover: #1a1a24;
+      --border: #1e1e2e;
+      --text: #e0e0e0;
+      --muted: #888;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --pink: #ec4899;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-text-size-adjust: 100%;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+
+    /* Header — stacks on mobile */
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1.5rem; padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border); gap: 0.75rem; flex-wrap: wrap;
+    }
+    .header-left { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+    .logo { font-size: 1.5rem; }
+    .header h1 { font-size: 1.2rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .header-time { color: var(--muted); font-size: 0.75rem; }
+    .header-updated { color: var(--muted); font-size: 0.65rem; margin-top: 0.15rem; }
+    .status-badge {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.4rem 0.75rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600; flex-shrink: 0;
+    }
+    .status-badge.online { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status-badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; animation: pulse 2s infinite; }
+    .status-badge.online .status-dot { background: var(--green); }
+    .status-badge.offline .status-dot { background: var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Nav */
+    .nav-links { margin-bottom: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .nav-link {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(99,102,241,0.15); border: 1px solid var(--border);
+      color: var(--text); text-decoration: none;
+      padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem;
+    }
+
+    /* Grid system — responsive */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+    .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
+
+    @media (max-width: 768px) {
+      .container { padding: 0.75rem; }
+      .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); }
+      .main-grid { grid-template-columns: 1fr; }
+      .header h1 { font-size: 1rem; }
+      .hide-mobile { display: none !important; }
+      .task-table { font-size: 0.75rem; }
+      .task-table th, .task-table td { padding: 0.5rem 0.4rem; }
+      .model-table th, .model-table td { padding: 0.4rem; font-size: 0.7rem; }
+      .card-body { padding: 0.75rem; }
+      .card-header { padding: 0.75rem; }
+      .commit-item { flex-wrap: wrap; gap: 0.25rem; }
+      .commit-date { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .grid-4, .grid-5 { grid-template-columns: 1fr 1fr; }
+      .summary-value { font-size: 1.3rem; }
+      .roi-value { font-size: 1.1rem; }
+    }
+
+    /* Summary Cards */
+    .summary-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem;
+    }
+    .summary-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; margin-bottom: 0.5rem;
+    }
+    .summary-icon.purple { background: rgba(99,102,241,0.2); }
+    .summary-icon.green { background: rgba(34,197,94,0.2); }
+    .summary-icon.blue { background: rgba(59,130,246,0.2); }
+    .summary-icon.red { background: rgba(239,68,68,0.2); }
+    .summary-value { font-size: 1.5rem; font-weight: 700; }
+    .summary-label { color: var(--muted); font-size: 0.75rem; margin-top: 0.15rem; }
+
+    /* ROI Cards */
+    .roi-card {
+      background: linear-gradient(135deg, var(--card) 0%, rgba(34,197,94,0.06) 100%);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.85rem; text-align: center;
+    }
+    .roi-value { font-size: 1.2rem; font-weight: 700; color: var(--green); }
+    .roi-value.cost { color: var(--amber); }
+    .roi-label { color: var(--muted); font-size: 0.65rem; margin-top: 0.15rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Cards */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.85rem 1rem; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+    .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    .card-body { padding: 0.85rem 1rem; }
+
+    /* Tables */
+    .task-table, .model-table { width: 100%; border-collapse: collapse; }
+    .task-table th, .model-table th {
+      text-align: left; padding: 0.6rem 0.5rem; font-size: 0.65rem;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    .task-table td, .model-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    .task-table tr:last-child td, .model-table tr:last-child td { border-bottom: none; }
+    .task-name { font-weight: 500; word-break: break-word; }
+    .task-status {
+      display: inline-block; padding: 0.2rem 0.4rem; border-radius: 4px;
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase; white-space: nowrap;
+    }
+    .task-status.completed { background: rgba(34,197,94,0.15); color: var(--green); }
+    .task-status.in_progress, .task-status.in-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .task-status.failed { background: rgba(239,68,68,0.15); color: var(--red); }
+    .task-status.pending { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .task-category { font-size: 0.65rem; padding: 0.15rem 0.35rem; background: rgba(99,102,241,0.15); color: var(--accent); border-radius: 3px; white-space: nowrap; }
+    .task-tokens { font-family: 'SF Mono', 'Consolas', monospace; color: var(--purple); font-size: 0.75rem; }
+    .task-cost { font-family: 'SF Mono', 'Consolas', monospace; color: var(--green); font-size: 0.75rem; }
+    .task-time { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+
+    /* Responsive table wrapper */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Progress */
+    .progress-container { padding: 0.75rem 1rem; background: rgba(255,255,255,0.02); }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.8rem; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 3px; transition: width 0.3s; }
+
+    /* News */
+    .news-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .news-item:last-child { border-bottom: none; }
+    .news-severity { width: 3px; border-radius: 3px; flex-shrink: 0; }
+    .news-severity.high { background: var(--red); }
+    .news-severity.medium { background: var(--amber); }
+    .news-severity.low { background: var(--green); }
+    .news-severity.info { background: var(--blue); }
+    .news-content { flex: 1; min-width: 0; }
+    .news-headline { font-weight: 600; margin-bottom: 0.3rem; line-height: 1.3; font-size: 0.85rem; }
+    .news-summary { color: var(--muted); font-size: 0.8rem; line-height: 1.4; margin-bottom: 0.3rem; word-break: break-word; }
+    .news-meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--muted); flex-wrap: wrap; }
+
+    /* Jobs / Services */
+    .job-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem; }
+    .job-item:last-child { border-bottom: none; }
+    .job-info { flex: 1; min-width: 0; }
+    .job-name { font-weight: 600; font-size: 0.8rem; }
+    .job-schedule { font-size: 0.7rem; color: var(--muted); font-family: 'SF Mono', monospace; }
+    .job-desc { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
+    .job-status { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; white-space: nowrap; }
+    .job-status.active, .job-status.running { background: rgba(34,197,94,0.15); color: var(--green); }
+    .job-status.stopped { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    /* Activity Log */
+    .activity-item { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-time { color: var(--accent); font-family: 'SF Mono', monospace; font-size: 0.7rem; white-space: nowrap; }
+    .activity-text { color: var(--text); word-break: break-word; }
+
+    /* Commits */
+    .commit-item { display: flex; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; align-items: baseline; }
+    .commit-item:last-child { border-bottom: none; }
+    .commit-hash { font-family: 'SF Mono', 'Consolas', monospace; color: var(--accent); font-size: 0.7rem; flex-shrink: 0; }
+    .commit-msg { color: var(--text); flex: 1; min-width: 0; word-break: break-word; }
+    .commit-date { color: var(--muted); font-size: 0.65rem; white-space: nowrap; flex-shrink: 0; }
+    .commit-tag { display: inline-block; font-size: 0.55rem; padding: 0.1rem 0.3rem; background: rgba(99,102,241,0.2); color: var(--accent); border-radius: 3px; margin-left: 0.3rem; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 1.5rem 0.5rem; color: var(--muted); font-size: 0.7rem; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.8rem; }
+
+    /* Scrollable card body */
+    .scrollable { max-height: 350px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">📊</span>
+        <div>
+          <h1 id="dash-title">ALEX — NAVADA VC</h1>
+          <div class="header-time" id="current-time">Loading...</div>
+          <div class="header-updated" id="last-updated"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <div class="status-badge online" id="status-badge">
+          <span class="status-dot"></span>
+          <span id="status-text">ONLINE</span>
+        </div>
+        <button onclick="clearDashboard()" style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,0.15);color:var(--red);font-size:0.7rem;font-weight:600;cursor:pointer;">Clear</button>
+        <button id="restore-btn" onclick="restoreDashboard()" style="display:none;padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--blue);background:rgba(59,130,246,0.15);color:var(--blue);font-size:0.7rem;font-weight:600;cursor:pointer;">Restore</button>
+      </div>
+    </header>
+
+    <div class="nav-links">
+      <a href="uk-economy.html" class="nav-link">📈 UK Economy</a>
+    </div>
+
+    <!-- Summary -->
+    <div class="grid-4">
+      <div class="summary-card">
+        <div class="summary-icon purple">📋</div>
+        <div class="summary-value" id="total-tasks">0</div>
+        <div class="summary-label">Total Tasks</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon green">✅</div>
+        <div class="summary-value" id="completed-tasks">0</div>
+        <div class="summary-label">Completed</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon blue">⏳</div>
+        <div class="summary-value" id="in-progress-tasks">0</div>
+        <div class="summary-label">In Progress</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon red">❌</div>
+        <div class="summary-value" id="failed-tasks">0</div>
+        <div class="summary-label">Failed</div>
+      </div>
+    </div>
+
+    <!-- ROI -->
+    <div class="grid-5">
+      <div class="roi-card">
+        <div class="roi-value" id="roi-cost">£0.00</div>
+        <div class="roi-label">Today's Cost</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value cost" id="roi-avg">£0.00</div>
+        <div class="roi-label">Avg / Call</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value" id="roi-calls" style="color:var(--accent);">0</div>
+        <div class="roi-label">API Calls</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value" id="roi-tokens" style="color:var(--cyan);">0</div>
+        <div class="roi-label">Tokens</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value" id="roi-tasks" style="color:var(--purple);">0</div>
+        <div class="roi-label">Done</div>
+      </div>
+    </div>
+
+    <!-- Model Costs -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">💷 Cost by Model</span>
+        <span style="font-size:0.65rem;color:var(--muted);" id="roi-date"></span>
+      </div>
+      <div class="table-wrap" style="padding:0;">
+        <table class="model-table">
+          <thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead>
+          <tbody id="model-tbody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Task History -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Task History</span>
+        <span style="font-size:0.65rem;color:var(--muted);" id="task-date"></span>
+      </div>
+      <div class="table-wrap" style="padding:0;">
+        <table class="task-table">
+          <thead><tr><th>Task</th><th>Category</th><th>Status</th><th class="hide-mobile">Time</th><th>Tokens</th><th>Cost</th></tr></thead>
+          <tbody id="task-tbody"><tr><td colspan="6" class="empty">No tasks yet</td></tr></tbody>
+        </table>
+      </div>
+      <div class="progress-container">
+        <div class="progress-label"><span>Completion</span><span id="progress-text">0%</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <div>
+        <!-- News -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📰 News & Insights</span></div>
+          <div class="card-body scrollable" id="news-body"><div class="empty">No news yet</div></div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📝 Activity Log</span></div>
+          <div class="card-body scrollable" id="activity-body"><div class="empty">No activity yet</div></div>
+        </div>
+      </div>
+
+      <div>
+        <!-- Heartbeats -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">⏰ Heartbeats</span></div>
+          <div class="card-body" id="heartbeats-body"></div>
+        </div>
+
+        <!-- Services -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">🖥️ Services</span></div>
+          <div class="card-body" id="services-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Git Commits -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔀 Version History</span>
+        <span style="font-size:0.65rem;color:var(--muted);" id="commit-count"></span>
+      </div>
+      <div class="card-body scrollable" id="commits-body"><div class="empty">Loading commits...</div></div>
+    </div>
+
+    <footer class="footer">
+      ALEX Activity Tracker — NAVADA VC — Auto-refreshes every 5s<br>
+      <span style="color:var(--accent);">Raspberry Pi 5</span>
+    </footer>
+  </div>
+
+  <script>
+    let data = {}, tokenData = {}, commitsData = [];
+
+    async function loadData() {
+      try {
+        const [d, t, c] = await Promise.all([
+          fetch('/dashboard_data.json?_='+Date.now()).then(r=>r.json()),
+          fetch('/api/tokens?_='+Date.now()).then(r=>r.json()),
+          fetch('/api/commits?_='+Date.now()).then(r=>r.json()),
+        ]);
+        data = d; tokenData = t; commitsData = c.commits || [];
+        render();
+      } catch(e) { console.error('Load failed:', e); }
+    }
+
+    function fmt(n) {
+      if (typeof n !== 'number') return n || '—';
+      if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+      if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+      return n.toLocaleString();
+    }
+
+    function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+    function render() {
+      if (data.title) document.getElementById('dash-title').textContent = data.title;
+
+      // Status
+      const badge = document.getElementById('status-badge');
+      badge.className = 'status-badge ' + (data.status === 'online' ? 'online' : 'offline');
+      document.getElementById('status-text').textContent = (data.status || 'offline').toUpperCase();
+
+      if (data.last_updated) {
+        document.getElementById('last-updated').textContent = 'Updated: ' + new Date(data.last_updated).toLocaleString('en-GB', {timeZone:'Europe/London'});
+      }
+
+      // Summary
+      const s = data.summary || {};
+      document.getElementById('total-tasks').textContent = s.total_tasks || 0;
+      document.getElementById('completed-tasks').textContent = s.completed || 0;
+      document.getElementById('in-progress-tasks').textContent = s.in_progress || 0;
+      document.getElementById('failed-tasks').textContent = s.failed || 0;
+
+      // Progress
+      const total = s.total_tasks||0, done = s.completed||0;
+      const pct = total > 0 ? Math.round(done/total*100) : 0;
+      document.getElementById('progress-text').textContent = pct+'% ('+done+'/'+total+')';
+      document.getElementById('progress-fill').style.width = pct+'%';
+
+      // ROI
+      const t = tokenData || {};
+      document.getElementById('roi-cost').textContent = '£'+(t.total_cost_gbp||0).toFixed(2);
+      document.getElementById('roi-avg').textContent = '£'+(t.avg_cost_per_task_gbp||0).toFixed(4);
+      document.getElementById('roi-calls').textContent = fmt(t.total_calls||0);
+      document.getElementById('roi-tokens').textContent = fmt(t.total_tokens||0);
+      document.getElementById('roi-tasks').textContent = s.completed||0;
+      document.getElementById('roi-date').textContent = t.date||'';
+      document.getElementById('task-date').textContent = t.date||new Date().toISOString().split('T')[0];
+
+      // Model breakdown
+      const models = t.by_model || [];
+      const mBody = document.getElementById('model-tbody');
+      if (!models.length) {
+        mBody.innerHTML = '<tr><td colspan="5" class="empty">No API calls today</td></tr>';
+      } else {
+        mBody.innerHTML = models.map(m=>`<tr>
+          <td style="font-weight:600">${esc(m.model)}</td>
+          <td>${m.calls}</td>
+          <td class="task-tokens">${fmt(m.input_tokens)}</td>
+          <td class="task-tokens">${fmt(m.output_tokens)}</td>
+          <td class="task-cost">£${m.cost_gbp.toFixed(4)}</td>
+        </tr>`).join('');
+      }
+
+      // Tasks
+      const tasks = data.tasks || [];
+      const tbody = document.getElementById('task-tbody');
+      if (!tasks.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No tasks yet</td></tr>';
+      } else {
+        tbody.innerHTML = tasks.map(tk=>`<tr>
+          <td class="task-name">${esc(tk.name||'')}</td>
+          <td><span class="task-category">${esc(tk.category||'general')}</span></td>
+          <td><span class="task-status ${(tk.status||'').replace(/ /g,'-')}">${esc(tk.status||'pending')}</span></td>
+          <td class="task-time hide-mobile">${esc(tk.time||'')}</td>
+          <td class="task-tokens">${tk.tokens?fmt(tk.tokens):'—'}</td>
+          <td class="task-cost">${tk.cost?esc(tk.cost):'—'}</td>
+        </tr>`).join('');
+      }
+
+      // News
+      const news = data.news || [];
+      const nBody = document.getElementById('news-body');
+      if (!news.length) { nBody.innerHTML = '<div class="empty">No news yet</div>'; }
+      else {
+        nBody.innerHTML = news.map(n=>`<div class="news-item">
+          <div class="news-severity ${esc(n.severity||'info')}"></div>
+          <div class="news-content">
+            <div class="news-headline">${esc(n.headline||'')}</div>
+            <div class="news-summary">${esc(n.summary||'')}</div>
+            <div class="news-meta"><span>${esc(n.time||'')}</span>${n.source?'<span>'+esc(n.source)+'</span>':''}</div>
+          </div>
+        </div>`).join('');
+      }
+
+      // Activity
+      const log = data.activity_log || [];
+      const aBody = document.getElementById('activity-body');
+      if (!log.length) { aBody.innerHTML = '<div class="empty">No activity yet</div>'; }
+      else {
+        aBody.innerHTML = log.map(a=>`<div class="activity-item">
+          <span class="activity-time">${esc(a.time||'')}</span>
+          <span class="activity-text">${esc(a.text||'')}</span>
+        </div>`).join('');
+      }
+
+      // Heartbeats
+      const hb = data.heartbeats || [];
+      document.getElementById('heartbeats-body').innerHTML = hb.map(h=>`<div class="job-item">
+        <div class="job-info">
+          <div class="job-name">${esc(h.name||'')}</div>
+          <div class="job-schedule">${esc(h.schedule||'')}</div>
+          ${h.description?'<div class="job-desc">'+esc(h.description)+'</div>':''}
+        </div>
+        <span class="job-status ${esc(h.status||'active')}">${(h.status||'active').toUpperCase()}</span>
+      </div>`).join('') || '<div class="empty">None</div>';
+
+      // Services
+      const svc = data.services || [];
+      document.getElementById('services-body').innerHTML = svc.map(sv=>`<div class="job-item">
+        <div class="job-info">
+          <div class="job-name">${esc(sv.name||'')}</div>
+          <div class="job-schedule">${esc(sv.port||'')}</div>
+        </div>
+        <span class="job-status ${esc(sv.status||'running')}">${(sv.status||'running').toUpperCase()}</span>
+      </div>`).join('') || '<div class="empty">None</div>';
+
+      // Commits
+      const cBody = document.getElementById('commits-body');
+      document.getElementById('commit-count').textContent = commitsData.length+' commits';
+      if (!commitsData.length) { cBody.innerHTML = '<div class="empty">No commits</div>'; }
+      else {
+        cBody.innerHTML = commitsData.map(c=>{
+          const d = new Date(c.date.replace(' ', 'T').replace(/ ([+-])/, '$1'));
+          const ds = isNaN(d) ? c.date : d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'});
+          const refs = c.refs ? c.refs.split(',').filter(r=>r.trim()).map(r=>'<span class="commit-tag">'+esc(r.trim())+'</span>').join('') : '';
+          return `<div class="commit-item">
+            <span class="commit-hash">${esc(c.short_hash)}</span>
+            <span class="commit-msg">${esc(c.message)}${refs}</span>
+            <span class="commit-date">${ds}</span>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    function updateTime() {
+      document.getElementById('current-time').textContent = new Date().toLocaleString('en-GB', {
+        weekday:'long',year:'numeric',month:'long',day:'numeric',
+        hour:'2-digit',minute:'2-digit',second:'2-digit',
+        timeZone:'Europe/London',timeZoneName:'short'
+      });
+    }
+
+    async function checkBackup() {
+      try {
+        const r = await fetch('/api/has-backup?_='+Date.now());
+        const j = await r.json();
+        document.getElementById('restore-btn').style.display = j.exists ? 'inline-block' : 'none';
+      } catch(e) {}
+    }
+
+    async function clearDashboard() {
+      if (!confirm('Clear all dashboard data (tasks, activity, news, metrics)? A backup will be saved.')) return;
+      try {
+        const r = await fetch('/api/clear', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) { loadData(); checkBackup(); }
+        else alert('Error: '+(j.error||'Unknown'));
+      } catch(e) { alert('Failed: '+e); }
+    }
+
+    async function restoreDashboard() {
+      if (!confirm('Restore dashboard data from backup?')) return;
+      try {
+        const r = await fetch('/api/restore', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) { loadData(); checkBackup(); }
+        else alert('Error: '+(j.error||'Unknown'));
+      } catch(e) { alert('Failed: '+e); }
+    }
+
+    updateTime(); setInterval(updateTime,1000);
+    loadData(); setInterval(loadData,5000);
+    checkBackup(); setInterval(checkBackup,10000);
+  </script>
+</body>
+</html>

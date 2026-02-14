@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALEX Token Usage Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0a0a0f;
+        color: #e0e0e0;
+        padding: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    h1 {
+        font-size: 28px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .subtitle {
+        color: #888;
+        font-size: 14px;
+        margin-bottom: 32px;
+    }
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    .card {
+        background: #151520;
+        border: 1px solid #252535;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    .card .label {
+        font-size: 12px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    .card .value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+    }
+    .card .value.cost { color: #4ade80; }
+    .card .value.calls { color: #60a5fa; }
+    .card .value.tokens { color: #c084fc; }
+    .card .sub {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+    }
+    .charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+    .chart-box {
+        background: #151520;
+        border: 1px solid #252535;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    .chart-box h3 {
+        font-size: 15px;
+        color: #ccc;
+        margin-bottom: 16px;
+    }
+    .chart-box canvas {
+        max-height: 280px;
+    }
+    .full-width { grid-column: 1 / -1; }
+    h2 {
+        font-size: 18px;
+        color: #fff;
+        margin: 32px 0 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #252535;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 24px;
+        font-size: 14px;
+    }
+    th {
+        text-align: left;
+        padding: 10px 12px;
+        background: #151520;
+        color: #888;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #252535;
+    }
+    td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #1a1a28;
+    }
+    tr:hover td {
+        background: #151520;
+    }
+    td.cost {
+        color: #4ade80;
+        font-weight: 600;
+    }
+    .footer {
+        text-align: center;
+        color: #555;
+        font-size: 12px;
+        margin-top: 48px;
+        padding-top: 24px;
+        border-top: 1px solid #252535;
+    }
+    @media (max-width: 768px) {
+        .charts { grid-template-columns: 1fr; }
+        .cards { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+</head>
+<body>
+
+<h1>ALEX Token Usage Report</h1>
+<p class="subtitle">Generated Friday 06 February 2026, 19:52 &mdash; 2026-01-30 to 2026-02-06 (8 days)</p>
+
+<div class="cards">
+    <div class="card">
+        <div class="label">Total Cost</div>
+        <div class="value cost">$62.06</div>
+        <div class="sub">$7.76/day avg</div>
+    </div>
+    <div class="card">
+        <div class="label">API Calls</div>
+        <div class="value calls">2,368</div>
+        <div class="sub">296/day avg</div>
+    </div>
+    <div class="card">
+        <div class="label">Input Tokens</div>
+        <div class="value tokens">22,208,285</div>
+    </div>
+    <div class="card">
+        <div class="label">Output Tokens</div>
+        <div class="value tokens">736,939</div>
+    </div>
+    <div class="card">
+        <div class="label">Total Tokens</div>
+        <div class="value tokens">22,945,224</div>
+    </div>
+</div>
+
+<div class="charts">
+    <div class="chart-box">
+        <h3>Daily Cost ($)</h3>
+        <canvas id="dailyCostChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>Daily API Calls</h3>
+        <canvas id="dailyCallsChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>Cost by Model</h3>
+        <canvas id="modelChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>Cost by Source</h3>
+        <canvas id="sourceChart"></canvas>
+    </div>
+    <div class="chart-box full-width">
+        <h3>Today's Hourly Activity</h3>
+        <canvas id="hourlyChart"></canvas>
+    </div>
+</div>
+
+<h2>Daily Breakdown</h2>
+<table>
+    <tr><th>Date</th><th>Calls</th><th>Input</th><th>Output</th><th>Total</th><th>Cost</th></tr>
+    <tr>
+            <td>2026-01-30</td><td>11</td>
+            <td>242,392</td><td>13,535</td>
+            <td>255,927</td><td class="cost">$0.81</td>
+        </tr><tr>
+            <td>2026-01-31</td><td>476</td>
+            <td>6,028,600</td><td>196,815</td>
+            <td>6,225,415</td><td class="cost">$20.16</td>
+        </tr><tr>
+            <td>2026-02-01</td><td>577</td>
+            <td>6,524,495</td><td>158,540</td>
+            <td>6,683,035</td><td class="cost">$17.71</td>
+        </tr><tr>
+            <td>2026-02-02</td><td>253</td>
+            <td>2,681,022</td><td>43,080</td>
+            <td>2,724,102</td><td class="cost">$5.95</td>
+        </tr><tr>
+            <td>2026-02-03</td><td>184</td>
+            <td>638,732</td><td>51,882</td>
+            <td>690,614</td><td class="cost">$1.83</td>
+        </tr><tr>
+            <td>2026-02-04</td><td>535</td>
+            <td>4,211,647</td><td>189,637</td>
+            <td>4,401,284</td><td class="cost">$11.14</td>
+        </tr><tr>
+            <td>2026-02-05</td><td>167</td>
+            <td>860,877</td><td>43,327</td>
+            <td>904,204</td><td class="cost">$2.68</td>
+        </tr><tr>
+            <td>2026-02-06</td><td>165</td>
+            <td>1,020,520</td><td>40,123</td>
+            <td>1,060,643</td><td class="cost">$1.78</td>
+        </tr>
+</table>
+
+<h2>By Model</h2>
+<table>
+    <tr><th>Model</th><th>Calls</th><th>Input</th><th>Output</th><th>Cost</th><th>% Cost</th></tr>
+    <tr>
+            <td>Sonnet 4</td><td>1,345</td>
+            <td>15,788,930</td><td>417,136</td>
+            <td class="cost">$53.62</td><td>86.4%</td>
+        </tr><tr>
+            <td>Haiku 3.5</td><td>947</td>
+            <td>5,655,419</td><td>276,855</td>
+            <td class="cost">$5.63</td><td>9.1%</td>
+        </tr><tr>
+            <td>kimi-k2-thinking</td><td>34</td>
+            <td>511,465</td><td>22,276</td>
+            <td class="cost">$1.87</td><td>3.0%</td>
+        </tr><tr>
+            <td>gpt-5</td><td>4</td>
+            <td>20,817</td><td>9,718</td>
+            <td class="cost">$0.21</td><td>0.3%</td>
+        </tr><tr>
+            <td>gemini-2.5-pro</td><td>6</td>
+            <td>56,912</td><td>1,980</td>
+            <td class="cost">$0.20</td><td>0.3%</td>
+        </tr><tr>
+            <td>claude-opus-4-5-20251101</td><td>8</td>
+            <td>43,557</td><td>2,821</td>
+            <td class="cost">$0.17</td><td>0.3%</td>
+        </tr><tr>
+            <td>qwen-2.5-72b-instruct</td><td>5</td>
+            <td>26,117</td><td>1,688</td>
+            <td class="cost">$0.10</td><td>0.2%</td>
+        </tr><tr>
+            <td>mistral-large-2411</td><td>2</td>
+            <td>27,207</td><td>4</td>
+            <td class="cost">$0.08</td><td>0.1%</td>
+        </tr><tr>
+            <td>gemini-2.5-pro-preview</td><td>2</td>
+            <td>18,606</td><td>396</td>
+            <td class="cost">$0.06</td><td>0.1%</td>
+        </tr><tr>
+            <td>GPT-4o</td><td>4</td>
+            <td>11,981</td><td>1,314</td>
+            <td class="cost">$0.04</td><td>0.1%</td>
+        </tr><tr>
+            <td>gemini-2.5-flash</td><td>1</td>
+            <td>8,668</td><td>35</td>
+            <td class="cost">$0.03</td><td>0.0%</td>
+        </tr><tr>
+            <td>llama-3.3-70b-instruct</td><td>2</td>
+            <td>8,644</td><td>3</td>
+            <td class="cost">$0.03</td><td>0.0%</td>
+        </tr><tr>
+            <td>gpt-5.1</td><td>1</td>
+            <td>3,071</td><td>125</td>
+            <td class="cost">$0.01</td><td>0.0%</td>
+        </tr><tr>
+            <td>DeepSeek</td><td>7</td>
+            <td>26,891</td><td>2,588</td>
+            <td class="cost">$0.00</td><td>0.0%</td>
+        </tr>
+</table>
+
+<h2>By Source</h2>
+<table>
+    <tr><th>Source</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>
+    <tr>
+            <td>user</td><td>1,980</td>
+            <td>20,504,843</td><td class="cost">$56.74</td>
+        </tr><tr>
+            <td>telegram</td><td>209</td>
+            <td>1,752,346</td><td class="cost">$3.89</td>
+        </tr><tr>
+            <td>api</td><td>78</td>
+            <td>437,110</td><td class="cost">$1.04</td>
+        </tr><tr>
+            <td>scheduled</td><td>66</td>
+            <td>217,961</td><td class="cost">$0.31</td>
+        </tr><tr>
+            <td>telegram-kemet</td><td>2</td>
+            <td>3,674</td><td class="cost">$0.02</td>
+        </tr><tr>
+            <td>web</td><td>5</td>
+            <td>4,542</td><td class="cost">$0.02</td>
+        </tr><tr>
+            <td>idle-starter</td><td>6</td>
+            <td>15,110</td><td class="cost">$0.02</td>
+        </tr><tr>
+            <td>fact-extraction-cache</td><td>17</td>
+            <td>7,451</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>knowledge-distill</td><td>5</td>
+            <td>2,187</td><td class="cost">$0.00</td>
+        </tr>
+</table>
+
+<h2>By Scheduled Task</h2>
+<table>
+    <tr><th>Task</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>
+    <tr>
+            <td>market-alerts</td><td>17</td>
+            <td>46,795</td><td class="cost">$0.07</td>
+        </tr><tr>
+            <td>inbox-review</td><td>9</td>
+            <td>23,705</td><td class="cost">$0.04</td>
+        </tr><tr>
+            <td>evening-summary</td><td>6</td>
+            <td>22,125</td><td class="cost">$0.04</td>
+        </tr><tr>
+            <td>daily-email-summary</td><td>4</td>
+            <td>20,017</td><td class="cost">$0.03</td>
+        </tr><tr>
+            <td>morning-briefing</td><td>6</td>
+            <td>14,019</td><td class="cost">$0.03</td>
+        </tr><tr>
+            <td>afternoon-checkin</td><td>6</td>
+            <td>20,705</td><td class="cost">$0.03</td>
+        </tr><tr>
+            <td>midday-research</td><td>5</td>
+            <td>12,979</td><td class="cost">$0.03</td>
+        </tr><tr>
+            <td>midmorning-checkin</td><td>5</td>
+            <td>12,598</td><td class="cost">$0.02</td>
+        </tr><tr>
+            <td>africa-tech-monitor</td><td>3</td>
+            <td>10,427</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>weekly-startup-scan</td><td>1</td>
+            <td>8,357</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>weekly-self-review</td><td>1</td>
+            <td>8,401</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>weekly-african-markets</td><td>1</td>
+            <td>8,271</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>weekly-economic-deep-dive</td><td>1</td>
+            <td>8,266</td><td class="cost">$0.01</td>
+        </tr><tr>
+            <td>stock-alerts</td><td>1</td>
+            <td>1,296</td><td class="cost">$0.00</td>
+        </tr>
+</table>
+
+<div class="footer">
+    ALEX &mdash; Global Economist at NAVADA &mdash; Token Usage Report<br>
+    Auto-generated by token-report-html.py
+</div>
+
+<script>
+const chartFont = { family: "-apple-system, sans-serif", size: 11 };
+const gridColor = "rgba(255,255,255,0.06)";
+const tickColor = "#666";
+Chart.defaults.color = tickColor;
+Chart.defaults.font = chartFont;
+
+new Chart(document.getElementById("dailyCostChart"), {
+    type: "bar",
+    data: {
+        labels: ["2026-01-30", "2026-01-31", "2026-02-01", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06"],
+        datasets: [{ label: "Cost ($)", data: [0.81, 20.16, 17.71, 5.95, 1.83, 11.14, 2.68, 1.78],
+            backgroundColor: "rgba(74,222,128,0.7)", borderRadius: 4 }]
+    },
+    options: { plugins: { legend: { display: false } },
+        scales: { y: { grid: { color: gridColor }, ticks: { callback: v => "$"+v } },
+                   x: { grid: { display: false } } } }
+});
+
+new Chart(document.getElementById("dailyCallsChart"), {
+    type: "bar",
+    data: {
+        labels: ["2026-01-30", "2026-01-31", "2026-02-01", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06"],
+        datasets: [{ label: "Calls", data: [11, 476, 577, 253, 184, 535, 167, 165],
+            backgroundColor: "rgba(96,165,250,0.7)", borderRadius: 4 }]
+    },
+    options: { plugins: { legend: { display: false } },
+        scales: { y: { grid: { color: gridColor } }, x: { grid: { display: false } } } }
+});
+
+new Chart(document.getElementById("modelChart"), {
+    type: "doughnut",
+    data: {
+        labels: ["Sonnet 4", "Haiku 3.5", "kimi-k2-thinking", "gpt-5", "gemini-2.5-pro", "claude-opus-4-5-20251101", "qwen-2.5-72b-instruct", "mistral-large-2411", "gemini-2.5-pro-preview", "GPT-4o", "gemini-2.5-flash", "llama-3.3-70b-instruct", "gpt-5.1", "DeepSeek"],
+        datasets: [{ data: [53.62, 5.63, 1.87, 0.21, 0.2, 0.17, 0.1, 0.08, 0.06, 0.04, 0.03, 0.03, 0.01, 0.0],
+            backgroundColor: ["#4ade80","#60a5fa","#c084fc","#f472b6","#fb923c","#facc15","#34d399","#a78bfa","#f87171","#38bdf8","#e879f9","#fbbf24","#4ade80","#818cf8"] }]
+    },
+    options: { plugins: { legend: { position: "right", labels: { boxWidth: 12, padding: 8 } } } }
+});
+
+new Chart(document.getElementById("sourceChart"), {
+    type: "doughnut",
+    data: {
+        labels: ["user", "telegram", "api", "scheduled", "telegram-kemet", "web", "idle-starter", "fact-extraction-cache", "knowledge-distill"],
+        datasets: [{ data: [56.74, 3.89, 1.04, 0.31, 0.02, 0.02, 0.02, 0.01, 0.0],
+            backgroundColor: ["#4ade80","#60a5fa","#c084fc","#f472b6","#fb923c","#facc15","#34d399","#a78bfa","#f87171"] }]
+    },
+    options: { plugins: { legend: { position: "right", labels: { boxWidth: 12, padding: 8 } } } }
+});
+
+new Chart(document.getElementById("hourlyChart"), {
+    type: "bar",
+    data: {
+        labels: ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"],
+        datasets: [{ label: "Calls", data: [7, 0, 0, 0, 0, 0, 0, 0, 0, 18, 8, 17, 17, 19, 5, 11, 17, 0, 24, 22, 0, 0, 0, 0],
+            backgroundColor: "rgba(192,132,252,0.7)", borderRadius: 4 }]
+    },
+    options: { plugins: { legend: { display: false } },
+        scales: { y: { grid: { color: gridColor } }, x: { grid: { display: false } } } }
+});
+</script>
+
+</body>
+</html>

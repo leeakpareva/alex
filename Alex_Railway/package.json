@@ -1,0 +1,54 @@
+{
+  "name": "alex",
+  "version": "1.0.0",
+  "description": "ALEX - Global Economist at NAVADA, a full-featured AI agent",
+  "main": "src/gateway.js",
+  "type": "module",
+  "bin": {
+    "alex": "./Alex-CLI/navada.js",
+    "alex-setup": "./Alex-CLI/setup.js"
+  },
+  "scripts": {
+    "start": "node src/gateway.js",
+    "setup": "node Alex-CLI/setup.js",
+    "dev": "node --watch src/gateway.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=test-report.json 2>&1; node tests/generate-report.js",
+    "test:live": "vitest run tests/integration/",
+    "generate:qr": "node scripts/generate-qr.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@mermaid-js/mermaid-cli": "^11.4.2",
+    "@slack/web-api": "^7.13.0",
+    "@upstash/redis": "^1.36.1",
+    "imapflow": "^1.2.8",
+    "js-yaml": "^4.1.1",
+    "mailparser": "^3.9.3",
+    "markmap-cli": "^0.18.3",
+    "node-telegram-bot-api": "^0.66.0",
+    "nodemailer": "^6.9.0",
+    "openai": "^4.104.0",
+    "redis": "^5.10.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "telegram",
+    "automation",
+    "economist"
+  ],
+  "author": "NAVADA",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
+    "qrcode": "^1.5.4",
+    "vitest": "^4.0.18"
+  }
+}

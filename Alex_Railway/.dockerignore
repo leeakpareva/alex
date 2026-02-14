@@ -1,0 +1,48 @@
+# Dependencies (rebuilt in Docker)
+node_modules/
+
+# Version control
+.git/
+.gitignore
+
+# Tests and dev tooling
+tests/
+vitest.config.*
+test-report.json
+.claude/
+CLAUDE.md
+
+# Environment files (secrets injected via env vars)
+.env
+.env.*
+
+# Documentation
+docs/
+*.md
+!package.json
+
+# Build artifacts and caches
+*.log
+coverage/
+
+# Runtime data directories (mounted as volumes)
+logs/
+uploads/
+daily/
+diary/
+archive/
+outputs/
+
+# Manager and other non-essential directories
+Manager/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Deploy tooling (not needed inside the image)
+deploy/
+
+# Dashboard (separate deployment)
+dashboard-vercel/
+dashboard/

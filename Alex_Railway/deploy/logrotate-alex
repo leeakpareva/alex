@@ -1,0 +1,23 @@
+/home/head/.alex/logs/gateway.log
+/home/head/.alex/logs/cron.log
+/home/head/.alex/logs/scheduler.log
+{
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+/home/head/navada-1/dashboard/dashboard.log
+{
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

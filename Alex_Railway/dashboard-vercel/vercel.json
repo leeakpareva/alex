@@ -1,0 +1,34 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/home.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/api-library", "destination": "/api-library.html" },
+    { "source": "/chat", "destination": "/chat.html" },
+    { "source": "/experiment", "destination": "/experiment.html" },
+    { "source": "/experiment/phase-1", "destination": "/experiment-phase-1.html" },
+    { "source": "/experiment/phase-2", "destination": "/experiment-phase-2.html" },
+    { "source": "/experiment/phase-3", "destination": "/experiment-phase-3.html" },
+    { "source": "/experiment/phase-4", "destination": "/experiment-phase-4.html" },
+    { "source": "/live-log", "destination": "/live-log.html" },
+    { "source": "/articles", "destination": "/articles.html" },
+    { "source": "/articles/alex-vs-openclaw", "destination": "/alex-vs-openclaw.html" },
+    { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/faq", "destination": "/faq.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/navada-admin", "destination": "/navada-admin.html" },
+    { "source": "/redis-viewer", "destination": "/redis-viewer.html" },
+    { "source": "/api-learn", "destination": "/api-learn.html" },
+    { "source": "/qr", "destination": "/api/qr.js" },
+    { "source": "/api/v1/:endpoint", "destination": "/api/v1/[endpoint].js" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Authorization, Content-Type, X-API-Key" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+[Unit]
+Description=ALEX - Global Economist at NAVADA
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=head
+WorkingDirectory=/home/head/navada-1
+ExecStart=/usr/bin/node /home/head/navada-1/src/gateway.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/head/.alex/logs/gateway.log
+StandardError=append:/home/head/.alex/logs/gateway.log
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=80%
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

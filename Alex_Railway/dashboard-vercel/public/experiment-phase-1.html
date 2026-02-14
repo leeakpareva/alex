@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16111f">
+  <title>Phase 1: Copilot Integration — ALEX</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .page-wrapper {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--foreground); }
+    .back-link svg { width: 16px; height: 16px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 1.5rem 0 2.5rem;
+    }
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted-foreground);
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Vision section */
+    .vision-section {
+      margin: 2.5rem 0;
+    }
+    .vision-section h2 {
+      font-size: 1.5rem;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+    .vision-section p {
+      color: var(--muted-foreground);
+      line-height: 1.75;
+      font-size: 0.95rem;
+    }
+
+    /* Section headings */
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Architecture row */
+    .arch-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin: 2.5rem 0 3rem;
+      flex-wrap: wrap;
+    }
+    .arch-card {
+      text-align: center;
+      padding: 1.5rem 1.25rem;
+      flex: 1;
+      min-width: 160px;
+      max-width: 240px;
+    }
+    .arch-card .icon-box {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 0.75rem;
+      margin: 0 auto 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid;
+    }
+    .arch-card h3 {
+      font-size: 1.05rem;
+      color: var(--foreground);
+      margin-bottom: 0.35rem;
+    }
+    .arch-card p {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+    }
+    .arch-arrow {
+      color: var(--muted-foreground);
+      font-size: 1.5rem;
+      padding: 0 0.5rem;
+      flex-shrink: 0;
+    }
+    .arch-arrow svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* Roadmap steps */
+    .roadmap-section {
+      margin: 3rem 0;
+    }
+    .roadmap-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .roadmap-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+    }
+    .step-number {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background: oklch(0.75 0.25 330 / 0.1);
+      border: 1px solid oklch(0.75 0.25 330 / 0.3);
+      color: var(--neon-pink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .step-content h3 {
+      font-size: 1rem;
+      color: var(--foreground);
+      margin-bottom: 0.3rem;
+    }
+    .step-content p {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    /* Benefits grid */
+    .benefits-section {
+      margin: 3rem 0;
+    }
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    .benefit-card {
+      padding: 1.5rem;
+    }
+    .benefit-card h3 {
+      font-size: 1rem;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+    }
+    .benefit-card p {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      line-height: 1.65;
+    }
+
+    /* Success metrics */
+    .metrics-box {
+      padding: 2rem;
+      margin: 3rem 0;
+    }
+    .metrics-box h3 {
+      font-size: 1.15rem;
+      color: var(--foreground);
+      margin-bottom: 1.25rem;
+    }
+    .metrics-list {
+      list-style: none;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .metrics-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+    }
+    .metric-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-cyan);
+      flex-shrink: 0;
+    }
+
+    /* Navigation */
+    .page-nav {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 2.5rem;
+      margin-top: 2.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .page-nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .page-nav a:hover { color: var(--neon-pink); }
+    .page-nav a svg { width: 16px; height: 16px; }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2.5rem;
+    }
+    .footer-name {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.3rem;
+    }
+    .footer-brand {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: oklch(0.4 0.08 290);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper { padding: 1.25rem 1rem 3rem; }
+      .hero h1 { font-size: 1.75rem; }
+      .hero p { font-size: 0.95rem; }
+      .section-title { font-size: 1.2rem; }
+      .vision-section h2 { font-size: 1.3rem; }
+      .benefits-grid { grid-template-columns: 1fr; }
+      .metrics-list { grid-template-columns: 1fr; }
+      .arch-row { flex-direction: column; gap: 0.5rem; }
+      .arch-arrow { transform: rotate(90deg); }
+      .arch-card { max-width: 100%; }
+      .metrics-box { padding: 1.5rem; }
+      .roadmap-step { padding: 1rem 1.25rem; }
+    }
+
+    @media (max-width: 480px) {
+      .page-wrapper { padding: 1rem 0.75rem 2.5rem; }
+      .hero h1 { font-size: 1.5rem; }
+      .hero p { font-size: 0.9rem; }
+      .section-title { font-size: 1.1rem; }
+      .vision-section h2 { font-size: 1.15rem; }
+      .vision-section p { font-size: 0.9rem; }
+      .benefit-card { padding: 1.25rem; }
+      .benefit-card h3 { font-size: 0.95rem; }
+      .benefit-card p { font-size: 0.8rem; }
+      .metrics-box { padding: 1.25rem; }
+      .metrics-box h3 { font-size: 1rem; }
+      .metrics-list li { font-size: 0.85rem; }
+      .roadmap-step { padding: 0.75rem 1rem; }
+      .step-content h3 { font-size: 0.95rem; }
+      .step-content p { font-size: 0.8rem; }
+      .arch-card h3 { font-size: 0.95rem; }
+      .arch-card p { font-size: 0.8rem; }
+      .site-footer { padding: 2rem 0 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="page-wrapper">
+
+      <!-- Back link -->
+      <a href="/experiment" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <path d="M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Experiment
+      </a>
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-badges">
+          <span class="badge badge-pink">Phase 1</span>
+          <span class="badge badge-cyan">Now</span>
+        </div>
+        <h1>Copilot Integration</h1>
+        <p>The first step toward a tokenized workplace: deploy an AI agent for every employee and begin measuring the true cost and value of AI-assisted work.</p>
+      </div>
+
+      <!-- The Vision -->
+      <div class="vision-section">
+        <h2>The Vision</h2>
+        <p>Every employee gets an AI copilot. Every interaction generates data. For the first time, companies can see exactly how AI amplifies human capability.</p>
+      </div>
+
+      <!-- Integration Architecture -->
+      <div>
+        <h2 class="section-title">Integration Architecture</h2>
+        <div class="arch-row">
+          <div class="theme-card arch-card">
+            <div class="icon-box icon-box-pink">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <h3>Employee</h3>
+            <p>Human worker with domain expertise</p>
+          </div>
+          <div class="arch-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div class="theme-card arch-card">
+            <div class="icon-box icon-box-cyan">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                <path d="M9 9h6v6H9z"/>
+              </svg>
+            </div>
+            <h3>AI Agent</h3>
+            <p>Personal AI copilot (like ALEX)</p>
+          </div>
+          <div class="arch-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div class="theme-card arch-card">
+            <div class="icon-box icon-box-orange">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+              </svg>
+            </div>
+            <h3>Analytics</h3>
+            <p>Token tracking &amp; value measurement</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Implementation Roadmap -->
+      <div class="roadmap-section">
+        <h2 class="section-title">Implementation Roadmap</h2>
+        <div class="roadmap-steps">
+          <div class="theme-card roadmap-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Agent Deployment</h3>
+              <p>Deploy AI agents (like ALEX) for each team member with role-appropriate permissions</p>
+            </div>
+          </div>
+          <div class="theme-card roadmap-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Usage Tracking</h3>
+              <p>Monitor token consumption, task types, and interaction patterns across the organization</p>
+            </div>
+          </div>
+          <div class="theme-card roadmap-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Baseline Metrics</h3>
+              <p>Establish productivity baselines: tasks completed, time saved, quality scores</p>
+            </div>
+          </div>
+          <div class="theme-card roadmap-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Value Correlation</h3>
+              <p>Correlate token usage with business outcomes to identify high-ROI use cases</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Benefits -->
+      <div class="benefits-section">
+        <h2 class="section-title">Key Benefits</h2>
+        <div class="benefits-grid">
+          <div class="theme-card theme-card-pink benefit-card">
+            <h3>Immediate Productivity Gains</h3>
+            <p>AI handles research, drafting, analysis, and routine tasks — freeing humans for high-value work</p>
+          </div>
+          <div class="theme-card theme-card-cyan benefit-card">
+            <h3>Transparent Cost Tracking</h3>
+            <p>Every API call is logged with exact token counts and costs. No hidden expenses.</p>
+          </div>
+          <div class="theme-card theme-card-orange benefit-card">
+            <h3>Data-Driven Decisions</h3>
+            <p>Real usage data replaces guesswork. See which teams and tasks benefit most from AI.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success Metrics -->
+      <div class="theme-card gradient-pink-cyan metrics-box">
+        <h3>Success Metrics</h3>
+        <ul class="metrics-list">
+          <li><span class="metric-dot"></span> 100% employee AI coverage</li>
+          <li><span class="metric-dot"></span> Baseline productivity measured within 30 days</li>
+          <li><span class="metric-dot"></span> Token cost per task established</li>
+          <li><span class="metric-dot"></span> ROI positive within first week</li>
+        </ul>
+      </div>
+
+      <!-- Navigation -->
+      <div class="page-nav">
+        <a href="/experiment/phase-2">
+          Next: Phase 2 — Value Quantification
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <p class="footer-name">Lee Akpareva MBA, MA</p>
+        <p class="footer-brand">NAVADA</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/chat-widget.js"></script>
+</body>
+</html>
