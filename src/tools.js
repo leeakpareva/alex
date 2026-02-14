@@ -1301,16 +1301,80 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const chartFilename = input.filename || `chart_${Date.now()}.png`;
                 const outputPath = path.join(chartsDir, chartFilename);
 
-                // Inject output_path and run the Python script
-                const fullScript = `import matplotlib\nmatplotlib.use('Agg')\noutput_path = ${JSON.stringify(outputPath)}\n${input.python_code}`;
+                // Enhanced Python script with better visualization libraries
+                const fullScript = `
+import sys
+import os
+
+# Standard imports
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+
+# Enhanced imports - fail gracefully if not available
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from plotly.io import write_image
+    plotly_available = True
+except ImportError:
+    plotly_available = False
+
+try:
+    import altair as alt
+    altair_available = True
+except ImportError:
+    altair_available = False
+
+try:
+    from scipy import stats
+    scipy_available = True
+except ImportError:
+    scipy_available = False
+
+try:
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    sklearn_available = True
+except ImportError:
+    sklearn_available = False
+
+# Set output path
+output_path = ${JSON.stringify(outputPath)}
+
+# Set high-quality defaults
+sns.set_theme(style="whitegrid", palette="husl")
+plt.rcParams['figure.figsize'] = (12, 8)
+plt.rcParams['figure.dpi'] = 150
+plt.rcParams['savefig.dpi'] = 150
+plt.rcParams['font.size'] = 11
+plt.rcParams['axes.titlesize'] = 14
+plt.rcParams['axes.labelsize'] = 12
+
+# User's Python code
+${input.python_code}
+
+# Ensure matplotlib charts are saved if created
+if plt.get_fignums():
+    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.close('all')
+`;
                 const tmpScript = path.join(chartsDir, `_tmp_${Date.now()}.py`);
                 await fs.writeFile(tmpScript, fullScript);
 
                 let stdout = '';
+                let stderr = '';
                 try {
                     const result = await execAsync(`python3 ${tmpScript}`, { timeout: 180000 });
                     stdout = result.stdout || '';
-                    if (result.stderr) console.log('[PYTHON] stderr:', result.stderr.substring(0, 200));
+                    stderr = result.stderr || '';
+                    // Only log non-warning errors
+                    if (stderr && !stderr.includes('Warning') && !stderr.includes('FutureWarning')) {
+                        console.log('[PYTHON] stderr:', stderr.substring(0, 200));
+                    }
                 } finally {
                     await fs.unlink(tmpScript).catch(() => {});
                 }
@@ -1324,7 +1388,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                         success: true,
                         path: outputPath,
                         caption: input.caption || '',
-                        message: `Output generated: ${outputPath}`,
+                        message: `High-quality chart generated: ${outputPath}`,
                         send_photo: true,
                         printed_output: stdout.substring(0, 10000) || undefined
                     };

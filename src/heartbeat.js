@@ -181,6 +181,43 @@ This is your chance to evolve and get better each week.`
         name: 'ralph-review',
         task_description: 'Ralph self-improvement engine: analyse diary and feedback, identify failures, propose fixes.'
     }],
+    ['daily-ops-report', {
+        name: 'daily-ops-report',
+        task_description: `Daily Ops Report for Lee - comprehensive email summary:
+
+1. Infrastructure Health:
+   - Run /api/e2e check and summarize all service statuses
+   - Check Postgres connectivity and data flow status
+   - Verify Upstash/Redis dashboard updates
+   - Report any failed cron jobs or system errors from logs
+
+2. Financial Summary:
+   - Portfolio overview with tracked stocks performance
+   - Key economic indicators and market movements
+   - Crypto positions if any
+   - Notable opportunities or risks identified
+
+3. Task & Activity Summary:
+   - Tasks completed today (from memory and dashboard)
+   - Emails processed (inbox status and actions taken)
+   - Research conducted and key findings
+   - Any Ralph improvements implemented
+
+4. Connectivity & Performance:
+   - Watchdog transitions count
+   - API call statistics and costs (from token logs)
+   - Response times and circuit breaker status
+   - ChromaDB document count and health
+
+5. Tomorrow's Priorities:
+   - Scheduled tasks for tomorrow
+   - Any pending deadlines or follow-ups
+   - Suggested focus areas based on today's activity
+
+Generate a professional HTML email with clear sections and send to Lee using the send_email tool with template: daily-summary.
+Include relevant charts if data visualization would be helpful (use generate_chart tool).
+Store the report in memory category 'reports' for reference.`
+    }],
 ]);
 
 /**
