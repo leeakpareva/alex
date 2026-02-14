@@ -125,7 +125,8 @@ export function startConnectivityWatchdog({
     const pgTarget = pgUrl ? parseHostPortFromUrl(pgUrl, 'postgres.railway.internal', 5432) : { host: 'postgres.railway.internal', port: 5432 };
 
     const targets = [
-        { name: 'chroma', kind: 'http', url: `${chromaBase.replace(/\\/+$/, '')}/api/v2/heartbeat` },
+        // Strip trailing slashes from base URL.
+        { name: 'chroma', kind: 'http', url: `${chromaBase.replace(/\/+$/, '')}/api/v2/heartbeat` },
         { name: 'nodejs', kind: 'http', url: nodejsBase },
         { name: 'http-nodejs', kind: 'http', url: httpNodejsBase },
         { name: 'anythingllm-internal', kind: 'http', url: anythingInternal },
