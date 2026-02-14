@@ -16,9 +16,11 @@ import { runRalphReview } from './ralph.js';
 // dashPost is set by gateway.js via setDashPost()
 let dashPost = () => {};
 let redisRef = null;
+let dbRef = null;
 
 export function setDashPost(fn) { dashPost = fn; }
 export function setRedis(r) { redisRef = r; }
+export function setDb(db) { dbRef = db; }
 
 // Anti-repetition: track recent output hashes (4-hour window)
 const recentOutputHashes = new Map();
@@ -61,6 +63,17 @@ async function saveTaskOutput(taskName, model, text) {
     await fs.writeFile(filePath, content);
     await fs.chmod(filePath, 0o600);
     console.log(`[HEARTBEAT] Saved task output: ${monthFolder}/${filename}`);
+
+    // Persist to Postgres (fire-and-forget)
+    if (dbRef && typeof dbRef.insertTaskOutput === 'function') {
+        dbRef.insertTaskOutput({
+            task_name: taskName,
+            model,
+            content: text || '',
+            file_path: filePath,
+            meta: { monthFolder, filename },
+        }).catch(() => {});
+    }
 }
 
 /**

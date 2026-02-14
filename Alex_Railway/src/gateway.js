@@ -75,7 +75,8 @@ import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmail
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit, selectModel } from './chat.js';
 import { processUploadedFile } from './document-processor.js';
 import { runRalphReview } from './ralph.js';
-import { init as initJournal, appendExchange, writeDiaryEntry, loadShortCache, forceSaveChat, getLastDailyLines, getDiaryContext, modelLabel as journalModelLabel, setJournalRedis, runChurn } from './daily-journal.js';
+import { init as initJournal, appendExchange, writeDiaryEntry, loadShortCache, forceSaveChat, getLastDailyLines, getDiaryContext, modelLabel as journalModelLabel, setJournalRedis, setJournalDb, runChurn } from './daily-journal.js';
+import { createDb } from './db.js';
 
 // ============================================================================
 // TELEGRAM MARKDOWN SAFE SEND — tries Markdown, falls back to plain text
@@ -114,6 +115,7 @@ let skills = null;
 let scheduledTasks = new Map();
 let redis = null;
 let localRedis = null;
+let db = null;
 let dashboardUrl = 'https://www.alexnavada.xyz/dashboard';
 let dashboardPushUrl = null;
 let dashboardPushSecret = null;
@@ -269,6 +271,9 @@ async function auditLog(entry) {
         await mkdir(logDir, { recursive: true });
         const logFile = path.join(logDir, `audit_${date}.jsonl`);
         await appendFile(logFile, JSON.stringify({ ...entry, timestamp: new Date().toISOString() }) + '\n');
+        if (db && typeof db.insertAudit === 'function') {
+            db.insertAudit({ ...entry, timestamp: new Date().toISOString() }).catch(() => {});
+        }
     } catch (err) {
         console.error('[AUDIT] Log error:', err.message);
     }
@@ -5191,6 +5196,30 @@ async function init() {
     setToolsDashPost(postDashboard);
     // Journal uses local Redis (faster, on-Pi) with Upstash fallback
     setJournalRedis(localRedis || redis);
+
+    // Optional Postgres persistence (Railway): DATABASE_URL
+    try {
+        const databaseUrl = config.database_url || process.env.DATABASE_URL;
+        if (databaseUrl) {
+            db = createDb(databaseUrl);
+            await db.init();
+            console.log('[DB] Postgres initialized');
+        } else {
+            console.log('[DB] No DATABASE_URL — Postgres disabled');
+        }
+    } catch (e) {
+        console.error('[DB] Init failed:', e?.message || String(e));
+        db = null;
+    }
+
+    // Wire DB into modules that can persist (non-blocking)
+    try {
+        setJournalDb(db);
+    } catch {}
+    try {
+        // heartbeat.js may expose setDb in Railway builds; ignore if not.
+        (await import('./heartbeat.js')).setDb?.(db);
+    } catch {}
 
     // Initialize memory system
     memory = new MemorySystem(WORKSPACE_PATH);

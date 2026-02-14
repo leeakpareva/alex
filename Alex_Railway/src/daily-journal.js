@@ -15,6 +15,7 @@ const PROGRESS_FILE = path.join(DIARY_DIR, 'progress.txt');
 const FACTS_FILE = path.join(DIARY_DIR, 'facts.json');
 
 let redisRef = null;
+let dbRef = null;
 
 /**
  * Set Redis reference for cache operations.
@@ -22,6 +23,14 @@ let redisRef = null;
  */
 export function setJournalRedis(r) {
     redisRef = r;
+}
+
+/**
+ * Set Postgres DB reference for persistence (optional).
+ * Expected interface: { insertExchange: async (obj) => void }
+ */
+export function setJournalDb(db) {
+    dbRef = db;
 }
 
 /**
@@ -136,6 +145,17 @@ export async function appendExchange({ question, answer, source, modelLabel: lab
 
     // Update short cache (fire-and-forget)
     updateShortCache().catch(() => {});
+
+    // Persist to Postgres (fire-and-forget)
+    if (dbRef && typeof dbRef.insertExchange === 'function') {
+        dbRef.insertExchange({
+            source: source || 'unknown',
+            user_name: userName || 'User',
+            model_label: label || 'Unknown',
+            question: question || '',
+            answer: answer || '',
+        }).catch(() => {});
+    }
 }
 
 /**

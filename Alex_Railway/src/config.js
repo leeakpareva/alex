@@ -17,6 +17,8 @@ export const ALLOWED_WRITE_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
     '/home/head',
+    '/home/alex',
+    '/app',
 ];
 
 // Allowed directories for email attachments
@@ -24,6 +26,8 @@ export const ALLOWED_ATTACHMENT_PATHS = [
     WORKSPACE_PATH,
     '/tmp',
     '/home/head',
+    '/home/alex',
+    '/app',
 ];
 
 const REQUIRED_KEYS = ['anthropic_api_key', 'telegram_bot_token'];
@@ -65,6 +69,7 @@ const OPTIONAL_KEYS = {
     chromadb_tenant: { type: 'string' },
     chromadb_database: { type: 'string' },
     local_redis_url: { type: 'string' },
+    database_url: { type: 'string' },
 };
 
 /**
@@ -115,6 +120,7 @@ export async function loadConfig() {
             upstash_redis_url: process.env.UPSTASH_REDIS_URL,
             upstash_redis_token: process.env.UPSTASH_REDIS_TOKEN,
             local_redis_url: process.env.LOCAL_REDIS_URL || process.env.REDIS_URL,
+            database_url: process.env.DATABASE_URL,
             chromadb_api_key: process.env.CHROMADB_API_KEY || process.env.CHROMA_API_KEY,
             chromadb_tenant: process.env.CHROMADB_TENANT,
             chromadb_database: process.env.CHROMADB_DATABASE,
