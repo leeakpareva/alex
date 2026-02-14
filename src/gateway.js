@@ -552,15 +552,45 @@ Just message me naturally — I'm here to help.
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
     });
 
-    // /init — owner-only E2E self-check (Railway nodes + dashboard + logs)
+    // /init — E2E self-check (full details for owner, basic for others)
     bot.onText(/\/init/, async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
-        if (String(userId) !== String(config.telegram_owner_id)) {
-            await bot.sendMessage(chatId, "This command is only available to the owner.");
+
+        // Debug logging
+        console.log(`[INIT] Command received from user ${userId}, owner is ${config.telegram_owner_id}`);
+
+        // Check if user is owner - handle both string and number comparison
+        const isOwner = !config.telegram_owner_id || // If no owner configured, allow all
+                       String(userId) === String(config.telegram_owner_id) ||
+                       userId === config.telegram_owner_id ||
+                       (config.telegram_owner_id && userId === parseInt(config.telegram_owner_id));
+
+        // For non-owners, show basic health status
+        if (!isOwner) {
+            try {
+                // Try basic health check
+                const healthUrl = `http://127.0.0.1:${process.env.ALEX_PORT || '9090'}/api/health`;
+                const response = await fetch(healthUrl).catch(() => null);
+
+                if (response && response.ok) {
+                    const health = await response.json();
+                    const status = `<b>Alex Status</b>\n\n` +
+                                  `✓ Service: Online\n` +
+                                  `✓ Uptime: ${Math.floor(health.uptime_seconds / 60)} minutes\n` +
+                                  `✓ Telegram: ${health.telegram || 'connected'}\n\n` +
+                                  `For full diagnostics, contact the system owner.`;
+                    await bot.sendMessage(chatId, status, { parse_mode: 'HTML' });
+                } else {
+                    await bot.sendMessage(chatId, "✓ Alex is online and responding.\n\nFor detailed diagnostics, contact the system owner.");
+                }
+            } catch {
+                await bot.sendMessage(chatId, "✓ Alex is online and responding.\n\nFor detailed diagnostics, contact the system owner.");
+            }
             return;
         }
 
+        // Owner gets full E2E check
         await bot.sendMessage(chatId, "Running E2E self-check (this takes ~5-10s)...");
 
         let e2e = null;
@@ -578,10 +608,11 @@ Just message me naturally — I'm here to help.
         });
 
         const msgText =
-            `<b>/init</b>\n\n` +
-            `<b>Overall:</b> ${e2e.ok ? 'OK' : 'FAIL'}\n` +
-            `<b>Checks:</b>\n${lines.map(l => `• ${l}`).join('\n')}\n\n` +
-            `<i>Tip:</i> use /logs and /errors if anything is failing.`;
+            `<b>/init - Full E2E Check</b>\n\n` +
+            `<b>Overall:</b> ${e2e.ok ? '✅ OK' : '❌ FAIL'}\n` +
+            `<b>Timestamp:</b> ${e2e.ts}\n\n` +
+            `<b>Service Checks:</b>\n${lines.map(l => `• ${l}`).join('\n')}\n\n` +
+            `<i>Tip:</i> use /logs and /errors for detailed diagnostics.`;
 
         await bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
     });
