@@ -11,7 +11,6 @@ import { Redis } from '@upstash/redis';
 import os from 'os';
 import path from 'path';
 import { startConnectivityWatchdog } from './connectivity-watchdog.js';
-import { startConnectivityWatchdog } from './connectivity-watchdog.js';
 import http from 'http';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -4921,7 +4920,6 @@ async function init() {
     config = await loadConfig();
 
     // Railway connectivity watchdog (internal reachability + log of state transitions)
-    startConnectivityWatchdog();
 
     // Railway connectivity watchdog (internal reachability + log of state transitions)
     startConnectivityWatchdog();
