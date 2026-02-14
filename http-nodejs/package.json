@@ -1,0 +1,17 @@
+{
+  "name": "http-nodejs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Event ingress for ALEX (Railway): receive webhooks, authenticate, enqueue to Redis for Alex to consume.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "redis": "^5.10.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
+

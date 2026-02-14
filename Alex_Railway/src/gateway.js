@@ -117,6 +117,8 @@ let localRedis = null;
 let dashboardUrl = 'https://www.alexnavada.xyz/dashboard';
 let dashboardPushUrl = null;
 let dashboardPushSecret = null;
+let flowMonitorTimer = null;
+const flowState = new Map(); // name -> { ok: boolean, lastChange: iso, lastCode?: number, lastErr?: string }
 const learnModeChats = new Set(); // Track chats with /learn active
 const mathModeChats = new Set(); // Track chats with /mathematician active
 const strategistModeChats = new Set(); // Track chats with /strategist active
@@ -332,6 +334,88 @@ function postDashboard(action, payload) {
         }
     }
     scheduleDashPush();
+}
+
+// ============================================================================
+// FLOW MONITOR — probes internal services and logs state transitions
+// ============================================================================
+
+async function appendFlowLog(line) {
+    try {
+        const logDir = path.join(WORKSPACE_PATH, 'logs');
+        await mkdir(logDir, { recursive: true });
+        const file = path.join(logDir, 'flow-monitor.log');
+        await appendFile(file, line + '\n');
+    } catch {
+        // Non-critical
+    }
+}
+
+async function probeHttp(url, { timeoutMs = 5000 } = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: controller.signal });
+        return { ok: res.ok, status: res.status };
+    } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+    } finally {
+        clearTimeout(t);
+    }
+}
+
+async function updateFlow(name, result, { notify = true } = {}) {
+    const prev = flowState.get(name);
+    const nowIso = new Date().toISOString();
+    const ok = !!result.ok;
+    const code = typeof result.status === 'number' ? result.status : undefined;
+    const err = result.error ? String(result.error).substring(0, 200) : undefined;
+
+    const changed = !prev || prev.ok !== ok || prev.lastCode !== code;
+    if (!changed) return;
+
+    const msg = `[FLOW] ${name}: ${ok ? 'OK' : 'DOWN'}${code ? ` (${code})` : ''}${err ? ` — ${err}` : ''}`;
+    console.log(msg);
+    await appendFlowLog(`${nowIso} ${msg}`);
+
+    flowState.set(name, { ok, lastChange: nowIso, lastCode: code, lastErr: err });
+
+    if (notify) {
+        // Only post to dashboard if configured; never block normal flow.
+        try {
+            postDashboard('add_activity', { entry: msg });
+        } catch {}
+    }
+}
+
+function startFlowMonitor() {
+    if (flowMonitorTimer) return;
+
+    const targets = [
+        { name: 'nodejs', url: process.env.NODEJS_BASE_URL || 'http://nodejs.railway.internal:3000/' },
+        { name: 'http-nodejs', url: process.env.HTTP_NODEJS_BASE_URL || 'http://http-nodejs.railway.internal:8080/' },
+        { name: 'chroma', url: 'http://chroma.railway.internal:8000/api/v2/heartbeat' },
+    ];
+
+    flowMonitorTimer = setInterval(async () => {
+        // Run probes sequentially to keep load predictable.
+        for (const t of targets) {
+            const r = await probeHttp(t.url, { timeoutMs: 5000 });
+            await updateFlow(t.name, r);
+        }
+
+        // Redis: best-effort ping (if client exists).
+        try {
+            if (localRedis) {
+                await localRedis.ping();
+                await updateFlow('redis_local', { ok: true, status: 200 }, { notify: false });
+            }
+        } catch (e) {
+            await updateFlow('redis_local', { ok: false, error: e?.message || String(e) });
+        }
+    }, 60000);
+
+    console.log('[FLOW] Monitor started (60s interval)');
 }
 
 // ============================================================================
@@ -5203,6 +5287,9 @@ async function init() {
         { name: 'Weekly Cleanup', schedule: 'Sun 02:00', status: 'active' },
     ];
     scheduleDashPush();
+
+    // Flow monitor (internal connectivity + state transitions)
+    startFlowMonitor();
 
     // Write alive marker every 60s so catch-up knows when we were last running
     setInterval(async () => {
