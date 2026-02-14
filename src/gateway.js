@@ -42,6 +42,73 @@ function withCors(req, headers = {}) {
     };
 }
 
+async function computeDashboardTokenData() {
+    // Align schema with the Vercel dashboard expectations (dash:tokens).
+    const date = new Date().toISOString().split('T')[0];
+    const logFile = path.join(WORKSPACE_PATH, 'logs', 'tokens', `tokens_${date}.jsonl`);
+
+    let totalIn = 0, totalOut = 0, totalCalls = 0, totalCostUsd = 0;
+    const byModel = {};
+
+    try {
+        const content = await readFile(logFile, 'utf-8');
+        for (const line of content.split('\n')) {
+            if (!line.trim()) continue;
+            const e = JSON.parse(line);
+            const inp = e.input_tokens || 0;
+            const out = e.output_tokens || 0;
+            totalIn += inp;
+            totalOut += out;
+            totalCalls++;
+
+            // Rough pricing model; must remain consistent with dashboard expectations.
+            let costUsd = 0;
+            let modelName = 'Sonnet';
+            const m = e.model || '';
+            if (m.includes('haiku')) { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; modelName = 'Haiku'; }
+            else if (m === 'kimi-k2-thinking') { costUsd = inp / 1e6 * 1.0 + out / 1e6 * 4.0; modelName = 'Kimi K2 Think'; }
+            else if (m.startsWith('kimi')) { costUsd = inp / 1e6 * 0.5 + out / 1e6 * 2.0; modelName = 'Kimi K2'; }
+            else if (m.includes('deepseek')) { costUsd = inp / 1e6 * 0.14 + out / 1e6 * 0.28; modelName = 'DeepSeek'; }
+            else if (m === 'o3') { costUsd = inp / 1e6 * 10 + out / 1e6 * 40; modelName = 'o3'; }
+            else if (m === 'o4-mini') { costUsd = inp / 1e6 * 1.1 + out / 1e6 * 4.4; modelName = 'o4-mini'; }
+            else if (m === 'gpt-4.1-nano') { costUsd = inp / 1e6 * 0.1 + out / 1e6 * 0.4; modelName = 'GPT-4.1 Nano'; }
+            else if (m === 'gpt-4.1-mini') { costUsd = inp / 1e6 * 0.4 + out / 1e6 * 1.6; modelName = 'GPT-4.1 Mini'; }
+            else if (m === 'gpt-4.1') { costUsd = inp / 1e6 * 2 + out / 1e6 * 8; modelName = 'GPT-4.1'; }
+            else if (m === 'gpt-5') { costUsd = inp / 1e6 * 1.25 + out / 1e6 * 10; modelName = 'GPT-5'; }
+            else if (m === 'gpt-5-mini') { costUsd = inp / 1e6 * 0.25 + out / 1e6 * 2; modelName = 'GPT-5 Mini'; }
+            else if (m === 'gpt-5-nano') { costUsd = inp / 1e6 * 0.05 + out / 1e6 * 0.4; modelName = 'GPT-5 Nano'; }
+            else if (m === 'gpt-5.1') { costUsd = inp / 1e6 * 1.25 + out / 1e6 * 10; modelName = 'GPT-5.1'; }
+            else if (m === 'gpt-5.2') { costUsd = inp / 1e6 * 1.75 + out / 1e6 * 14; modelName = 'GPT-5.2'; }
+            else if (m.includes('gpt')) { costUsd = inp / 1e6 * 2.5 + out / 1e6 * 10; modelName = 'GPT-4o'; }
+            else if (m.includes('sonnet')) { costUsd = inp / 1e6 * 3 + out / 1e6 * 15; }
+            else { costUsd = inp / 1e6 * 0.8 + out / 1e6 * 4; }
+
+            totalCostUsd += costUsd;
+            if (!byModel[modelName]) byModel[modelName] = { model: modelName, calls: 0, input_tokens: 0, output_tokens: 0, cost_gbp: 0 };
+            byModel[modelName].calls++;
+            byModel[modelName].input_tokens += inp;
+            byModel[modelName].output_tokens += out;
+            byModel[modelName].cost_gbp += costUsd * 0.79;
+        }
+    } catch {
+        // No token log yet today.
+    }
+
+    const totalTokens = totalIn + totalOut;
+    const totalCostGbp = totalCostUsd * 0.79;
+    return {
+        date,
+        total_input_tokens: totalIn,
+        total_output_tokens: totalOut,
+        total_tokens: totalTokens,
+        total_calls: totalCalls,
+        total_cost_gbp: totalCostGbp,
+        total_cost_usd: totalCostUsd,
+        avg_cost_per_task_gbp: totalCalls ? totalCostGbp / totalCalls : 0,
+        by_model: Object.values(byModel),
+    };
+}
+
 // Download a file from a URL into a Buffer
 function downloadFile(url) {
     return new Promise((resolve, reject) => {
@@ -4777,8 +4844,8 @@ Call the send_email tool now with exactly these parameters.`;
 
         } else if (req.method === 'GET' && req.url === '/api/dashboard/tokens') {
             try {
-                const stats = await getDailyTokenStats();
-                return writeJson(res, 200, stats || {}, cors);
+                const data = await computeDashboardTokenData();
+                return writeJson(res, 200, data || {}, cors);
             } catch (e) {
                 return writeJson(res, 500, { error: e.message }, cors);
             }
