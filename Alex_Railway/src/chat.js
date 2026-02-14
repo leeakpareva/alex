@@ -92,6 +92,42 @@ function calcCostGbp(inputTokens, outputTokens, pricing) {
     return (inputCost + outputCost) * USD_TO_GBP;
 }
 
+const ANNOTATION_TAGS = ['citation', 'source', 'document', 'search_result'];
+
+export function stripAnnotationTags(text) {
+    if (typeof text !== 'string' || !text) return text;
+
+    let cleaned = text;
+    for (const tag of ANNOTATION_TAGS) {
+        const paired = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+        cleaned = cleaned.replace(paired, '$1');
+
+        const selfClosing = new RegExp(`<${tag}[^>]*\\/>`, 'gi');
+        cleaned = cleaned.replace(selfClosing, '');
+    }
+    return cleaned;
+}
+
+export function sanitizeAssistantMessage(msg) {
+    if (!msg || msg.role !== 'assistant') return msg;
+
+    if (typeof msg.content === 'string') {
+        return { ...msg, content: stripAnnotationTags(msg.content) };
+    }
+
+    if (Array.isArray(msg.content)) {
+        const content = msg.content.map(block => {
+            if (block.type === 'text' && typeof block.text === 'string') {
+                return { ...block, text: stripAnnotationTags(block.text) };
+            }
+            return block;
+        });
+        return { ...msg, content };
+    }
+
+    return msg;
+}
+
 function getModelLabel(model) {
     if (model.includes('haiku')) return 'Haiku';
     if (model.includes('sonnet')) return 'Sonnet';
@@ -645,17 +681,18 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
             }
             return true;
         }).map(msg => {
+            const cleanedMsg = sanitizeAssistantMessage(msg);
             // Fix empty text content blocks — Anthropic rejects these
-            if (Array.isArray(msg.content)) {
-                const fixed = msg.content.map(b =>
+            if (Array.isArray(cleanedMsg.content)) {
+                const fixed = cleanedMsg.content.map(b =>
                     b.type === 'text' && !b.text ? { ...b, text: '(empty)' } : b
                 );
-                return { ...msg, content: fixed };
+                return { ...cleanedMsg, content: fixed };
             }
-            if (typeof msg.content === 'string' && !msg.content) {
-                return { ...msg, content: '(empty)' };
+            if (typeof cleanedMsg.content === 'string' && !cleanedMsg.content) {
+                return { ...cleanedMsg, content: '(empty)' };
             }
-            return msg;
+            return cleanedMsg;
         });
     }
 

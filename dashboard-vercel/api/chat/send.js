@@ -13,6 +13,34 @@ function getRedis() {
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+
+const ANNOTATION_TAGS = ['citation', 'source', 'document', 'search_result'];
+
+function stripAnnotationTags(text) {
+  if (typeof text !== 'string' || !text) return text;
+
+  let cleaned = text;
+  for (const tag of ANNOTATION_TAGS) {
+    const paired = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'gi');
+    cleaned = cleaned.replace(paired, '$1');
+
+    const selfClosing = new RegExp(`<${tag}[^>]*\/>`, 'gi');
+    cleaned = cleaned.replace(selfClosing, '');
+  }
+  return cleaned;
+}
+
+function sanitizeHistoryForAnthropic(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history.map(msg => {
+    if (!msg || msg.role !== 'assistant') return msg;
+    if (typeof msg.content !== 'string') return msg;
+    return { ...msg, content: stripAnnotationTags(msg.content) };
+  });
+}
+
+
 // --- Dual model configuration ---
 const MODEL_PUBLIC = 'claude-3-5-haiku-20241022';
 const MODEL_MASTER = 'claude-sonnet-4-20250514';
@@ -131,7 +159,7 @@ module.exports = async function handler(req, res) {
         model,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: history,
+        messages: sanitizeHistoryForAnthropic(history),
       }),
     });
 
