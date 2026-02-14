@@ -553,68 +553,103 @@ Just message me naturally — I'm here to help.
     });
 
     // /init — E2E self-check (full details for owner, basic for others)
-    bot.onText(/\/init/, async (msg) => {
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
-
-        // Debug logging
-        console.log(`[INIT] Command received from user ${userId}, owner is ${config.telegram_owner_id}`);
-
-        // Check if user is owner - handle both string and number comparison
-        const isOwner = !config.telegram_owner_id || // If no owner configured, allow all
-                       String(userId) === String(config.telegram_owner_id) ||
-                       userId === config.telegram_owner_id ||
-                       (config.telegram_owner_id && userId === parseInt(config.telegram_owner_id));
-
-        // For non-owners, show basic health status
-        if (!isOwner) {
-            try {
-                // Try basic health check
-                const healthUrl = `http://127.0.0.1:${process.env.ALEX_PORT || '9090'}/api/health`;
-                const response = await fetch(healthUrl).catch(() => null);
-
-                if (response && response.ok) {
-                    const health = await response.json();
-                    const status = `<b>Alex Status</b>\n\n` +
-                                  `✓ Service: Online\n` +
-                                  `✓ Uptime: ${Math.floor(health.uptime_seconds / 60)} minutes\n` +
-                                  `✓ Telegram: ${health.telegram || 'connected'}\n\n` +
-                                  `For full diagnostics, contact the system owner.`;
-                    await bot.sendMessage(chatId, status, { parse_mode: 'HTML' });
-                } else {
-                    await bot.sendMessage(chatId, "✓ Alex is online and responding.\n\nFor detailed diagnostics, contact the system owner.");
-                }
-            } catch {
-                await bot.sendMessage(chatId, "✓ Alex is online and responding.\n\nFor detailed diagnostics, contact the system owner.");
-            }
-            return;
-        }
-
-        // Owner gets full E2E check
-        await bot.sendMessage(chatId, "Running E2E self-check (this takes ~5-10s)...");
-
-        let e2e = null;
+    bot.onText(/\/init(?:\s|$|@)/, async (msg) => {
         try {
-            e2e = await runE2EChecks({ includeSlow: true });
-        } catch (e) {
-            await bot.sendMessage(chatId, `E2E failed: ${e.message}`);
-            return;
+            const chatId = msg.chat.id;
+            const userId = msg.from.id;
+
+            // Debug logging
+            console.log(`[INIT] Command received from user ${userId}, owner is ${config.telegram_owner_id}`);
+            console.log(`[INIT] Message text: '${msg.text}'`);
+
+            // Send immediate response so user knows command was received
+            await bot.sendMessage(chatId, "🔍 Processing /init command...");
+
+            // Check if user is owner - handle both string and number comparison
+            const isOwner = !config.telegram_owner_id || // If no owner configured, allow all
+                           String(userId) === String(config.telegram_owner_id) ||
+                           userId === config.telegram_owner_id ||
+                           (config.telegram_owner_id && userId === parseInt(config.telegram_owner_id));
+
+            console.log(`[INIT] Is owner: ${isOwner}`);
+
+            // For non-owners, show basic health status
+            if (!isOwner) {
+                try {
+                    // Simple status message for non-owners
+                    const uptime = Math.floor(process.uptime() / 60);
+                    const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+                    const status = `<b>🤖 Alex Status</b>\n\n` +
+                                  `✅ Service: Online\n` +
+                                  `⏱ Uptime: ${uptime} minutes\n` +
+                                  `💾 Memory: ${memUsage}MB used\n` +
+                                  `🔗 Telegram: Connected\n\n` +
+                                  `<i>For full diagnostics, contact the system owner.</i>`;
+
+                    await bot.sendMessage(chatId, status, { parse_mode: 'HTML' });
+                    console.log(`[INIT] Basic status sent to non-owner`);
+                } catch (err) {
+                    console.error('[INIT] Error sending non-owner status:', err);
+                    await bot.sendMessage(chatId, "✅ Alex is online and responding.\n\nFor detailed diagnostics, contact the system owner.");
+                }
+                return;
+            }
+
+            // Owner gets full E2E check
+            await bot.sendMessage(chatId, "⏳ Running full E2E self-check (5-10 seconds)...");
+            console.log(`[INIT] Starting E2E check for owner`);
+
+            let e2e = null;
+            try {
+                // Check if function exists
+                if (typeof runE2EChecks !== 'function') {
+                    console.error('[INIT] runE2EChecks function not found!');
+                    throw new Error('E2E check function not available');
+                }
+
+                e2e = await runE2EChecks({ includeSlow: true });
+                console.log(`[INIT] E2E check completed:`, e2e.ok ? 'SUCCESS' : 'FAILED');
+            } catch (e) {
+                console.error('[INIT] E2E check error:', e);
+
+                // Send error and fallback to basic info
+                const uptime = Math.floor(process.uptime() / 60);
+                const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+                const fallbackMsg = `❌ E2E check failed: ${e.message}\n\n` +
+                                   `<b>Basic Health Info:</b>\n` +
+                                   `✅ Alex Service: Running\n` +
+                                   `⏱ Uptime: ${uptime} minutes\n` +
+                                   `💾 Memory: ${memUsage}MB\n` +
+                                   `🔗 Telegram: Connected`;
+
+                await bot.sendMessage(chatId, fallbackMsg, { parse_mode: 'HTML' });
+                return;
+            }
+
+            // Format the results
+            const lines = Object.entries(e2e.checks || {}).map(([name, r]) => {
+                const icon = r.ok ? '✅' : '❌';
+                const status = r.ok ? 'OK' : 'FAIL';
+                const detail = r.ok ? `${r.ms}ms` : (r.error || r.status || 'error');
+                return `${icon} ${name}: ${status} (${detail})`;
+            });
+
+            const msgText =
+                `<b>🔍 /init - Full E2E Check</b>\n\n` +
+                `<b>Overall:</b> ${e2e.ok ? '✅ PASS' : '❌ FAIL'}\n` +
+                `<b>Time:</b> ${new Date(e2e.ts).toLocaleTimeString()}\n\n` +
+                `<b>Service Checks:</b>\n${lines.join('\n')}\n\n` +
+                `<i>💡 Use /logs and /errors for more details</i>`;
+
+            await bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
+            console.log(`[INIT] Full E2E results sent to owner`);
+
+        } catch (error) {
+            console.error('[INIT] Unexpected error in command handler:', error);
+            await bot.sendMessage(msg.chat.id, `❌ Error processing /init: ${error.message}`).catch(console.error);
         }
-
-        const lines = Object.entries(e2e.checks || {}).map(([name, r]) => {
-            const tag = r.ok ? 'OK' : 'FAIL';
-            const why = r.ok ? `status=${r.status}` : `err=${r.error || r.status || 'unknown'}`;
-            return `${tag} ${name} (${why}, ${r.ms}ms)`;
-        });
-
-        const msgText =
-            `<b>/init - Full E2E Check</b>\n\n` +
-            `<b>Overall:</b> ${e2e.ok ? '✅ OK' : '❌ FAIL'}\n` +
-            `<b>Timestamp:</b> ${e2e.ts}\n\n` +
-            `<b>Service Checks:</b>\n${lines.map(l => `• ${l}`).join('\n')}\n\n` +
-            `<i>Tip:</i> use /logs and /errors for detailed diagnostics.`;
-
-        await bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
     });
 
     // Special greetings for Lee (owner)
