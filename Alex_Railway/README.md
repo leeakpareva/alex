@@ -557,7 +557,7 @@ You provide economic research, market analysis, and strategic intelligence.
 Change this file to create a completely different agent — a CTO, a sales lead, a research assistant, a customer support agent, anything.
 
 ### 5. Deploy
-
+ 
 ```bash
 # Service
 sudo cp deploy/navada-1.service /etc/systemd/system/alex.service
@@ -569,8 +569,37 @@ sudo cp deploy/cron/alex-tasks /etc/cron.d/alex-tasks
 sudo chown root:root /etc/cron.d/alex*
 ```
 
-### 6. Verify
+### Railway Deployment (Alex_Railway)
 
+This repo also supports Railway deployment (no local config file required) via environment variables.
+
+Services used in Railway:
+- `alex` (the agent gateway)
+- `nodejs` (Next.js UI)
+- `Chroma` (vector DB service)
+- `Redis` (cache)
+- `AnythingLLM` (optional)
+
+Minimum env vars for Railway `alex` service:
+- `ANTHROPIC_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_OWNER_ID` (number)
+- `TELEGRAM_AUTHORIZED_USERS` (comma-separated numbers)
+- `REDIS_URL` (Railway internal or external)
+- `CHROMA_BASE_URL` (example: `http://chroma.railway.internal:8000`)
+- `CHROMA_API_KEY` / `CHROMADB_API_KEY` (if required by your Chroma setup)
+
+Dashboard wiring (Vercel):
+- `DASHBOARD_URL` (example: `https://www.alexnavada.xyz/dashboard`)
+- `DASHBOARD_PUSH_URL` (example: `https://www.alexnavada.xyz/api/push`)
+- `DASHBOARD_PUSH_SECRET` (or `PUSH_SECRET`) must match the Vercel dashboard API secret.
+
+Notes:
+- If `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN` are set, Alex pushes dashboard state directly to Upstash.
+- If Upstash is not set, Alex can still push dashboard state via `DASHBOARD_PUSH_URL` using HTTP.
+
+### 6. Verify
+ 
 ```bash
 sudo systemctl status alex          # Should show active (running)
 journalctl -u alex -f               # Watch live logs

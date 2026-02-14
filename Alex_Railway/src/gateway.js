@@ -114,6 +114,9 @@ let skills = null;
 let scheduledTasks = new Map();
 let redis = null;
 let localRedis = null;
+let dashboardUrl = 'https://www.alexnavada.xyz/dashboard';
+let dashboardPushUrl = null;
+let dashboardPushSecret = null;
 const learnModeChats = new Set(); // Track chats with /learn active
 const mathModeChats = new Set(); // Track chats with /mathematician active
 const strategistModeChats = new Set(); // Track chats with /strategist active
@@ -153,12 +156,28 @@ const dashState = {
 // Debounce Redis writes — max 1 push per 5 seconds
 let dashPushTimer = null;
 function scheduleDashPush() {
-    if (!redis || dashPushTimer) return;
+    const canPushRedis = !!redis;
+    const canPushHttp = !!(dashboardPushUrl && dashboardPushSecret);
+    if ((!canPushRedis && !canPushHttp) || dashPushTimer) return;
     dashPushTimer = setTimeout(async () => {
         dashPushTimer = null;
         try {
             dashState.last_updated = new Date().toISOString();
-            await redis.set('dash:data', JSON.stringify(dashState));
+            if (canPushRedis) {
+                await redis.set('dash:data', JSON.stringify(dashState));
+            }
+            if (canPushHttp) {
+                // Optional fallback for Railway: push dashboard state to a Vercel endpoint.
+                // Endpoint should accept: { dashboard } and require Bearer auth.
+                await fetch(dashboardPushUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${dashboardPushSecret}`,
+                    },
+                    body: JSON.stringify({ dashboard: dashState }),
+                }).catch(() => {});
+            }
         } catch (err) {
             console.error('[DASH] Redis push failed:', err.message);
         }
@@ -1307,7 +1326,7 @@ Just message me naturally for anything else.`;
         const lastUpdated = dashState.last_updated ? new Date(dashState.last_updated).toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' GMT' : 'unknown';
 
         let text = `*ALEX Dashboard*\n\n`;
-        text += `[alexnavada.xyz](https://alexnavada.xyz)\n\n`;
+        text += `[alexnavada.xyz](${dashboardUrl})\n\n`;
         text += `*Live data:*\n`;
         text += `• Status: ${dashState.status}\n`;
         text += `• Tasks: ${dashState.summary.total_tasks} total (${dashState.summary.completed} done, ${dashState.summary.failed} failed)\n`;
@@ -1315,7 +1334,8 @@ Just message me naturally for anything else.`;
         text += `• Activity entries: ${dashState.activity_log.length}\n`;
         text += `• Last sync: ${lastUpdated}\n`;
         text += `• Redis: ${redis ? 'connected' : 'disconnected'}\n`;
-        text += `\n_Dashboard refreshes every 15s. Data pushed via Upstash Redis. Hourly deep sync via cron._`;
+        text += `• Push: ${(dashboardPushUrl && dashboardPushSecret) ? 'http push enabled' : 'http push disabled'}\n`;
+        text += `\n_Dashboard refreshes every 15s. Data pushed via Upstash Redis (preferred) or HTTP /api/push fallback._`;
         await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     });
 
@@ -5001,6 +5021,10 @@ async function init() {
 
     // Load configuration (with schema validation)
     config = await loadConfig();
+    // Dashboard link + optional HTTP push fallback (useful on Railway when Upstash isn't configured).
+    dashboardUrl = config.dashboard_url || process.env.DASHBOARD_URL || dashboardUrl;
+    dashboardPushUrl = config.dashboard_push_url || process.env.DASHBOARD_PUSH_URL || null;
+    dashboardPushSecret = config.dashboard_push_secret || process.env.DASHBOARD_PUSH_SECRET || process.env.PUSH_SECRET || null;
 
     // Hydrate FULL_ACCESS_USERS from persisted config
     if (Array.isArray(config.full_access_users)) {
