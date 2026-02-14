@@ -92,9 +92,28 @@ export async function loadConfig() {
         configMeta = await loadEncryptedConfig(CONFIG_PATH, SECRET_KEY);
         config = configMeta.config;
     } catch (err) {
-        console.error(`Config error: ${err.message}`);
-        console.log('Run: alex-setup to configure');
-        process.exit(1);
+        // Railway fallback: build runtime config from environment variables.
+        config = {
+            anthropic_api_key: process.env.ANTHROPIC_API_KEY,
+            telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN,
+            telegram_owner_id: process.env.TELEGRAM_OWNER_ID ? Number(process.env.TELEGRAM_OWNER_ID) : undefined,
+            telegram_authorized_users: process.env.TELEGRAM_AUTHORIZED_USERS
+                ? process.env.TELEGRAM_AUTHORIZED_USERS.split(',').map(s => Number(s.trim())).filter(Boolean)
+                : undefined,
+            openai_api_key: process.env.OPENAI_API_KEY,
+            deepseek_api_key: process.env.DEEPSEEK_API_KEY,
+            kimi_api_key: process.env.KIMI_API_KEY,
+            openrouter_api_key: process.env.OPENROUTER_API_KEY,
+            upstash_redis_url: process.env.UPSTASH_REDIS_URL,
+            upstash_redis_token: process.env.UPSTASH_REDIS_TOKEN,
+            local_redis_url: process.env.LOCAL_REDIS_URL || process.env.REDIS_URL,
+            chromadb_api_key: process.env.CHROMADB_API_KEY || process.env.CHROMA_API_KEY,
+            chromadb_tenant: process.env.CHROMADB_TENANT,
+            chromadb_database: process.env.CHROMADB_DATABASE,
+            control_api_token: process.env.CONTROL_API_TOKEN
+        };
+        configMeta = { encrypted: false };
+        console.log('[CONFIG] Using environment fallback (no config file)');
     }
 
     // Merge YAML config (non-secrets) — JSON wins on conflicts

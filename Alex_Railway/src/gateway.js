@@ -4285,7 +4285,7 @@ Rules for Python Mode:
 // ============================================================================
 
 function setupControlAPI() {
-    const CONTROL_PORT = parseInt(process.env.ALEX_PORT || '9090', 10);
+    const CONTROL_PORT = parseInt(process.env.ALEX_PORT || process.env.PORT || '9090', 10);
     const controlChatId = 'control-api';
     const terminalChatId = 'terminal-chat';
 
@@ -4906,6 +4906,80 @@ async function catchUpMissedTasks() {
 }
 
 // ============================================================================
+// INTERNAL SCHEDULER (Railway fallback when system cron is unavailable)
+// ============================================================================
+
+const INTERNAL_SCHEDULE = [
+    { task: 'morning-briefing', hour: 8, minute: 0, days: '*' },
+    { task: 'midmorning-checkin', hour: 11, minute: 0, days: '*' },
+    { task: 'midday-research', hour: 13, minute: 0, days: '*' },
+    { task: 'afternoon-checkin', hour: 16, minute: 0, days: '*' },
+    { task: 'evening-summary', hour: 18, minute: 0, days: '*' },
+    { task: 'inbox-review', hour: 10, minute: 0, days: '*' },
+    { task: 'inbox-review', hour: 15, minute: 0, days: '*' },
+    { task: 'cleanup', hour: 3, minute: 0, days: '*' },
+    { task: 'dashboard-sync', minute: 0, everyHour: true, days: '*' },
+    { task: 'weekly-self-review', hour: 22, minute: 0, days: [0] },
+];
+
+const schedulerRunKeys = new Set();
+
+function scheduleMatches(entry, now) {
+    const day = now.getDay();
+    const dayOk = entry.days === '*' || entry.days.includes(day);
+    if (!dayOk) return false;
+    if (entry.everyHour) return now.getMinutes() === entry.minute;
+    return now.getHours() === entry.hour && now.getMinutes() === entry.minute;
+}
+
+async function runScheduledTaskByName(taskName) {
+    if (taskName === 'dashboard-sync') {
+        await runDashboardSync();
+        return;
+    }
+    if (taskName === 'cleanup') {
+        await runCleanup(memory);
+        return;
+    }
+    const taskDef = BUILTIN_TASKS.get(taskName);
+    if (!taskDef) {
+        console.warn(`[SCHED] Unknown task: ${taskName}`);
+        return;
+    }
+    currentCallerUserId = config.telegram_owner_id || null;
+    await handleScheduledTask(taskDef, heartbeatDeps());
+    currentCallerUserId = null;
+}
+
+function startInternalScheduler() {
+    const enabled = process.env.ALEX_INTERNAL_SCHEDULER !== 'false';
+    if (!enabled) {
+        console.log('[SCHED] Internal scheduler disabled by ALEX_INTERNAL_SCHEDULER=false');
+        return;
+    }
+
+    setInterval(async () => {
+        const now = new Date();
+        const minuteKey = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+
+        // Trim old run keys daily to avoid growth.
+        if (now.getHours() === 0 && now.getMinutes() === 1) schedulerRunKeys.clear();
+
+        for (const entry of INTERNAL_SCHEDULE) {
+            if (!scheduleMatches(entry, now)) continue;
+            const runKey = `${entry.task}:${minuteKey}`;
+            if (schedulerRunKeys.has(runKey)) continue;
+            schedulerRunKeys.add(runKey);
+            runScheduledTaskByName(entry.task).catch(err => {
+                console.error(`[SCHED] ${entry.task} failed:`, err.message);
+            });
+        }
+    }, 30000);
+
+    console.log('[SCHED] Internal scheduler active (30s tick)');
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -4981,6 +5055,16 @@ async function init() {
     } catch (err) {
         console.error('[LOCAL-REDIS] Connection failed:', err.message);
         localRedis = null;
+    }
+
+    // Railway fallback: publish dashboard data to local Redis when Upstash is not configured.
+    if (!redis && localRedis) {
+        redis = {
+            set: async (key, value) => localRedis.set(key, value),
+            get: async (key) => localRedis.get(key),
+            del: async (key) => localRedis.del(key),
+        };
+        console.log('[REDIS] Using local Redis for dashboard publish fallback');
     }
 
     // Wire up dashboard helpers for heartbeat + tools modules
@@ -5060,6 +5144,9 @@ async function init() {
 
     // Check for missed scheduled tasks during downtime
     await catchUpMissedTasks();
+
+    // Start internal scheduler fallback for Railway/container environments.
+    startInternalScheduler();
 
     // Notify dashboard that ALEX is online
     postDashboard('set_status', { status: 'online' });

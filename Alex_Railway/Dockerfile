@@ -64,10 +64,6 @@ COPY src/ ./src/
 COPY Alex-Scripts/ ./Alex-Scripts/
 COPY Alex-CLI/ ./Alex-CLI/
 
-# Container cron schedule
-COPY deploy/oci/crontab /etc/cron.d/alex-container
-RUN chmod 0644 /etc/cron.d/alex-container && crontab /etc/cron.d/alex-container
-
 # Data directory (mounted as volume in production)
 RUN mkdir -p /home/alex/.alex/logs \
              /home/alex/.alex/conversations \
@@ -94,5 +90,5 @@ EXPOSE 9090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -sf http://localhost:9090/api/health || exit 1
 
-# Start cron daemon in background, then run ALEX as main process
-CMD cron && exec node src/gateway.js
+# Start ALEX gateway
+CMD ["node", "src/gateway.js"]

@@ -8,32 +8,50 @@ import sys
 import json
 import hashlib
 import os
+from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 
-CHROMA_PATH = "/home/head/.alex/chromadb"
+WORKSPACE = os.environ.get("ALEX_WORKSPACE", "/home/alex/.alex")
+CHROMA_PATH = os.path.join(WORKSPACE, "chromadb")
 COLLECTION = "alex_knowledge"
-UPLOADS_DIR = "/home/head/.alex/uploads"
+UPLOADS_DIR = os.path.join(WORKSPACE, "uploads")
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-# Chroma Cloud credentials (from ~/.chroma/credentials)
-CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY", "ck-6okEKDvgvhyHGff5vpnQzcHWnXF7a72MjQEvYjcLTSmH")
-CHROMA_TENANT = os.environ.get("CHROMA_TENANT", "efc7bdaa-9d78-48bd-94f4-d7202d714f10")
-CHROMA_DATABASE = os.environ.get("CHROMA_DATABASE", "alex_knowledge")
+# Chroma credentials / endpoint
+CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY", "")
+CHROMA_TENANT = os.environ.get("CHROMA_TENANT", "")
+CHROMA_DATABASE = os.environ.get("CHROMA_DATABASE", "")
+CHROMA_BASE_URL = os.environ.get("CHROMA_BASE_URL", "")
 
 _client = None
 
 
 def get_client():
-    """Get or create ChromaDB client. Uses Cloud if API key available, falls back to local."""
+    """Get or create ChromaDB client. Prefers internal HTTP, then cloud, then local."""
     global _client
     if _client is not None:
         return _client
 
     import chromadb
 
+    if CHROMA_BASE_URL:
+        try:
+            parsed = urlparse(CHROMA_BASE_URL)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            ssl = parsed.scheme == "https"
+            _client = chromadb.HttpClient(host=host, port=port, ssl=ssl)
+            _client.heartbeat()
+            print(f"[CHROMA] Connected to HttpClient at {CHROMA_BASE_URL}", file=sys.stderr)
+            return _client
+        except Exception as e:
+            print(f"[CHROMA] HttpClient connection failed ({e}), trying cloud/local", file=sys.stderr)
+
     if CHROMA_API_KEY:
         try:
+            if not CHROMA_TENANT or not CHROMA_DATABASE:
+                raise ValueError("CHROMA_TENANT and CHROMA_DATABASE are required for CloudClient")
             _client = chromadb.CloudClient(
                 api_key=CHROMA_API_KEY,
                 tenant=CHROMA_TENANT,
@@ -46,6 +64,7 @@ def get_client():
         except Exception as e:
             print(f"[CHROMA] Cloud connection failed ({e}), falling back to local", file=sys.stderr)
 
+    os.makedirs(CHROMA_PATH, exist_ok=True)
     _client = chromadb.PersistentClient(path=CHROMA_PATH)
     print("[CHROMA] Using local PersistentClient", file=sys.stderr)
     return _client
