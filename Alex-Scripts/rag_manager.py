@@ -17,7 +17,8 @@ CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
 # Chroma Cloud credentials (from ~/.chroma/credentials)
-CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY", "ck-6okEKDvgvhyHGff5vpnQzcHWnXF7a72MjQEvYjcLTSmH")
+# Never hardcode secrets in-repo. Provide via env (Railway / local shell).
+CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY", "")
 CHROMA_TENANT = os.environ.get("CHROMA_TENANT", "efc7bdaa-9d78-48bd-94f4-d7202d714f10")
 CHROMA_DATABASE = os.environ.get("CHROMA_DATABASE", "alex_knowledge")
 
