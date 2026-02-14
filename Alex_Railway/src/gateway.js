@@ -498,11 +498,21 @@ Just message me naturally — I'm here to help.
         const chatId = msg.chat.id;
         if (!isAuthorizedUser(msg.from.id)) { await bot.sendMessage(chatId, "This command is only available to authorized users."); return; }
         try {
-            const { stdout: uptime } = await execAsync('uptime -p');
-            const { stdout: temp } = await execAsync('vcgencmd measure_temp 2>/dev/null || echo "temp=N/A"');
-            const { stdout: disk } = await execAsync("df -h / | tail -1 | awk '{print $3 \" / \" $2 \" (\" $5 \")\"}'");
-            const { stdout: mem } = await execAsync("free -m | awk '/Mem:/ {printf \"%dMB / %dMB (%.1f%%)\", $3, $2, $3/$2 * 100}'");
-            const { stdout: loadavg } = await execAsync("cat /proc/loadavg | awk '{print $1, $2, $3}'");
+            const safeExec = async (cmd, fallback) => {
+                try {
+                    const { stdout } = await execAsync(cmd);
+                    const out = stdout?.trim();
+                    return out || fallback;
+                } catch {
+                    return fallback;
+                }
+            };
+
+            const uptime = await safeExec('uptime -p', `up ${Math.floor(process.uptime() / 60)} minutes`);
+            const tempRaw = await safeExec('vcgencmd measure_temp 2>/dev/null', 'temp=N/A');
+            const disk = await safeExec("df -h / | tail -1 | awk '{print $3 \" / \" $2 \" (\" $5 \")\"}'", 'N/A');
+            const mem = await safeExec("free -m | awk '/Mem:/ {printf \"%dMB / %dMB (%.1f%%)\", $3, $2, $3/$2 * 100}'", `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB (process RSS)`);
+            const loadavg = await safeExec("cat /proc/loadavg | awk '{print $1, $2, $3}'", os.loadavg().slice(0, 3).map(v => v.toFixed(2)).join(' '));
 
             const uptimeSec = os.uptime();
             const days = Math.floor(uptimeSec / 86400);
@@ -559,13 +569,13 @@ Just message me naturally — I'm here to help.
 
 *Hardware:*
 • Raspberry Pi 5 (${os.arch()})
-• Temperature: ${temp.trim().replace('temp=', '')}
-• System uptime: ${uptime.trim()} (${days}d ${hours}h)
-• Load average: ${loadavg.trim()}
+• Temperature: ${tempRaw.replace('temp=', '')}
+• System uptime: ${uptime} (${days}d ${hours}h)
+• Load average: ${loadavg}
 
 *Resources:*
-• RAM: ${mem.trim()}
-• Disk: ${disk.trim()}
+• RAM: ${mem}
+• Disk: ${disk}
 • Workspace: ${workspaceSize}
 • Runtime: Node.js ${process.version}
 

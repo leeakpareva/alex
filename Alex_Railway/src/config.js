@@ -103,6 +103,7 @@ export async function loadConfig() {
             openai_api_key: process.env.OPENAI_API_KEY,
             deepseek_api_key: process.env.DEEPSEEK_API_KEY,
             kimi_api_key: process.env.KIMI_API_KEY,
+            apify_api_key: process.env.APIFY_API_KEY,
             openrouter_api_key: process.env.OPENROUTER_API_KEY,
             upstash_redis_url: process.env.UPSTASH_REDIS_URL,
             upstash_redis_token: process.env.UPSTASH_REDIS_TOKEN,

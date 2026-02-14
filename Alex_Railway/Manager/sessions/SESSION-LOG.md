@@ -78,6 +78,15 @@ This session was about maturity and scale. The focus shifted from adding new fea
 ### Commits
 - `476ebc6` — Add manage_user tool, fix duplicate processes on restart
 - `696be7c` — Implement 25 improvements: security, reliability, smart routing, memory, proactiveness
+
+---
+
+## Day 14 — Saturday 14 Feb 2026
+### Session Summary
+Railway production hardening and connectivity verification: confirmed Alex can reach the Nodejs service via Railway internal DNS, added Railway-safe scheduler/Redis/dashboard fallbacks, validated Telegram authorization, and documented all changes for deployment continuity.
+
+### Logs
+- `Manager/sessions/SESSION-2026-02-14-railway-ops.md`
 - `a1e398c` — Reorganize ~/.alex/ dirs, add /email menu + 6 new Telegram commands, log rotation
 - `1d9df49` — Add Fixes/CHANGELOG.md, /profile command, interactive /email + /inbox buttons
 - `9ecbb36` — Move setup files to deploy/ and docs/, update email-filing and dashboard
