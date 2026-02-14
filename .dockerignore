@@ -40,8 +40,12 @@ Manager/
 .DS_Store
 Thumbs.db
 
-# Deploy tooling (not needed inside the image)
+# Deploy tooling
+# NOTE: Railway Docker build needs deploy/oci/crontab for container cron wiring.
 deploy/
+!deploy/
+!deploy/oci/
+!deploy/oci/crontab
 
 # Dashboard (separate deployment)
 dashboard-vercel/
