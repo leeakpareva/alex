@@ -361,18 +361,41 @@ async function probeHttp(url, { timeoutMs = 5000 } = {}) {
     const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: controller.signal });
-        return { ok: res.ok, status: res.status };
+        // For service-connectivity checks, any HTTP response means the node is reachable.
+        // 4xx can still indicate a healthy service (e.g., auth required, root path 404).
+        return {
+            ok: res.status < 500,
+            reachable: true,
+            status: res.status
+        };
     } catch (e) {
-        return { ok: false, error: e?.message || String(e) };
+        return { ok: false, reachable: false, error: e?.message || String(e) };
     } finally {
         clearTimeout(t);
     }
 }
 
+
+function normalizeMonitorUrl(rawUrl, fallbackUrl) {
+    const candidate = (rawUrl || fallbackUrl || '').trim();
+    if (!candidate) return fallbackUrl;
+    if (/^https?:\/\//i.test(candidate)) return candidate;
+
+    // Railway internal DNS is plain HTTP.
+    if (candidate.endsWith('.railway.internal') || candidate.includes('.railway.internal:')) {
+        return `http://${candidate.replace(/\/+$/, '')}/`;
+    }
+
+    // Public Railway domains should be HTTPS.
+    return `https://${candidate.replace(/\/+$/, '')}/`;
+}
+
 async function updateFlow(name, result, { notify = true } = {}) {
     const prev = flowState.get(name);
     const nowIso = new Date().toISOString();
-    const ok = !!result.ok;
+    const ok = typeof result.ok === 'boolean'
+        ? result.ok
+        : (typeof result.status === 'number');
     const code = typeof result.status === 'number' ? result.status : undefined;
     const err = result.error ? String(result.error).substring(0, 200) : undefined;
 
@@ -397,9 +420,9 @@ function startFlowMonitor() {
     if (flowMonitorTimer) return;
 
     const targets = [
-        { name: 'nodejs', url: process.env.NODEJS_BASE_URL || 'http://nodejs.railway.internal:3000/' },
-        { name: 'http-nodejs', url: process.env.HTTP_NODEJS_BASE_URL || 'http://http-nodejs.railway.internal:8080/' },
-        { name: 'chroma', url: 'http://chroma.railway.internal:8000/api/v2/heartbeat' },
+        { name: 'nodejs', url: normalizeMonitorUrl(process.env.NODEJS_BASE_URL, 'http://nodejs.railway.internal:3000/') },
+        { name: 'http-nodejs', url: normalizeMonitorUrl(process.env.HTTP_NODEJS_BASE_URL, 'http://http-nodejs.railway.internal:8080/') },
+        { name: 'chroma', url: normalizeMonitorUrl(process.env.CHROMA_BASE_URL, 'http://chroma.railway.internal:8000/api/v2/heartbeat') },
     ];
 
     flowMonitorTimer = setInterval(async () => {
