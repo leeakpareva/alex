@@ -3781,16 +3781,32 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
                 return `${time} ${days}`;
             }
 
-            // --- Built-in tasks ---
+            // --- Built-in tasks (complete schedule from crontab) ---
             const builtinSchedule = [
-                { name: 'morning-briefing', cron: '0 8 * * *', desc: 'Daily morning briefing' },
+                // Morning routine
+                { name: 'api-data-refresh', cron: '0 7 * * *', desc: 'Refresh API data for dashboard' },
+                { name: 'morning-briefing', cron: '0 8 * * *', desc: 'Daily morning briefing with news & weather' },
+                { name: 'check-followups', cron: '0 9 * * *', desc: 'Check deadlines and follow-ups' },
+                { name: 'stock-alerts', cron: '0 9,12,16 * * 1-5', desc: 'Stock market alerts (weekdays)' },
+
+                // Midday routine
+                { name: 'inbox-review', cron: '0 10,15 * * *', desc: 'Review email inbox (10am & 3pm)' },
                 { name: 'midmorning-checkin', cron: '0 11 * * *', desc: 'Mid-morning check-in' },
-                { name: 'midday-research', cron: '0 13 * * *', desc: 'Economic research scan' },
+                { name: 'midday-research', cron: '0 13 * * *', desc: 'Economic & AI research scan' },
+
+                // Afternoon/Evening routine
                 { name: 'afternoon-checkin', cron: '0 16 * * *', desc: 'Afternoon check-in' },
-                { name: 'evening-summary', cron: '0 18 * * *', desc: 'Evening summary' },
-                { name: 'weekly-self-review', cron: '0 22 * * 0', desc: 'Weekly self-improvement review' },
-                { name: 'dashboard-sync', cron: '0 * * * *', desc: 'Hourly dashboard metrics sync' },
-                { name: 'cleanup', cron: '0 3 * * *', desc: 'Conversation memory cleanup' },
+                { name: 'evening-summary', cron: '0 18 * * *', desc: 'Evening summary & priorities' },
+                { name: 'ralph-review', cron: '0 21 * * *', desc: 'Ralph self-improvement analysis' },
+                { name: 'daily-ops-report', cron: '0 22 * * *', desc: 'Daily ops report email to Lee' },
+                { name: 'weekly-self-review', cron: '0 22 * * 0', desc: 'Weekly self-improvement review (Sunday)' },
+
+                // Maintenance tasks
+                { name: 'daily-churn', cron: '0 2 * * *', desc: 'Process daily journal & index to RAG' },
+                { name: 'cleanup', cron: '0 3 * * *', desc: 'Clean old conversations & logs' },
+
+                // Hourly
+                { name: 'dashboard-sync', cron: '0 * * * *', desc: 'Sync metrics to dashboard' },
             ];
 
             // --- User tasks from disk ---
@@ -5169,12 +5185,23 @@ async function catchUpMissedTasks() {
 
         // Built-in task schedule (hour, days: 0=Sun..6=Sat, '*'=all)
         const schedule = [
-            { task: 'morning-briefing',   hour: 8,  days: '*' },
+            { task: 'api-data-refresh',    hour: 7,  days: '*' },
+            { task: 'morning-briefing',    hour: 8,  days: '*' },
+            { task: 'check-followups',     hour: 9,  days: '*' },
+            { task: 'stock-alerts',        hour: 9,  days: [1,2,3,4,5] }, // Weekdays
+            { task: 'inbox-review-am',     hour: 10, days: '*' },
             { task: 'midmorning-checkin',  hour: 11, days: '*' },
+            { task: 'stock-alerts-noon',   hour: 12, days: [1,2,3,4,5] }, // Weekdays
             { task: 'midday-research',     hour: 13, days: '*' },
+            { task: 'inbox-review-pm',     hour: 15, days: '*' },
             { task: 'afternoon-checkin',   hour: 16, days: '*' },
+            { task: 'stock-alerts-close',  hour: 16, days: [1,2,3,4,5] }, // Weekdays
             { task: 'evening-summary',     hour: 18, days: '*' },
-            { task: 'weekly-self-review',  hour: 22, days: [0] },
+            { task: 'ralph-review',        hour: 21, days: '*' },
+            { task: 'daily-ops-report',    hour: 22, days: '*' },
+            { task: 'weekly-self-review',  hour: 22, days: [0] }, // Sunday
+            { task: 'daily-churn',         hour: 2,  days: '*' },
+            { task: 'cleanup',             hour: 3,  days: '*' },
         ];
 
         const missed = [];
