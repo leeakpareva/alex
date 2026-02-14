@@ -102,6 +102,7 @@ export function startConnectivityWatchdog({
     keepalive = process.env.CONNECTIVITY_KEEPALIVE !== '0',
     // If true, also ping the public domain (helps prevent "Sleep when idle" scale-to-zero).
     publicKeepalive = process.env.CONNECTIVITY_PUBLIC_KEEPALIVE !== '0',
+    db = null,
     logFile = process.env.CONNECTIVITY_LOG_FILE || path.join(os.homedir(), '.alex', 'logs', 'connectivity-watchdog.log'),
 } = {}) {
     if (process.env.CONNECTIVITY_WATCHDOG === '0') {
@@ -141,6 +142,16 @@ export function startConnectivityWatchdog({
             await appendLine(logFile, line);
         } catch (e) {
             console.warn('[WATCHDOG] log write failed:', e.message);
+        }
+
+        // Best-effort DB persistence (never crash the agent)
+        if (db && typeof db.insertConnectivityEvent === 'function') {
+            db.insertConnectivityEvent({
+                name,
+                ok: status.ok,
+                detail: status.detail || null,
+                meta: { source: 'watchdog' },
+            }).catch(() => {});
         }
     }
 

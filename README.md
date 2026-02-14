@@ -569,6 +569,27 @@ sudo cp deploy/cron/alex-tasks /etc/cron.d/alex-tasks
 sudo chown root:root /etc/cron.d/alex*
 ```
 
+### Railway Deployment (Production)
+
+This repo also supports Railway deployment via the included `Dockerfile` (cron is wired from `deploy/oci/crontab` so scheduled tasks keep running 24/7).
+
+**Railway env vars (recommended):**
+
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`, `TELEGRAM_AUTHORIZED_USERS`
+- `ANTHROPIC_API_KEY` (and optionally `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `KIMI_API_KEY`, `OPENROUTER_API_KEY`)
+- `DATABASE_URL` (optional, enables Postgres persistence for watchdog events + Ralph reviews + E2E reports)
+- `CHROMA_BASE_URL` (defaults to `http://chroma.railway.internal:8000`)
+- `NODEJS_BASE_URL` (defaults to `http://nodejs.railway.internal:3000`)
+- `HTTP_NODEJS_BASE_URL` (defaults to `http://http-nodejs.railway.internal:8080`)
+- Optional hardening for dashboard reads:
+  - `DASHBOARD_READ_TOKEN` (protects `/api/dashboard/*`)
+  - `DASHBOARD_ALLOWED_ORIGINS` (restrict CORS for dashboard reads)
+
+**Vercel dashboard env vars (required if not using Upstash):**
+
+- `ALEX_API_BASE_URL` (Alex Railway public URL, e.g. `https://<service>.up.railway.app`)
+- `ALEX_DASHBOARD_READ_TOKEN` (only if Alex sets `DASHBOARD_READ_TOKEN`)
+
 ### 6. Verify
 
 ```bash
@@ -578,6 +599,12 @@ npx vitest run                       # Run test suite (136 tests)
 ```
 
 Send a message to your bot on Telegram — it should respond.
+
+Quick production checks:
+
+- `GET /api/health` should return 200
+- `GET /api/e2e` should return 200 (or 503 with per-check detail)
+- Telegram `/init` (owner-only) runs the E2E check and returns a concise summary
 
 ---
 

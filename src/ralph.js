@@ -67,7 +67,7 @@ async function readRecentFeedback() {
  * @param {object} deps - { callAnthropicQueued, config }
  */
 export async function runRalphReview(deps) {
-    const { callAnthropicQueued, config } = deps;
+    const { callAnthropicQueued, config, db = null } = deps;
     console.log('[RALPH] Starting self-improvement review...');
 
     await fs.mkdir(FIXES_DIR, { recursive: true });
@@ -131,6 +131,41 @@ If everything looks healthy and no issues found, say so clearly.`;
         }, 0, { source: 'ralph-review' });
 
         const reviewText = response?.content?.[0]?.text || 'Ralph: No analysis produced.';
+
+        // Best-effort persistence (optional)
+        if (db && typeof db.insertRalphReview === 'function') {
+            try {
+                const issueMatch = reviewText.match(/### Issues Found\n([\s\S]*?)(?=###|$)/);
+                const fixMatch = reviewText.match(/### Proposed Fixes\n([\s\S]*?)(?=###|$)/);
+                const healthMatch = reviewText.match(/### Overall Health\n([\s\S]*?)$/);
+
+                const issues = [];
+                const fixes = [];
+                if (issueMatch) {
+                    for (const line of issueMatch[1].split('\n')) {
+                        const t = line.replace(/^[-*]\s*/, '').trim();
+                        if (t) issues.push(t);
+                    }
+                }
+                if (fixMatch) {
+                    for (const line of fixMatch[1].split('\n')) {
+                        const t = line.replace(/^\d+\.\s*/, '').trim();
+                        if (t) fixes.push(t);
+                    }
+                }
+                const health = healthMatch ? healthMatch[1].trim() : null;
+
+                await db.insertRalphReview({
+                    model,
+                    issues: issues.length ? issues : null,
+                    fixes: fixes.length ? fixes : null,
+                    health,
+                    review: reviewText,
+                });
+            } catch {
+                // Never block Ralph on persistence failures.
+            }
+        }
 
         // Save fix proposal to disk
         const date = new Date().toISOString().split('T')[0];

@@ -11,6 +11,7 @@ import { Redis } from '@upstash/redis';
 import os from 'os';
 import path from 'path';
 import { startConnectivityWatchdog } from './connectivity-watchdog.js';
+import { createDb } from './db.js';
 import http from 'http';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -107,6 +108,62 @@ async function computeDashboardTokenData() {
         avg_cost_per_task_gbp: totalCalls ? totalCostGbp / totalCalls : 0,
         by_model: Object.values(byModel),
     };
+}
+
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+async function fetchWithTimeout(url, { timeoutMs = 5000 } = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    const start = Date.now();
+    try {
+        const res = await fetch(url, { method: 'GET', signal: controller.signal });
+        // drain body to free sockets; we only care about status here
+        try { await res.arrayBuffer(); } catch {}
+        return { ok: res.status >= 200 && res.status < 300, status: res.status, ms: Date.now() - start };
+    } catch (e) {
+        return { ok: false, error: e.name === 'AbortError' ? 'timeout' : (e.message || 'fetch_failed'), ms: Date.now() - start };
+    } finally {
+        clearTimeout(t);
+    }
+}
+
+async function runE2EChecks({ includeSlow = false } = {}) {
+    const port = process.env.ALEX_PORT || '9090';
+    const chromaBase = (process.env.CHROMA_BASE_URL || 'http://chroma.railway.internal:8000').replace(/\/+$/, '');
+    const nodejsBase = process.env.NODEJS_BASE_URL || 'http://nodejs.railway.internal:3000';
+    const httpNodejsBase = process.env.HTTP_NODEJS_BASE_URL || 'http://http-nodejs.railway.internal:8080';
+
+    const checks = {
+        alex_health: await fetchWithTimeout(`http://127.0.0.1:${port}/api/health`, { timeoutMs: 2500 }),
+        chroma_heartbeat: await fetchWithTimeout(`${chromaBase}/api/v2/heartbeat`, { timeoutMs: 4000 }),
+        dashboard_data: await fetchWithTimeout(`http://127.0.0.1:${port}/api/dashboard/data`, { timeoutMs: 2500 }),
+        nodejs: await fetchWithTimeout(nodejsBase, { timeoutMs: 4000 }),
+        http_nodejs: await fetchWithTimeout(httpNodejsBase, { timeoutMs: 4000 }),
+    };
+
+    if (includeSlow) {
+        const anything = process.env.ANYTHINGLLM_INTERNAL_URL || 'http://anythingllm.railway.internal:3001';
+        checks.anythingllm = await fetchWithTimeout(anything, { timeoutMs: 5000 });
+    }
+
+    const ok = Object.values(checks).every(c => c && c.ok);
+    const result = { ok, ts: new Date().toISOString(), checks };
+
+    // Best-effort logging
+    try {
+        const e2ePath = path.join(WORKSPACE_PATH, 'logs', 'e2e.jsonl');
+        await mkdir(path.dirname(e2ePath), { recursive: true });
+        await appendFile(e2ePath, JSON.stringify(result) + '\n');
+    } catch {}
+
+    if (db && typeof db.insertReport === 'function') {
+        db.insertReport({ kind: 'e2e', content: JSON.stringify(result), meta: { ok } }).catch(() => {});
+    }
+
+    return result;
 }
 
 // Download a file from a URL into a Buffer
@@ -206,6 +263,7 @@ let skills = null;
 let scheduledTasks = new Map();
 let redis = null;
 let localRedis = null;
+let db = null;
 const learnModeChats = new Set(); // Track chats with /learn active
 const mathModeChats = new Set(); // Track chats with /mathematician active
 const strategistModeChats = new Set(); // Track chats with /strategist active
@@ -346,6 +404,8 @@ async function auditLog(entry) {
 }
 
 function postDashboard(action, payload) {
+    // Always update timestamp so direct dashboard reads stay fresh even when Upstash is disabled.
+    dashState.last_updated = new Date().toISOString();
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) + ' GMT';
     switch (action) {
         case 'add_task': {
@@ -490,6 +550,40 @@ Just message me naturally — I'm here to help.
 
         await bot.sendMessage(chatId, welcome, { parse_mode: 'HTML' });
         await memory.appendMemory('user', `New session started with ${msg.from.first_name} (ID: ${userId})`);
+    });
+
+    // /init — owner-only E2E self-check (Railway nodes + dashboard + logs)
+    bot.onText(/\/init/, async (msg) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        if (String(userId) !== String(config.telegram_owner_id)) {
+            await bot.sendMessage(chatId, "This command is only available to the owner.");
+            return;
+        }
+
+        await bot.sendMessage(chatId, "Running E2E self-check (this takes ~5-10s)...");
+
+        let e2e = null;
+        try {
+            e2e = await runE2EChecks({ includeSlow: true });
+        } catch (e) {
+            await bot.sendMessage(chatId, `E2E failed: ${e.message}`);
+            return;
+        }
+
+        const lines = Object.entries(e2e.checks || {}).map(([name, r]) => {
+            const tag = r.ok ? 'OK' : 'FAIL';
+            const why = r.ok ? `status=${r.status}` : `err=${r.error || r.status || 'unknown'}`;
+            return `${tag} ${name} (${why}, ${r.ms}ms)`;
+        });
+
+        const msgText =
+            `<b>/init</b>\n\n` +
+            `<b>Overall:</b> ${e2e.ok ? 'OK' : 'FAIL'}\n` +
+            `<b>Checks:</b>\n${lines.map(l => `• ${l}`).join('\n')}\n\n` +
+            `<i>Tip:</i> use /logs and /errors if anything is failing.`;
+
+        await bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
     });
 
     // Special greetings for Lee (owner)
@@ -4331,6 +4425,7 @@ Rules for Python Mode:
         { command: 'health', description: 'Quick system health overview' },
         { command: 'help', description: 'Full guide with tips' },
         { command: 'id', description: 'Your Telegram user and chat ID' },
+        { command: 'init', description: 'Owner-only E2E self-check' },
         { command: 'indeed', description: 'Indeed job search' },
         { command: 'inbox', description: 'Email queue (not_started by default)' },
         { command: 'kemet', description: 'KEMET Automotive project (restricted)' },
@@ -4440,7 +4535,12 @@ function setupControlAPI() {
             const authHeader = req.headers['authorization'] || '';
             const providedToken = authHeader.replace(/^Bearer\s+/i, '');
             const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
-            const isLocalBypass = req.url === '/api/trigger' || req.url === '/api/command' || req.url === '/api/terminal-messages' || req.url === '/api/health';
+            const isLocalBypass =
+                req.url === '/api/trigger' ||
+                req.url === '/api/command' ||
+                req.url === '/api/terminal-messages' ||
+                req.url === '/api/health' ||
+                req.url === '/api/e2e';
 
             // Allow unauthenticated local requests from localhost (cron jobs + terminal)
             if (!(isLocalhost && isLocalBypass) && providedToken !== apiToken) {
@@ -4755,6 +4855,7 @@ Call the send_email tool now with exactly these parameters.`;
                         runRalphReview({
                             callAnthropicQueued: chatSystem.callAnthropicQueued,
                             config,
+                            db,
                         }).then(result => {
                             // Parse Ralph's markdown output for dashboard
                             const issues = [];
@@ -4864,6 +4965,14 @@ Call the send_email tool now with exactly these parameters.`;
                 return writeJson(res, 200, { commits }, cors);
             } catch {
                 return writeJson(res, 200, { commits: [] }, cors);
+            }
+
+        } else if (req.method === 'GET' && req.url === '/api/e2e') {
+            try {
+                const data = await runE2EChecks({ includeSlow: false });
+                return writeJson(res, data.ok ? 200 : 503, data, cors);
+            } catch (e) {
+                return writeJson(res, 500, { ok: false, error: e.message }, cors);
             }
 
         } else if (req.method === 'GET' && req.url === '/api/health') {
@@ -5048,10 +5157,22 @@ async function init() {
     // Load configuration (with schema validation)
     config = await loadConfig();
 
-    // Railway connectivity watchdog (internal reachability + log of state transitions)
+    // Optional Postgres persistence (Railway Postgres). Best-effort only.
+    try {
+        db = createDb(process.env.DATABASE_URL || process.env.database_url || null);
+        if (db) {
+            await db.init();
+            console.log('[DB] Postgres persistence enabled');
+        } else {
+            console.log('[DB] No DATABASE_URL — persistence disabled');
+        }
+    } catch (err) {
+        console.error('[DB] Init failed:', err.message);
+        db = null;
+    }
 
     // Railway connectivity watchdog (internal reachability + log of state transitions)
-    startConnectivityWatchdog();
+    startConnectivityWatchdog({ db });
 
     // Hydrate FULL_ACCESS_USERS from persisted config
     if (Array.isArray(config.full_access_users)) {
@@ -5286,6 +5407,11 @@ async function gracefulShutdown(signal) {
         if (localRedis) {
             await localRedis.quit().catch(() => {});
             console.log('[SHUTDOWN] Local Redis disconnected');
+        }
+        // Disconnect Postgres (optional)
+        if (db) {
+            await db.close().catch(() => {});
+            console.log('[SHUTDOWN] Postgres disconnected');
         }
         // Wait briefly for dashboard push
         await new Promise(r => setTimeout(r, 1000));
