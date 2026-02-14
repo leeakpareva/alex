@@ -190,3 +190,16 @@ _Updates will be added as work progresses._
 - `b05931b` — Add daily journal system, ChromaDB Cloud, local Redis, and diary
 
 - `f3e1d76` — Add Manager toolkit, Ralph self-improvement, backup system, and audit reports
+
+---
+
+## Day 15 — Saturday 14 Feb 2026
+### Session Summary
+Railway deployment hardening for 24/7 operation. Fixed Docker build context issues, added env-based config fallback (so ALEX can boot without `/home/alex/.alex/config.json`), and validated internal connectivity to Chroma, Redis, Postgres, nodejs, http-nodejs, and AnythingLLM. Added a lightweight connectivity watchdog that probes internal nodes and logs state transitions to help diagnose intermittent "disconnected" reports.
+
+### What Was Built
+- **Railway boot reliability**: ALEX can start from Railway environment variables when the local config file is missing.
+- **Connectivity watchdog**: Periodic probes + transition logging to `~/.alex/logs/connectivity-watchdog.log`, with optional self-keepalive.
+
+### Ops Notes
+- ALEX health endpoint is on `http://127.0.0.1:9090/api/health` in the Railway container build.

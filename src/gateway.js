@@ -10,6 +10,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { Redis } from '@upstash/redis';
 import os from 'os';
 import path from 'path';
+import { startConnectivityWatchdog } from './connectivity-watchdog.js';
+import { startConnectivityWatchdog } from './connectivity-watchdog.js';
 import http from 'http';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -4917,6 +4919,12 @@ async function init() {
 
     // Load configuration (with schema validation)
     config = await loadConfig();
+
+    // Railway connectivity watchdog (internal reachability + log of state transitions)
+    startConnectivityWatchdog();
+
+    // Railway connectivity watchdog (internal reachability + log of state transitions)
+    startConnectivityWatchdog();
 
     // Hydrate FULL_ACCESS_USERS from persisted config
     if (Array.isArray(config.full_access_users)) {
