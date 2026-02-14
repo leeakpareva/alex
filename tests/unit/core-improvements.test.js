@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { maskSensitive, FULL_ACCESS_USERS, TOOLS } from '../../src/tools.js';
-import { selectModel, CircuitBreaker, smartSplit } from '../../src/chat.js';
+import { selectModel, CircuitBreaker, smartSplit, stripAnnotationTags, sanitizeAssistantMessage } from '../../src/chat.js';
 import { isPathAllowed } from '../../src/config.js';
 import { KeywordIndex } from '../../src/keyword-index.js';
 import { RequestQueue } from '../../src/queue.js';
@@ -239,5 +239,33 @@ describe('bash blocklist (hardened)', () => {
             const blocked = dangerousPatterns.some(p => p.test(cmd));
             expect(blocked).toBe(false);
         }
+    });
+});
+
+
+describe('assistant annotation sanitization', () => {
+    it('strips citation and related tags while preserving inner text', () => {
+        const input = 'Answer <citation index="1">with source text</citation> done.';
+        expect(stripAnnotationTags(input)).toBe('Answer with source text done.');
+    });
+
+    it('strips other annotation tags and self-closing tags', () => {
+        const input = '<source id="a">Alpha</source> <search_result id="b"/> <document>Beta</document>';
+        expect(stripAnnotationTags(input)).toBe('Alpha  Beta');
+    });
+
+    it('sanitizes assistant block-array content only', () => {
+        const assistant = {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'See <citation>proof</citation>' }, { type: 'tool_use', id: 't1', name: 'x', input: {} }]
+        };
+        const user = { role: 'user', content: 'Keep <citation>this</citation> raw' };
+
+        const cleanedAssistant = sanitizeAssistantMessage(assistant);
+        const cleanedUser = sanitizeAssistantMessage(user);
+
+        expect(cleanedAssistant.content[0].text).toBe('See proof');
+        expect(cleanedAssistant.content[1].type).toBe('tool_use');
+        expect(cleanedUser).toEqual(user);
     });
 });
