@@ -550,17 +550,23 @@ async function setupTelegram() {
     const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
     if (webhookUrl) {
-        // Webhook mode (Railway) — don't poll, receive updates via /api/telegram endpoint
+        // Webhook mode (Railway) — receive updates via /api/telegram endpoint, no polling
         bot = new TelegramBot(config.telegram_bot_token);
         const secret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
         const whOpts = secret ? { secret_token: secret } : {};
+
+        // Claim the Redis lock so Pi knows not to poll
+        if (redis) {
+            await redis.set(POLL_LOCK_KEY, `webhook:${INSTANCE_ID}`, { ex: 86400 }).catch(() => {});
+        }
+
         bot.setWebHook(webhookUrl, whOpts).then(() => {
             console.log(`[TELEGRAM] Webhook set: ${webhookUrl}`);
         }).catch(err => {
             console.error('[TELEGRAM] Failed to set webhook:', err.message);
         });
     } else {
-        // Auto-detect: check for active webhook first, then try Redis polling lock
+        // Pi mode — check webhook + Redis lock before polling
         bot = new TelegramBot(config.telegram_bot_token);
 
         // Check if another instance has set a Telegram webhook
@@ -582,17 +588,28 @@ async function setupTelegram() {
                 bot = new TelegramBot(config.telegram_bot_token, { polling: true });
                 console.log(`[TELEGRAM] Polling lock acquired (${INSTANCE_ID}) — polling mode`);
 
-                bot.on('polling_error', (err) => {
-                    if (err?.message?.includes('409 Conflict')) return; // suppress
+                // On ANY 409 → immediately stop polling and release lock
+                // (means another instance or webhook took over)
+                bot.on('polling_error', async (err) => {
+                    if (err?.message?.includes('409 Conflict')) {
+                        if (bot.isPolling()) {
+                            bot.stopPolling();
+                            await releasePollLock();
+                            if (pollLockInterval) { clearInterval(pollLockInterval); pollLockInterval = null; }
+                            console.log('[TELEGRAM] 409 detected — stopped polling, released lock');
+                        }
+                        return;
+                    }
                     console.error('[TELEGRAM] Polling error:', err.message || err);
                 });
 
-                // Refresh the lock periodically
+                // Refresh the lock every 30s
                 pollLockInterval = setInterval(async () => {
                     const stillOwner = await refreshPollLock();
                     if (!stillOwner && bot.isPolling()) {
                         bot.stopPolling();
-                        console.log('[TELEGRAM] Lost polling lock — another instance took over, stopped polling');
+                        console.log('[TELEGRAM] Lost polling lock — stopped polling');
+                        clearInterval(pollLockInterval); pollLockInterval = null;
                     }
                 }, POLL_LOCK_REFRESH);
             } else {
@@ -600,40 +617,30 @@ async function setupTelegram() {
             }
         }
 
-        // Periodic check: claim polling if lock is free and we're not polling
+        // Periodic failover check (every 5 min): resume polling if lock+webhook both free
         setInterval(async () => {
             try {
-                // Skip if webhook mode or already polling
-                if (process.env.TELEGRAM_WEBHOOK_URL) return;
+                if (process.env.TELEGRAM_WEBHOOK_URL || bot.isPolling()) return;
                 const info = await bot.getWebHookInfo();
-                if (info.url) {
-                    // Webhook appeared — stop polling if we are
-                    if (bot.isPolling()) {
-                        bot.stopPolling();
-                        await releasePollLock();
-                        console.log(`[TELEGRAM] Webhook detected (${info.url}) — stopped polling`);
-                    }
-                    return;
-                }
-                // No webhook — try to claim lock if we're not polling
-                if (!bot.isPolling()) {
-                    const got = await tryAcquirePollLock();
-                    if (got) {
-                        bot.startPolling();
-                        console.log(`[TELEGRAM] Claimed polling lock (${INSTANCE_ID}) — resumed polling`);
-                        if (!pollLockInterval) {
-                            pollLockInterval = setInterval(async () => {
-                                const stillOwner = await refreshPollLock();
-                                if (!stillOwner && bot.isPolling()) {
-                                    bot.stopPolling();
-                                    console.log('[TELEGRAM] Lost polling lock — stopped polling');
-                                }
-                            }, POLL_LOCK_REFRESH);
-                        }
+                if (info.url) return; // Webhook active — stay idle
+
+                const got = await tryAcquirePollLock();
+                if (got) {
+                    bot.startPolling();
+                    console.log(`[TELEGRAM] Failover: claimed lock (${INSTANCE_ID}) — resumed polling`);
+                    if (!pollLockInterval) {
+                        pollLockInterval = setInterval(async () => {
+                            const stillOwner = await refreshPollLock();
+                            if (!stillOwner && bot.isPolling()) {
+                                bot.stopPolling();
+                                console.log('[TELEGRAM] Lost polling lock — stopped polling');
+                                clearInterval(pollLockInterval); pollLockInterval = null;
+                            }
+                        }, POLL_LOCK_REFRESH);
                     }
                 }
             } catch { /* silent */ }
-        }, 300000); // 5 minutes
+        }, 300000);
     }
 
     bot.onText(/\/start/, async (msg) => {
