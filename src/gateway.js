@@ -547,9 +547,14 @@ async function releasePollLock() {
 }
 
 async function setupTelegram() {
-    const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+    let webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
     if (webhookUrl) {
+        // Auto-append /api/telegram if not already present
+        if (!webhookUrl.includes('/api/telegram')) {
+            webhookUrl = webhookUrl.replace(/\/+$/, '') + '/api/telegram';
+        }
+
         // Webhook mode (Railway) — receive updates via /api/telegram endpoint, no polling
         bot = new TelegramBot(config.telegram_bot_token);
         const secret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
@@ -5727,9 +5732,11 @@ async function init() {
     scheduleDashPush();
 
     // Write alive marker every 60s so catch-up knows when we were last running
+    const aliveDir = path.join(WORKSPACE_PATH, 'logs');
+    await mkdir(aliveDir, { recursive: true }).catch(() => {});
     setInterval(async () => {
         try {
-            await writeFile(path.join(WORKSPACE_PATH, 'logs', '.last-alive'), new Date().toISOString());
+            await writeFile(path.join(aliveDir, '.last-alive'), new Date().toISOString());
         } catch {}
     }, 60000);
 
