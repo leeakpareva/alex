@@ -112,8 +112,9 @@ export function initializeScheduler() {
         try {
             const fs = await import('fs/promises');
             const path = await import('path');
-            const markerFile = path.join(process.env.ALEX_WORKSPACE || '/app/.alex', 'logs', '.last-alive');
-            await fs.writeFile(markerFile, new Date().toISOString());
+            const logsDir = path.join(process.env.ALEX_WORKSPACE || '/app/.alex', 'logs');
+            await fs.mkdir(logsDir, { recursive: true });
+            await fs.writeFile(path.join(logsDir, '.last-alive'), new Date().toISOString());
         } catch (error) {
             console.error('[SCHEDULER] Failed to update keep-alive marker:', error.message);
         }
