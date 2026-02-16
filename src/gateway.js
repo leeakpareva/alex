@@ -502,11 +502,11 @@ function isLimitedCommand(text) {
     return LIMITED_USER_ALLOWED_COMMANDS.has(cmd);
 }
 
-function setupTelegram() {
+async function setupTelegram() {
     const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
     if (webhookUrl) {
-        // Webhook mode — don't poll, receive updates via /api/telegram endpoint
+        // Webhook mode (Railway) — don't poll, receive updates via /api/telegram endpoint
         bot = new TelegramBot(config.telegram_bot_token);
         const secret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
         const whOpts = secret ? { secret_token: secret } : {};
@@ -516,22 +516,59 @@ function setupTelegram() {
             console.error('[TELEGRAM] Failed to set webhook:', err.message);
         });
     } else {
-        // Polling mode (Pi default)
-        bot = new TelegramBot(config.telegram_bot_token, { polling: true });
-
-        // Suppress 409 Conflict spam (caused by another instance polling the same bot token)
-        let last409Warn = 0;
-        bot.on('polling_error', (err) => {
-            if (err?.message?.includes('409 Conflict')) {
-                const now = Date.now();
-                if (now - last409Warn > 300000) { // Log once every 5 minutes
-                    console.warn('[TELEGRAM] 409 Conflict — another instance is polling this bot token. Set TELEGRAM_ENABLED=false on the other instance.');
-                    last409Warn = now;
-                }
-                return; // Suppress individual 409 log lines
+        // Pi mode — auto-detect if another instance owns the webhook
+        bot = new TelegramBot(config.telegram_bot_token);
+        let webhookActive = false;
+        try {
+            const info = await bot.getWebHookInfo();
+            if (info.url) {
+                webhookActive = true;
+                console.log(`[TELEGRAM] Webhook active (${info.url}) — running in API-only mode, no polling`);
             }
-            console.error('[TELEGRAM] Polling error:', err.message || err);
-        });
+        } catch (err) {
+            console.warn('[TELEGRAM] Could not check webhook status:', err.message);
+        }
+
+        if (!webhookActive) {
+            // No webhook set — safe to poll
+            bot = new TelegramBot(config.telegram_bot_token, { polling: true });
+            console.log('[TELEGRAM] No webhook detected — polling mode');
+
+            let last409Warn = 0;
+            bot.on('polling_error', (err) => {
+                if (err?.message?.includes('409 Conflict')) {
+                    const now = Date.now();
+                    if (now - last409Warn > 300000) {
+                        console.warn('[TELEGRAM] 409 Conflict — another instance is polling this bot token');
+                        last409Warn = now;
+                    }
+                    return;
+                }
+                console.error('[TELEGRAM] Polling error:', err.message || err);
+            });
+        }
+
+        // Periodically re-check webhook status (every 5 min)
+        // If webhook disappears (Railway down), start polling. If webhook appears, stop polling.
+        setInterval(async () => {
+            try {
+                const info = await bot.getWebHookInfo();
+                const hasWebhook = !!info.url;
+                const isPolling = bot.isPolling();
+
+                if (hasWebhook && isPolling) {
+                    // Railway came online — stop polling to avoid 409s
+                    bot.stopPolling();
+                    console.log(`[TELEGRAM] Webhook detected (${info.url}) — stopped polling`);
+                } else if (!hasWebhook && !isPolling && !process.env.TELEGRAM_WEBHOOK_URL) {
+                    // Railway went down, webhook cleared — resume polling
+                    console.log('[TELEGRAM] No webhook detected — resuming polling');
+                    bot.startPolling();
+                }
+            } catch {
+                // Silent — don't spam logs on transient failures
+            }
+        }, 300000); // 5 minutes
     }
 
     bot.onText(/\/start/, async (msg) => {
@@ -5545,7 +5582,7 @@ async function init() {
     // Setup Telegram (disabled via TELEGRAM_ENABLED=false for Railway/secondary instances)
     const telegramEnabled = process.env.TELEGRAM_ENABLED !== 'false';
     if (telegramEnabled) {
-        setupTelegram();
+        await setupTelegram();
     } else {
         console.log('[TELEGRAM] Disabled via TELEGRAM_ENABLED=false — running in API-only mode');
         // Create a no-op bot stub so the rest of the codebase doesn't crash
