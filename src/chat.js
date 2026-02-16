@@ -680,38 +680,55 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
      * when replayed without the corresponding tool definition.
      */
     function sanitizeRecent(msgs) {
-        const toolUseIds = new Set();
-        const serverToolIds = new Set();
+        // Pass 1: collect all IDs from both sides
+        const toolUseIds = new Set();     // tool_use IDs in assistant messages
+        const toolResultIds = new Set();  // tool_use_ids referenced by tool_result in user messages
+        const serverToolIds = new Set();  // server-side tool IDs to strip
         for (const msg of msgs) {
             if (msg.role === 'assistant' && Array.isArray(msg.content)) {
                 for (const b of msg.content) {
                     if (b.type === 'tool_use') toolUseIds.add(b.id);
-                    // Track server-side tool IDs so we can strip their results too
                     if (SERVER_TOOL_TYPES.has(b.type) && b.id) serverToolIds.add(b.id);
                 }
             }
-        }
-        return msgs.filter(msg => {
             if (msg.role === 'user' && Array.isArray(msg.content)) {
-                const hasOrphan = msg.content.some(b => b.type === 'tool_result' && !toolUseIds.has(b.tool_use_id));
-                if (hasOrphan) return false;
+                for (const b of msg.content) {
+                    if (b.type === 'tool_result' && b.tool_use_id) toolResultIds.add(b.tool_use_id);
+                }
             }
-            return true;
-        }).map(msg => {
+        }
+
+        // Pass 2: filter and clean messages
+        return msgs.map(msg => {
             const cleanedMsg = sanitizeAssistantMessage(msg);
-            // Strip server-side tool results from user messages
+
+            if (cleanedMsg.role === 'assistant' && Array.isArray(cleanedMsg.content)) {
+                // Strip tool_use blocks that have no matching tool_result
+                const stripped = cleanedMsg.content.filter(b => {
+                    if (b.type === 'tool_use' && !toolResultIds.has(b.id)) return false;
+                    return true;
+                });
+                if (stripped.length === 0) return { ...cleanedMsg, content: [{ type: 'text', text: '(tool results processed)' }] };
+                // Fix empty text blocks
+                const fixed = stripped.map(b => b.type === 'text' && !b.text ? { ...b, text: '(empty)' } : b);
+                return { ...cleanedMsg, content: fixed };
+            }
+
             if (cleanedMsg.role === 'user' && Array.isArray(cleanedMsg.content)) {
-                const stripped = cleanedMsg.content.filter(b =>
-                    !SERVER_RESULT_TYPES.has(b.type) && !(b.type === 'tool_result' && serverToolIds.has(b.tool_use_id))
-                );
-                if (stripped.length === 0) return null; // Mark for removal
+                // Strip orphaned tool_results (no matching tool_use) and server-side results
+                const stripped = cleanedMsg.content.filter(b => {
+                    if (b.type === 'tool_result' && !toolUseIds.has(b.tool_use_id)) return false;
+                    if (SERVER_RESULT_TYPES.has(b.type)) return false;
+                    if (b.type === 'tool_result' && serverToolIds.has(b.tool_use_id)) return false;
+                    return true;
+                });
+                if (stripped.length === 0) return null;
                 return { ...cleanedMsg, content: stripped };
             }
-            // Fix empty text content blocks — Anthropic rejects these
+
+            // Fix empty text content
             if (Array.isArray(cleanedMsg.content)) {
-                const fixed = cleanedMsg.content.map(b =>
-                    b.type === 'text' && !b.text ? { ...b, text: '(empty)' } : b
-                );
+                const fixed = cleanedMsg.content.map(b => b.type === 'text' && !b.text ? { ...b, text: '(empty)' } : b);
                 return { ...cleanedMsg, content: fixed };
             }
             if (typeof cleanedMsg.content === 'string' && !cleanedMsg.content) {
