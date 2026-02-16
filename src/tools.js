@@ -238,7 +238,7 @@ export const TOOLS = [
     },
     {
         name: "write_file",
-        description: "Write content to a file anywhere under /home/head (creates directories if needed). Use for creating scripts, configs, reports, or any file.",
+        description: "Write content to ANY file on this Raspberry Pi (creates directories if needed). The manager has full system access — no path restrictions. Use for creating scripts, configs, reports, system files, or any file anywhere.",
         input_schema: {
             type: "object",
             properties: {
@@ -971,39 +971,48 @@ export async function executeTool(name, input, { memory, skills, config, schedul
     }
 
     try {
+        // Owner has FULL unrestricted system access to the Pi
+        const isOwner = callerUserId && config.telegram_owner_id && (
+            String(callerUserId) === String(config.telegram_owner_id) || FULL_ACCESS_USERS.has(callerUserId)
+        );
+
         // Tools that manage their own timeouts internally (bash, generate_chart) skip the outer wrapper
         const needsOuterTimeout = !['bash', 'generate_chart', 'generate_diagram', 'generate_mindmap'].includes(name);
         const executeSwitch = async () => {
         switch (name) {
             case 'bash': {
-                // Guardrail: block destructive and dangerous operations
                 const cmd = input.command;
-                const destructivePatterns = /\brm\s|rmdir\s|unlink\s|shred\s|\brm\b.*-rf|\brm\b.*-r/i;
-                const dangerousPatterns = [
-                    /\bmkfs\b/i,
-                    /\bdd\b.*\bof\s*=\s*\/dev\//i,
-                    /\bcurl\b.*\|\s*(ba)?sh\b/i,
-                    /\bwget\b.*\|\s*(ba)?sh\b/i,
-                    /\bsudo\s+rm\b/i,
-                    /\breboot\b/i,
-                    /\bshutdown\b/i,
-                    /\bpoweroff\b/i,
-                    /\bsystemctl\s+(stop|disable)\s+alex\b/i,
-                    /\b>\s*\/dev\/sd[a-z]/i,
-                    /\bchmod\s+777\s+\//i,
-                    /\bchown\s.*\s+\//i,
-                ];
-                if (dangerousPatterns.some(p => p.test(cmd))) {
-                    return {
-                        success: false,
-                        error: 'BLOCKED: This command is considered dangerous and has been blocked for safety.'
-                    };
-                }
-                if (destructivePatterns.test(cmd)) {
-                    return {
-                        success: false,
-                        error: 'DELETE_GUARDRAIL: This command would delete files. You MUST ask the user to confirm 3 times AND provide the delete password before executing any file deletion. Ask: "This will delete files. Are you sure? (Confirmation 1 of 3)" — then ask twice more — then ask: "Please provide the delete password to proceed." The password must match exactly. Do NOT proceed without all 3 confirmations and the correct password.'
-                    };
+
+                // Owner (manager) bypasses ALL command restrictions — full Pi control
+                if (!isOwner) {
+                    // Guardrail: block destructive and dangerous operations for non-owners
+                    const destructivePatterns = /\brm\s|rmdir\s|unlink\s|shred\s|\brm\b.*-rf|\brm\b.*-r/i;
+                    const dangerousPatterns = [
+                        /\bmkfs\b/i,
+                        /\bdd\b.*\bof\s*=\s*\/dev\//i,
+                        /\bcurl\b.*\|\s*(ba)?sh\b/i,
+                        /\bwget\b.*\|\s*(ba)?sh\b/i,
+                        /\bsudo\s+rm\b/i,
+                        /\breboot\b/i,
+                        /\bshutdown\b/i,
+                        /\bpoweroff\b/i,
+                        /\bsystemctl\s+(stop|disable)\s+alex\b/i,
+                        /\b>\s*\/dev\/sd[a-z]/i,
+                        /\bchmod\s+777\s+\//i,
+                        /\bchown\s.*\s+\//i,
+                    ];
+                    if (dangerousPatterns.some(p => p.test(cmd))) {
+                        return {
+                            success: false,
+                            error: 'BLOCKED: This command is considered dangerous and has been blocked for safety.'
+                        };
+                    }
+                    if (destructivePatterns.test(cmd)) {
+                        return {
+                            success: false,
+                            error: 'DELETE_GUARDRAIL: This command would delete files. You MUST ask the user to confirm 3 times AND provide the delete password before executing any file deletion. Ask: "This will delete files. Are you sure? (Confirmation 1 of 3)" — then ask twice more — then ask: "Please provide the delete password to proceed." The password must match exactly. Do NOT proceed without all 3 confirmations and the correct password.'
+                        };
+                    }
                 }
                 const options = {
                     cwd: input.working_directory || os.homedir(),
@@ -1027,7 +1036,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
             }
 
             case 'write_file': {
-                if (!isPathAllowed(input.path, ALLOWED_WRITE_PATHS)) {
+                if (!isOwner && !isPathAllowed(input.path, ALLOWED_WRITE_PATHS)) {
                     return { success: false, error: `Write denied: path must be within ${ALLOWED_WRITE_PATHS.join(' or ')}` };
                 }
                 await fs.mkdir(path.dirname(input.path), { recursive: true });
@@ -1082,7 +1091,7 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                     return { success: false, error: 'old_text not found in file. Make sure it matches exactly (including whitespace).' };
                 }
                 const updated = content.replace(input.old_text, input.new_text);
-                if (!isPathAllowed(input.path, ALLOWED_WRITE_PATHS)) {
+                if (!isOwner && !isPathAllowed(input.path, ALLOWED_WRITE_PATHS)) {
                     return { success: false, error: `Write denied: path must be within ${ALLOWED_WRITE_PATHS.join(' or ')}` };
                 }
                 await fs.writeFile(input.path, updated);
@@ -1652,7 +1661,8 @@ if plt.get_fignums():
                 const outputPath = path.join(diagramsDir, outFilename);
                 await fs.writeFile(mmdPath, input.mermaid_code);
                 try {
-                    await execAsync(`npx --yes @mermaid-js/mermaid-cli mmdc -i ${JSON.stringify(mmdPath)} -o ${JSON.stringify(outputPath)} -b transparent --puppeteerConfigFile /dev/null`, { timeout: 60000 });
+                    const puppeteerConf = path.join(WORKSPACE_PATH, 'puppeteer-config.json');
+                    await execAsync(`npx --yes @mermaid-js/mermaid-cli -i ${JSON.stringify(mmdPath)} -o ${JSON.stringify(outputPath)} -b transparent -p ${JSON.stringify(puppeteerConf)}`, { timeout: 60000 });
                     await fs.unlink(mmdPath).catch(() => {});
                     return { success: true, path: outputPath, message: `Diagram generated: ${outputPath}`, send_photo: true, caption: 'Mermaid diagram' };
                 } catch (err) {
@@ -1674,11 +1684,11 @@ if plt.get_fignums():
                 try {
                     // Generate HTML with markmap-cli
                     await execAsync(`npx --yes markmap-cli ${JSON.stringify(mdPath)} -o ${JSON.stringify(htmlPath)} --no-open`, { timeout: 60000 });
-                    // Screenshot HTML to PNG with puppeteer
+                    // Screenshot HTML to PNG with puppeteer (using system Chromium on Pi)
                     const screenshotScript = `
                         const puppeteer = require('puppeteer');
                         (async () => {
-                            const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+                            const browser = await puppeteer.launch({ headless: 'new', executablePath: '/usr/bin/chromium', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] });
                             const page = await browser.newPage();
                             await page.setViewport({ width: 1400, height: 1000 });
                             await page.goto('file://${htmlPath.replace(/'/g, "\\'")}', { waitUntil: 'networkidle0', timeout: 30000 });

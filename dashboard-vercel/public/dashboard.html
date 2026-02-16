@@ -9,6 +9,8 @@
   <title>ALEX Dashboard</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="/theme.css">
   <style>
     :root {
@@ -222,6 +224,48 @@
       transition: transform 0.3s; z-index: 1000;
     }
     .refresh-indicator.active { transform: scaleX(1); }
+
+    /* Ralph enhanced styles */
+    .ralph-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.4rem; }
+    .ralph-header-left { display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap; }
+    .ralph-stats-pills { display:flex;gap:0.4rem;flex-wrap:wrap; }
+    .ralph-pill { font-size:0.6rem;padding:0.15rem 0.4rem;border-radius:3px;background:rgba(59,130,246,0.1);color:var(--blue); }
+    .ralph-progress { display:none;margin-bottom:0.6rem;padding:0.5rem;background:rgba(59,130,246,0.06);border-radius:4px;border-left:3px solid var(--blue); }
+    .ralph-progress.active { display:block; }
+    .ralph-progress-text { font-size:0.7rem;color:var(--blue);margin-bottom:0.3rem; }
+    .ralph-progress-bar { height:3px;background:var(--border);border-radius:2px;overflow:hidden; }
+    .ralph-progress-fill { height:100%;background:var(--blue);border-radius:2px;animation:progressPulse 2s ease-in-out infinite;width:60%; }
+    @keyframes progressPulse { 0%{width:20%;opacity:0.7} 50%{width:80%;opacity:1} 100%{width:20%;opacity:0.7} }
+    .ralph-health-box { font-size:0.75rem;margin-bottom:0.6rem;padding:0.5rem;border-radius:4px;border-left:3px solid var(--green);display:none; }
+    .ralph-health-box.visible { display:flex;gap:0.5rem;align-items:center;justify-content:space-between;flex-wrap:wrap; }
+    .ralph-score { font-size:0.85rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:4px;white-space:nowrap; }
+    .ralph-score.good { background:rgba(34,197,94,0.15);color:var(--green); }
+    .ralph-score.mid { background:rgba(245,158,11,0.15);color:var(--amber); }
+    .ralph-score.bad { background:rgba(239,68,68,0.15);color:var(--red); }
+    .ralph-cat { font-size:0.55rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px; }
+    .ralph-cat.reliability { background:rgba(239,68,68,0.12);color:var(--red); }
+    .ralph-cat.performance { background:rgba(245,158,11,0.12);color:var(--amber); }
+    .ralph-cat.quality { background:rgba(59,130,246,0.12);color:var(--blue); }
+    .ralph-cat.cost { background:rgba(34,197,94,0.12);color:var(--green); }
+    .ralph-cat.logging { background:rgba(136,136,136,0.12);color:var(--muted); }
+    .ralph-cat.security { background:rgba(168,85,247,0.12);color:#a855f7; }
+    .ralph-fix-status { font-size:0.55rem;padding:0.1rem 0.3rem;border-radius:3px;font-weight:600;text-transform:uppercase; }
+    .ralph-fix-status.proposed { background:rgba(59,130,246,0.12);color:var(--blue); }
+    .ralph-fix-status.implemented { background:rgba(34,197,94,0.12);color:var(--green); }
+    .ralph-fix-status.rejected { background:rgba(239,68,68,0.12);color:var(--red); }
+    .ralph-timeline { margin-top:0.6rem;border-top:1px solid var(--border);padding-top:0.5rem; }
+    .ralph-timeline-title { font-size:0.65rem;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem; }
+    .ralph-tl-entry { display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;font-size:0.65rem;border-bottom:1px solid var(--border); }
+    .ralph-tl-entry:last-child { border-bottom:none; }
+    .ralph-tl-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .ralph-tl-date { color:var(--muted);min-width:55px; }
+    .ralph-tl-detail { flex:1;color:var(--text); }
+    .ralph-tl-score { font-weight:600;font-size:0.6rem; }
+    .status-tag.running { background:rgba(59,130,246,0.15);color:var(--blue);animation:pulse 1.5s infinite; }
+    @media (max-width: 768px) {
+      .ralph-timeline { display:none; }
+      .ralph-stats-pills { display:none; }
+    }
   </style>
 </head>
 <body>
@@ -303,14 +347,26 @@
     <div class="section">
       <div class="section-title">Ralph — Self-Improvement Engine</div>
       <div class="card" id="ralph-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.4rem">
-          <div style="display:flex;align-items:center;gap:0.5rem">
+        <!-- Header row -->
+        <div class="ralph-header">
+          <div class="ralph-header-left">
             <span style="font-size:0.85rem;font-weight:600">Status</span>
             <span class="status-tag pending" id="ralph-status">PENDING</span>
+            <span style="font-size:0.65rem;color:var(--muted)" id="ralph-last-run">Last run: --</span>
           </div>
-          <div style="font-size:0.65rem;color:var(--muted)" id="ralph-last-run">Last run: --</div>
+          <div class="ralph-stats-pills" id="ralph-stats-pills"></div>
         </div>
-        <div id="ralph-health" style="font-size:0.75rem;margin-bottom:0.6rem;padding:0.5rem;background:rgba(34,197,94,0.06);border-radius:4px;border-left:3px solid var(--green);display:none"></div>
+        <!-- Progress bar (visible when running) -->
+        <div class="ralph-progress" id="ralph-progress">
+          <div class="ralph-progress-text" id="ralph-progress-text">Analyzing...</div>
+          <div class="ralph-progress-bar"><div class="ralph-progress-fill"></div></div>
+        </div>
+        <!-- Health assessment -->
+        <div class="ralph-health-box" id="ralph-health">
+          <span id="ralph-health-text"></span>
+          <span class="ralph-score" id="ralph-health-score"></span>
+        </div>
+        <!-- Issues & Fixes grid -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem" id="ralph-grid">
           <div>
             <div style="font-size:0.65rem;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Issues Found</div>
@@ -320,6 +376,11 @@
             <div style="font-size:0.65rem;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Proposed Fixes</div>
             <div id="ralph-fixes" class="scroll-box" style="max-height:150px"><div class="empty">No data yet</div></div>
           </div>
+        </div>
+        <!-- Review History Timeline -->
+        <div class="ralph-timeline" id="ralph-timeline" style="display:none">
+          <div class="ralph-timeline-title">Review History</div>
+          <div id="ralph-timeline-entries"></div>
         </div>
       </div>
     </div>
@@ -531,22 +592,49 @@
         }).join('');
       }
 
-      // Ralph
+      // Ralph — Enhanced render
       const ralph = data.ralph || {};
-      const rStatus = document.getElementById('ralph-status');
       const rSt = ralph.status || 'pending';
-      rStatus.className = 'status-tag ' + (rSt === 'completed' ? 'completed' : rSt === 'failed' ? 'failed' : 'pending');
+      const rStatus = document.getElementById('ralph-status');
+      const statusClass = rSt === 'completed' ? 'completed' : rSt === 'failed' ? 'failed' : rSt === 'running' ? 'running' : 'pending';
+      rStatus.className = 'status-tag ' + statusClass;
       rStatus.textContent = rSt.toUpperCase();
 
+      // Last run
       if (ralph.last_run) {
         const rd = new Date(ralph.last_run);
         document.getElementById('ralph-last-run').textContent = 'Last run: ' + rd.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
       }
 
+      // Stats pills
+      const stats = ralph.stats || {};
+      const pillsEl = document.getElementById('ralph-stats-pills');
+      if (stats.total_reviews) {
+        pillsEl.innerHTML = `
+          <span class="ralph-pill">${stats.total_reviews} reviews</span>
+          <span class="ralph-pill">${stats.total_issues_found || 0} issues</span>
+          <span class="ralph-pill">${stats.total_fixes_proposed || 0} fixes</span>
+        `;
+      } else {
+        pillsEl.innerHTML = '';
+      }
+
+      // Progress bar
+      const progressEl = document.getElementById('ralph-progress');
+      if (rSt === 'running') {
+        progressEl.classList.add('active');
+        document.getElementById('ralph-progress-text').textContent = ralph.current_focus || 'Analyzing...';
+      } else {
+        progressEl.classList.remove('active');
+      }
+
+      // Health assessment
       const rHealth = document.getElementById('ralph-health');
+      const rHealthText = document.getElementById('ralph-health-text');
+      const rHealthScore = document.getElementById('ralph-health-score');
       if (ralph.health) {
-        rHealth.textContent = ralph.health;
-        rHealth.style.display = 'block';
+        rHealthText.textContent = ralph.health;
+        rHealth.classList.add('visible');
         if (rSt === 'failed') {
           rHealth.style.borderLeftColor = 'var(--red)';
           rHealth.style.background = 'rgba(239,68,68,0.06)';
@@ -554,22 +642,66 @@
           rHealth.style.borderLeftColor = 'var(--green)';
           rHealth.style.background = 'rgba(34,197,94,0.06)';
         }
+        if (typeof ralph.health_score === 'number') {
+          const sc = ralph.health_score;
+          rHealthScore.textContent = sc + '/10';
+          rHealthScore.className = 'ralph-score ' + (sc >= 7 ? 'good' : sc >= 4 ? 'mid' : 'bad');
+          rHealthScore.style.display = '';
+        } else {
+          rHealthScore.style.display = 'none';
+        }
       } else {
-        rHealth.style.display = 'none';
+        rHealth.classList.remove('visible');
       }
 
+      // Issues (handles both string and object format)
       const rIssues = document.getElementById('ralph-issues');
       if (ralph.issues && ralph.issues.length) {
-        rIssues.innerHTML = ralph.issues.map(i => `<div class="list-item"><span class="list-text" style="color:var(--amber)">&#x26A0; ${esc(i)}</span></div>`).join('');
+        rIssues.innerHTML = ralph.issues.map(i => {
+          const text = typeof i === 'string' ? i : (i.text || '');
+          const cat = typeof i === 'object' && i.category ? i.category : '';
+          const catBadge = cat ? `<span class="ralph-cat ${esc(cat)}">${esc(cat)}</span> ` : '';
+          return `<div class="list-item">${catBadge}<span class="list-text" style="color:var(--amber)">&#x26A0; ${esc(text)}</span></div>`;
+        }).join('');
       } else {
         rIssues.innerHTML = '<div class="empty">No issues found</div>';
       }
 
+      // Fixes (handles both string and object format)
       const rFixes = document.getElementById('ralph-fixes');
       if (ralph.fixes && ralph.fixes.length) {
-        rFixes.innerHTML = ralph.fixes.map((f, i) => `<div class="list-item"><span class="list-text"><strong>${i+1}.</strong> ${esc(f)}</span></div>`).join('');
+        rFixes.innerHTML = ralph.fixes.map((f, idx) => {
+          const text = typeof f === 'string' ? f : (f.text || '');
+          const st = typeof f === 'object' && f.status ? f.status : 'proposed';
+          return `<div class="list-item"><span class="ralph-fix-status ${esc(st)}">${esc(st)}</span> <span class="list-text"><strong>${idx+1}.</strong> ${esc(text)}</span></div>`;
+        }).join('');
       } else {
         rFixes.innerHTML = '<div class="empty">No fixes proposed</div>';
+      }
+
+      // Timeline
+      const history = ralph.history || [];
+      const tlEl = document.getElementById('ralph-timeline');
+      const tlEntries = document.getElementById('ralph-timeline-entries');
+      if (history.length) {
+        tlEl.style.display = '';
+        tlEntries.innerHTML = history.slice().reverse().map(h => {
+          const hDate = new Date(h.date + 'T12:00:00');
+          const ds = hDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          const iCount = (h.issues || []).length;
+          const fCount = (h.fixes || []).length;
+          const sc = typeof h.health_score === 'number' ? h.health_score : null;
+          const dotColor = sc !== null ? (sc >= 7 ? 'var(--green)' : sc >= 4 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)';
+          const scoreText = sc !== null ? `<span class="ralph-tl-score" style="color:${dotColor}">${sc}/10</span>` : '';
+          return `<div class="ralph-tl-entry">
+            <span class="ralph-tl-dot" style="background:${dotColor}"></span>
+            <span class="ralph-tl-date">${ds}</span>
+            <span class="ralph-tl-detail">${iCount} issues, ${fCount} fixes</span>
+            ${scoreText}
+          </div>`;
+        }).join('');
+      } else {
+        tlEl.style.display = 'none';
       }
     }
 
@@ -580,6 +712,18 @@
         hour: '2-digit', minute: '2-digit',
         timeZone: 'Europe/London'
       });
+      // Live / Xs ago indicator
+      const connEl = document.getElementById('conn-status');
+      if (lastSuccess) {
+        const ago = Math.floor((Date.now() - lastSuccess) / 1000);
+        if (ago < 10) {
+          connEl.className = 'conn-status ok';
+          connEl.textContent = 'Live';
+        } else if (ago < 120) {
+          connEl.className = 'conn-status ok';
+          connEl.textContent = ago + 's ago';
+        }
+      }
     }
 
     // Visibility API - pause when hidden
@@ -613,5 +757,6 @@
   </script>
   <script src="/nav.js"></script>
   <script src="/chat-widget.js"></script>
+  <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/service-worker.js').catch(()=>{})}</script>
 </body>
 </html>

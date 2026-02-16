@@ -8,6 +8,9 @@
   <title>ALEX — Future Economist at NAVADA</title>
   <link rel="icon" href="/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="/theme.css">
   <style>
     /* Hero Section */
@@ -819,7 +822,7 @@
 
         <!-- Title -->
         <h1 class="hero-title animate-fade-in-up delay-200">
-          <span class="glow-cyan">ALEX</span> — Future Economist at NAVADA
+          Future Economist at NAVADA
         </h1>
 
         <!-- Description -->
@@ -1345,5 +1348,6 @@
   <!-- Shared components -->
   <script src="/nav.js"></script>
   <script src="/chat-widget.js"></script>
+  <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/service-worker.js').catch(()=>{})}</script>
 </body>
 </html>

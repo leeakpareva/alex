@@ -1,7 +1,7 @@
 ================================================================================
   ALEX JSON FILE INDEX
-  Auto-generated: Saturday 07 February 2026, 03:00:01
-  Total JSON files: 392 
+  Auto-generated: Monday 16 February 2026, 23:00:01
+  Total JSON files: 445 (+14 since last scan)
 ================================================================================
 
 This file is automatically updated every 30 minutes.
@@ -13,13 +13,21 @@ Run manually: bash Alex-Scripts/update-json-index.sh
 
   FILE                                                    SIZE  LAST MODIFIED
   ────                                        ────  ─────────────
+  Alex_Railway/dashboard/dashboard_data.json              8.3K  2026-02-16 21:02
+  Alex_Railway/dashboard-vercel/package.json              131B  2026-02-16 21:02
+  Alex_Railway/dashboard-vercel/vercel.json               1.6K  2026-02-16 21:02
+  Alex_Railway/Manager/QR_/clicks.json                    180B  2026-02-16 21:02
+  Alex_Railway/package.json                               1.4K  2026-02-16 21:02
   .claude/settings.local.json                             354B  2026-02-05 11:00
   dashboard/dashboard_data.json                           8.3K  2026-02-04 22:28
   dashboard-vercel/package.json                           131B  2026-02-01 18:20
+  dashboard-vercel/public/manifest.json                   561B  2026-02-16 21:52
   dashboard-vercel/vercel.json                            1.6K  2026-02-07 00:27
   dashboard-vercel/.vercel/project.json                   121B  2026-02-03 05:13
+  http-nodejs/package.json                                356B  2026-02-16 21:02
   Manager/QR_/clicks.json                                 180B  2026-02-07 01:18
-  package.json                                            1.4K  2026-02-07 00:26
+  package.json                                            1.4K  2026-02-16 21:02
+  railway.json                                            515B  2026-02-16 21:02
   reports/test-report.json                               29.0K  2026-02-01 18:20
   test-report.json                                       36.4K  2026-02-03 23:06
   .vercel/project.json                                    113B  2026-02-05 11:46
@@ -28,7 +36,7 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   CONVERSATIONS (~/.alex/conversations/)
 ────────────────────────────────────────────────────────────────────────
 
-  Active: 21  |  Archived: 319
+  Active: 21  |  Archived: 343
 
   FILE                                                    SIZE  LAST MODIFIED
   ────                                        ────  ─────────────
@@ -37,19 +45,19 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   1495502708.json                                         898B  2026-02-06 13:49
   5393434524.json                                         2.9K  2026-02-06 19:30
   6470673789.json                                           3B  2026-02-01 18:17
-  6920669447.json                                       237.6K  2026-02-06 23:37
+  6920669447.json                                        94.9K  2026-02-16 22:46
   7399112985.json                                       139.7K  2026-02-01 18:17
   7603217134.json                                         4.2K  2026-02-02 11:17
   7796797076.json                                           3B  2026-02-01 18:17
   8462512192.json                                       155.1K  2026-02-01 18:17
-  control-api.json                                       79.6K  2026-02-06 12:50
+  control-api.json                                      120.3K  2026-02-16 22:57
   email-action-e_1770069984033.json                       8.8K  2026-02-02 22:08
   email-action-e_1770197242243.json                       2.7K  2026-02-04 09:28
   kemet-6920669447.json                                   4.8K  2026-02-04 11:54
   slack-C0AC5MK54DU-1769925822.315359.json                947B  2026-02-01 18:17
   slack-C0AC5MK54DU-1769925864.383309.json                675B  2026-02-01 18:17
   slack-C0AC5MK54DU.json                                 10.2K  2026-02-01 18:17
-  terminal-chat.json                                    118.2K  2026-02-06 11:14
+  terminal-chat.json                                    118.2K  2026-02-08 16:31
   web-589ba3bd-65ea-414a-a686-6b1c47b11955.json           777B  2026-02-05 10:34
   web-8105c585-9de4-4f87-8617-41a6bf38ae4b.json           2.2K  2026-02-05 10:34
   web-ceea-02f7-02a8-3e61.json                            1.5K  2026-02-05 10:34
@@ -65,6 +73,7 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   kemet-weekly-report                       0 9 * * 1             enabled
   market-alerts                             0 */6 * * *           enabled
   Radio Boy AI Agent Design Meeting with Max  0 10 3 2 *            enabled
+  system_stability_monitor                  */15 * * * *          enabled
   weekly-african-markets                    0 9 * * 1             enabled
   weekly-economic-deep-dive                 0 9 * * 1             enabled
   weekly-startup-scan                       0 9 * * 1             enabled
@@ -73,7 +82,7 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   CONTENT CACHE (~/.alex/cache/content/)
 ────────────────────────────────────────────────────────────────────────
 
-  Files: 25  |  Total size: 104K
+  Files: 44  |  Total size: 180K
   (Auto-cleaned: 3-day TTL, 50-entry cap)
 
 ────────────────────────────────────────────────────────────────────────
@@ -91,10 +100,10 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   FILE                                                    SIZE  PURPOSE
   ────                                        ────  ───────
   datasets/apify_docs.json                              390.2K  Reference data
-  terminal-queue.json                                     2077B  Heartbeat msgs for desktop terminal
+  terminal-queue.json                                        2B  Heartbeat msgs for desktop terminal
   logs/inbox-seen.json                                     152B  Processed message tracking
 
 ================================================================================
   END OF INDEX
-  Next auto-update: 03:30
+  Next auto-update: 23:30
 ================================================================================

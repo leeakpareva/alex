@@ -223,7 +223,7 @@ import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
 import { createChatSystem, getDailyTokenStats, getLifetimeTokenStats, getTokenStatsBySource, smartSplit, selectModel } from './chat.js';
 import { processUploadedFile } from './document-processor.js';
-import { runRalphReview } from './ralph.js';
+import { runRalphReview, getRalphHistory, migrateExistingReviews } from './ralph.js';
 import { init as initJournal, appendExchange, writeDiaryEntry, loadShortCache, forceSaveChat, getLastDailyLines, getDiaryContext, modelLabel as journalModelLabel, setJournalRedis, runChurn } from './daily-journal.js';
 
 // ============================================================================
@@ -296,7 +296,13 @@ const dashState = {
     heartbeats: [],
     services: [],
     apify: { total_calls: 0, total_results: 0, last_call: null },
-    ralph: { last_run: null, status: 'pending', issues: [], fixes: [], health: '', review_date: null },
+    ralph: {
+        last_run: null, status: 'pending', issues: [], fixes: [], health: '',
+        health_score: null, review_date: null,
+        history: [],
+        stats: {},
+        current_focus: null, progress: null,
+    },
     last_updated: new Date().toISOString(),
 };
 
@@ -497,7 +503,36 @@ function isLimitedCommand(text) {
 }
 
 function setupTelegram() {
-    bot = new TelegramBot(config.telegram_bot_token, { polling: true });
+    const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+
+    if (webhookUrl) {
+        // Webhook mode — don't poll, receive updates via /api/telegram endpoint
+        bot = new TelegramBot(config.telegram_bot_token);
+        const secret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+        const whOpts = secret ? { secret_token: secret } : {};
+        bot.setWebHook(webhookUrl, whOpts).then(() => {
+            console.log(`[TELEGRAM] Webhook set: ${webhookUrl}`);
+        }).catch(err => {
+            console.error('[TELEGRAM] Failed to set webhook:', err.message);
+        });
+    } else {
+        // Polling mode (Pi default)
+        bot = new TelegramBot(config.telegram_bot_token, { polling: true });
+
+        // Suppress 409 Conflict spam (caused by another instance polling the same bot token)
+        let last409Warn = 0;
+        bot.on('polling_error', (err) => {
+            if (err?.message?.includes('409 Conflict')) {
+                const now = Date.now();
+                if (now - last409Warn > 300000) { // Log once every 5 minutes
+                    console.warn('[TELEGRAM] 409 Conflict — another instance is polling this bot token. Set TELEGRAM_ENABLED=false on the other instance.');
+                    last409Warn = now;
+                }
+                return; // Suppress individual 409 log lines
+            }
+            console.error('[TELEGRAM] Polling error:', err.message || err);
+        });
+    }
 
     bot.onText(/\/start/, async (msg) => {
         const chatId = msg.chat.id;
@@ -4985,54 +5020,99 @@ Call the send_email tool now with exactly these parameters.`;
                         return;
                     }
                     if (taskName === 'ralph-review') {
+                        // Set running state immediately and push to dashboard
+                        dashState.ralph.status = 'running';
+                        dashState.ralph.current_focus = 'Analyzing diary & feedback...';
+                        dashState.ralph.progress = 0;
+                        if (redis) {
+                            dashState.last_updated = new Date().toISOString();
+                            redis.set('dash:data', JSON.stringify(dashState)).catch(() => {});
+                        }
+
                         runRalphReview({
                             callAnthropicQueued: chatSystem.callAnthropicQueued,
                             config,
                             db,
-                        }).then(result => {
-                            // Parse Ralph's markdown output for dashboard
+                        }).then(async (result) => {
+                            // Parse structured JSON from <ralph-json> tags
+                            let structured = null;
+                            const jsonMatch = result?.match(/<ralph-json>([\s\S]*?)<\/ralph-json>/);
+                            if (jsonMatch) {
+                                try { structured = JSON.parse(jsonMatch[1].trim()); } catch {}
+                            }
+
+                            // Build issues/fixes arrays (structured or fallback to markdown)
                             const issues = [];
                             const fixes = [];
                             let health = '';
-                            if (result) {
+                            let healthScore = structured?.health_score ?? null;
+
+                            if (structured && structured.issues) {
+                                for (const i of structured.issues) {
+                                    issues.push({ text: i.text, category: i.category || 'quality' });
+                                }
+                            } else if (result) {
                                 const issueMatch = result.match(/### Issues Found\n([\s\S]*?)(?=###|$)/);
                                 if (issueMatch) {
                                     for (const line of issueMatch[1].split('\n')) {
                                         const trimmed = line.replace(/^[-*]\s*/, '').trim();
-                                        if (trimmed) issues.push(trimmed);
+                                        if (trimmed) issues.push({ text: trimmed, category: 'quality' });
                                     }
                                 }
+                            }
+
+                            if (structured && structured.fixes) {
+                                for (const f of structured.fixes) {
+                                    fixes.push({ text: f.text, status: f.status || 'proposed' });
+                                }
+                            } else if (result) {
                                 const fixMatch = result.match(/### Proposed Fixes\n([\s\S]*?)(?=###|$)/);
                                 if (fixMatch) {
                                     for (const line of fixMatch[1].split('\n')) {
                                         const trimmed = line.replace(/^\d+\.\s*/, '').trim();
-                                        if (trimmed) fixes.push(trimmed);
+                                        if (trimmed) fixes.push({ text: trimmed, status: 'proposed' });
                                     }
                                 }
-                                const healthMatch = result.match(/### Overall Health\n([\s\S]*?)$/);
+                            }
+
+                            if (result) {
+                                const healthMatch = result.match(/### Overall Health\n([\s\S]*?)(?=<ralph-json>|$)/);
                                 if (healthMatch) health = healthMatch[1].trim();
                             }
+
+                            // Load history for dashboard
+                            let historyData = { history: [], stats: {} };
+                            try { historyData = await getRalphHistory(); } catch {}
+
                             dashState.ralph = {
                                 last_run: new Date().toISOString(),
                                 status: 'completed',
                                 issues,
                                 fixes,
                                 health,
+                                health_score: healthScore,
                                 review_date: new Date().toISOString().split('T')[0],
+                                history: historyData.history,
+                                stats: historyData.stats,
+                                current_focus: null,
+                                progress: null,
                             };
                             scheduleDashPush();
 
                             // Notify owner if configured
                             if (config.telegram_notify_tasks && config.telegram_owner_id && bot && result) {
-                                const msg = `<b>Ralph Self-Improvement Review</b>\n\n${result.substring(0, 3500)}`;
+                                const cleanResult = result.replace(/<ralph-json>[\s\S]*?<\/ralph-json>/, '').trim();
+                                const msg = `<b>Ralph Self-Improvement Review</b>\n\n${cleanResult.substring(0, 3500)}`;
                                 bot.sendMessage(config.telegram_owner_id, msg, { parse_mode: 'HTML' }).catch(() => {
-                                    bot.sendMessage(config.telegram_owner_id, `Ralph Self-Improvement Review\n\n${result.substring(0, 3500)}`).catch(() => {});
+                                    bot.sendMessage(config.telegram_owner_id, `Ralph Self-Improvement Review\n\n${cleanResult.substring(0, 3500)}`).catch(() => {});
                                 });
                             }
                         }).catch(err => {
                             dashState.ralph.status = 'failed';
                             dashState.ralph.last_run = new Date().toISOString();
                             dashState.ralph.health = `Failed: ${err.message}`;
+                            dashState.ralph.current_focus = null;
+                            dashState.ralph.progress = null;
                             scheduleDashPush();
                             console.error('[RALPH] Failed:', err.message);
                         });
@@ -5140,6 +5220,29 @@ Call the send_email tool now with exactly these parameters.`;
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ messages: [] }));
             }
+
+        } else if (req.method === 'POST' && req.url === '/api/telegram') {
+            // Telegram webhook endpoint
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const update = JSON.parse(body);
+                    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+                    if (secret && req.headers['x-telegram-bot-api-secret-token'] !== secret) {
+                        res.writeHead(403);
+                        res.end('Forbidden');
+                        return;
+                    }
+                    bot.processUpdate(update);
+                    res.writeHead(200);
+                    res.end('OK');
+                } catch (err) {
+                    console.error('[WEBHOOK] Error:', err.message);
+                    res.writeHead(200);
+                    res.end('OK'); // Always 200 to prevent Telegram retries
+                }
+            });
 
         } else {
             res.writeHead(404);
@@ -5439,8 +5542,25 @@ async function init() {
         getDailyContext: getDiaryContext,
     });
 
-    // Setup Telegram
-    setupTelegram();
+    // Setup Telegram (disabled via TELEGRAM_ENABLED=false for Railway/secondary instances)
+    const telegramEnabled = process.env.TELEGRAM_ENABLED !== 'false';
+    if (telegramEnabled) {
+        setupTelegram();
+    } else {
+        console.log('[TELEGRAM] Disabled via TELEGRAM_ENABLED=false — running in API-only mode');
+        // Create a no-op bot stub so the rest of the codebase doesn't crash
+        bot = {
+            sendMessage: async () => ({}),
+            sendPhoto: async () => ({}),
+            sendDocument: async () => ({}),
+            sendVoice: async () => ({}),
+            sendChatAction: async () => ({}),
+            setMyCommands: async () => ({}),
+            onText: () => {},
+            on: () => {},
+            _events: {},
+        };
+    }
 
     // Setup Control API on port 9090
     setupControlAPI();
@@ -5482,7 +5602,7 @@ async function init() {
     postDashboard('update_services', { services: [
         { name: 'ALEX Gateway', port: 'systemd', status: 'online' },
         { name: 'Upstash Redis', port: 'cloud', status: 'online' },
-        { name: 'Telegram Bot', port: 'polling', status: 'online' },
+        { name: 'Telegram Bot', port: 'polling', status: telegramEnabled ? 'online' : 'disabled' },
         { name: 'Gmail Inbox', port: 'IMAP', status: config.gmail_address ? 'online' : 'disabled' },
         { name: 'Slack Bot', port: 'polling', status: config.slack_token ? 'online' : 'disabled' },
     ]});
@@ -5507,9 +5627,10 @@ async function init() {
     // Conversation starters after idle (owner only, 9am-6pm, max once per day)
     let lastStarterDate = null;
 
-    // Track owner message times
+    // Track owner message times (only when Telegram is active)
     const origSetup = bot._events?.message;
     setInterval(async () => {
+        if (!telegramEnabled) return;
         if (config.do_not_disturb) return;
         if (!config.telegram_owner_id) return;
 
@@ -5540,6 +5661,17 @@ async function init() {
         }
     }, 7200000); // Check every 2 hours
 
+    // Ralph: migrate existing reviews and load history into dashState
+    try {
+        await migrateExistingReviews();
+        const ralphData = await getRalphHistory();
+        dashState.ralph.history = ralphData.history;
+        dashState.ralph.stats = ralphData.stats;
+        console.log(`[RALPH] Loaded ${ralphData.history.length} history entries`);
+    } catch (err) {
+        console.error('[RALPH] History load failed:', err.message);
+    }
+
     console.log('');
     console.log('ALEX is now online and ready!');
     console.log(`Workspace: ${WORKSPACE_PATH}`);
@@ -5558,8 +5690,13 @@ async function gracefulShutdown(signal) {
     try {
         // Stop accepting new Telegram messages
         if (bot) {
-            bot.stopPolling();
-            console.log('[SHUTDOWN] Telegram polling stopped');
+            if (process.env.TELEGRAM_WEBHOOK_URL) {
+                await bot.deleteWebHook().catch(() => {});
+                console.log('[SHUTDOWN] Webhook removed');
+            } else {
+                bot.stopPolling();
+                console.log('[SHUTDOWN] Telegram polling stopped');
+            }
         }
         // Disconnect local Redis
         if (localRedis) {

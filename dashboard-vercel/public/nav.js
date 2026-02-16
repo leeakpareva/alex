@@ -113,4 +113,41 @@
   document.getElementById('nav-toggle').addEventListener('click', function() {
     document.getElementById('nav-links').classList.toggle('open');
   });
+
+  // Cookie consent banner
+  if (!localStorage.getItem('alex-cookie-consent')) {
+    const banner = document.createElement('div');
+    banner.id = 'cookie-banner';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;justify-content:center">
+        <span style="font-size:0.8rem;color:oklch(0.85 0.02 290);flex:1;min-width:200px">
+          This site uses cookies and local storage for functionality and analytics.
+        </span>
+        <button id="cookie-accept" style="
+          background:oklch(0.75 0.25 330);color:#fff;border:none;padding:0.45rem 1.25rem;
+          border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;
+          transition:background 0.2s;
+        ">Accept</button>
+      </div>
+    `;
+    const bStyle = document.createElement('style');
+    bStyle.textContent = `
+      #cookie-banner {
+        position:fixed;bottom:0;left:0;right:0;z-index:10000;
+        background:oklch(0.1 0.02 290 / 0.85);
+        backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+        border-top:1px solid oklch(0.3 0.08 290);
+        padding:0.75rem 1.25rem;
+        animation:cookieSlide 0.4s ease-out;
+      }
+      #cookie-accept:hover { background:oklch(0.8 0.25 330); }
+      @keyframes cookieSlide { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
+    `;
+    document.head.appendChild(bStyle);
+    document.body.appendChild(banner);
+    document.getElementById('cookie-accept').addEventListener('click', function() {
+      localStorage.setItem('alex-cookie-consent', '1');
+      banner.remove();
+    });
+  }
 })();

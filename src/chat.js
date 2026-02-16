@@ -108,6 +108,11 @@ export function stripAnnotationTags(text) {
     return cleaned;
 }
 
+// Server-side tool types that must be stripped from conversation history
+// (e.g. web_search added by Anthropic API, not by our tool definitions)
+const SERVER_TOOL_TYPES = new Set(['web_search', 'server_tool_use']);
+const SERVER_RESULT_TYPES = new Set(['web_search_tool_result', 'server_tool_result']);
+
 export function sanitizeAssistantMessage(msg) {
     if (!msg || msg.role !== 'assistant') return msg;
 
@@ -116,12 +121,19 @@ export function sanitizeAssistantMessage(msg) {
     }
 
     if (Array.isArray(msg.content)) {
-        const content = msg.content.map(block => {
-            if (block.type === 'text' && typeof block.text === 'string') {
-                return { ...block, text: stripAnnotationTags(block.text) };
-            }
-            return block;
-        });
+        // Strip server-side tool blocks (web_search etc.) and collect their IDs
+        const content = msg.content
+            .filter(block => !SERVER_TOOL_TYPES.has(block.type))
+            .map(block => {
+                if (block.type === 'text' && typeof block.text === 'string') {
+                    return { ...block, text: stripAnnotationTags(block.text) };
+                }
+                return block;
+            });
+        // If all content was stripped, add a placeholder
+        if (content.length === 0) {
+            return { ...msg, content: [{ type: 'text', text: '(search results processed)' }] };
+        }
         return { ...msg, content };
     }
 
@@ -663,14 +675,19 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
     }
 
     /**
-     * Remove orphaned tool_result messages from a recent message window
+     * Remove orphaned tool_result messages and server-side tool blocks from a recent message window.
+     * Server-side tools (web_search etc.) are injected by Anthropic's API but cause 400 errors
+     * when replayed without the corresponding tool definition.
      */
     function sanitizeRecent(msgs) {
         const toolUseIds = new Set();
+        const serverToolIds = new Set();
         for (const msg of msgs) {
             if (msg.role === 'assistant' && Array.isArray(msg.content)) {
                 for (const b of msg.content) {
                     if (b.type === 'tool_use') toolUseIds.add(b.id);
+                    // Track server-side tool IDs so we can strip their results too
+                    if (SERVER_TOOL_TYPES.has(b.type) && b.id) serverToolIds.add(b.id);
                 }
             }
         }
@@ -682,6 +699,14 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
             return true;
         }).map(msg => {
             const cleanedMsg = sanitizeAssistantMessage(msg);
+            // Strip server-side tool results from user messages
+            if (cleanedMsg.role === 'user' && Array.isArray(cleanedMsg.content)) {
+                const stripped = cleanedMsg.content.filter(b =>
+                    !SERVER_RESULT_TYPES.has(b.type) && !(b.type === 'tool_result' && serverToolIds.has(b.tool_use_id))
+                );
+                if (stripped.length === 0) return null; // Mark for removal
+                return { ...cleanedMsg, content: stripped };
+            }
             // Fix empty text content blocks — Anthropic rejects these
             if (Array.isArray(cleanedMsg.content)) {
                 const fixed = cleanedMsg.content.map(b =>
@@ -693,7 +718,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
                 return { ...cleanedMsg, content: '(empty)' };
             }
             return cleanedMsg;
-        });
+        }).filter(Boolean);
     }
 
     async function callDeepSeek(messages, systemPrompt, context = {}) {
