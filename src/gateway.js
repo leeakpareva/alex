@@ -502,6 +502,50 @@ function isLimitedCommand(text) {
     return LIMITED_USER_ALLOWED_COMMANDS.has(cmd);
 }
 
+// Redis-based polling lock — ensures only one instance polls Telegram at a time.
+// Both Pi and Railway share Upstash Redis. The lock holder refreshes every 30s
+// with a 90s TTL. If the holder dies, the lock expires and another instance claims it.
+const POLL_LOCK_KEY = 'telegram:poll-lock';
+const POLL_LOCK_TTL = 90; // seconds
+const POLL_LOCK_REFRESH = 30000; // ms
+const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
+let pollLockInterval = null;
+
+async function tryAcquirePollLock() {
+    if (!redis) return true; // No shared Redis — allow polling (single instance)
+    try {
+        // SET NX with TTL — only succeeds if key doesn't exist
+        const result = await redis.set(POLL_LOCK_KEY, INSTANCE_ID, { nx: true, ex: POLL_LOCK_TTL });
+        return result === 'OK' || result === true;
+    } catch {
+        return true; // Redis down — allow polling as fallback
+    }
+}
+
+async function refreshPollLock() {
+    if (!redis) return true;
+    try {
+        const owner = await redis.get(POLL_LOCK_KEY);
+        if (owner === INSTANCE_ID) {
+            await redis.expire(POLL_LOCK_KEY, POLL_LOCK_TTL);
+            return true;
+        }
+        return false; // Someone else owns it
+    } catch {
+        return true;
+    }
+}
+
+async function releasePollLock() {
+    if (!redis) return;
+    try {
+        const owner = await redis.get(POLL_LOCK_KEY);
+        if (owner === INSTANCE_ID) {
+            await redis.del(POLL_LOCK_KEY);
+        }
+    } catch { /* best effort */ }
+}
+
 async function setupTelegram() {
     const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
@@ -516,58 +560,79 @@ async function setupTelegram() {
             console.error('[TELEGRAM] Failed to set webhook:', err.message);
         });
     } else {
-        // Pi mode — auto-detect if another instance owns the webhook
+        // Auto-detect: check for active webhook first, then try Redis polling lock
         bot = new TelegramBot(config.telegram_bot_token);
+
+        // Check if another instance has set a Telegram webhook
         let webhookActive = false;
         try {
             const info = await bot.getWebHookInfo();
             if (info.url) {
                 webhookActive = true;
-                console.log(`[TELEGRAM] Webhook active (${info.url}) — running in API-only mode, no polling`);
+                console.log(`[TELEGRAM] Webhook active (${info.url}) — API-only mode, no polling`);
             }
         } catch (err) {
             console.warn('[TELEGRAM] Could not check webhook status:', err.message);
         }
 
         if (!webhookActive) {
-            // No webhook set — safe to poll
-            bot = new TelegramBot(config.telegram_bot_token, { polling: true });
-            console.log('[TELEGRAM] No webhook detected — polling mode');
+            // No webhook — try to acquire the Redis polling lock
+            const gotLock = await tryAcquirePollLock();
+            if (gotLock) {
+                bot = new TelegramBot(config.telegram_bot_token, { polling: true });
+                console.log(`[TELEGRAM] Polling lock acquired (${INSTANCE_ID}) — polling mode`);
 
-            let last409Warn = 0;
-            bot.on('polling_error', (err) => {
-                if (err?.message?.includes('409 Conflict')) {
-                    const now = Date.now();
-                    if (now - last409Warn > 300000) {
-                        console.warn('[TELEGRAM] 409 Conflict — another instance is polling this bot token');
-                        last409Warn = now;
+                bot.on('polling_error', (err) => {
+                    if (err?.message?.includes('409 Conflict')) return; // suppress
+                    console.error('[TELEGRAM] Polling error:', err.message || err);
+                });
+
+                // Refresh the lock periodically
+                pollLockInterval = setInterval(async () => {
+                    const stillOwner = await refreshPollLock();
+                    if (!stillOwner && bot.isPolling()) {
+                        bot.stopPolling();
+                        console.log('[TELEGRAM] Lost polling lock — another instance took over, stopped polling');
+                    }
+                }, POLL_LOCK_REFRESH);
+            } else {
+                console.log('[TELEGRAM] Another instance holds the polling lock — API-only mode');
+            }
+        }
+
+        // Periodic check: claim polling if lock is free and we're not polling
+        setInterval(async () => {
+            try {
+                // Skip if webhook mode or already polling
+                if (process.env.TELEGRAM_WEBHOOK_URL) return;
+                const info = await bot.getWebHookInfo();
+                if (info.url) {
+                    // Webhook appeared — stop polling if we are
+                    if (bot.isPolling()) {
+                        bot.stopPolling();
+                        await releasePollLock();
+                        console.log(`[TELEGRAM] Webhook detected (${info.url}) — stopped polling`);
                     }
                     return;
                 }
-                console.error('[TELEGRAM] Polling error:', err.message || err);
-            });
-        }
-
-        // Periodically re-check webhook status (every 5 min)
-        // If webhook disappears (Railway down), start polling. If webhook appears, stop polling.
-        setInterval(async () => {
-            try {
-                const info = await bot.getWebHookInfo();
-                const hasWebhook = !!info.url;
-                const isPolling = bot.isPolling();
-
-                if (hasWebhook && isPolling) {
-                    // Railway came online — stop polling to avoid 409s
-                    bot.stopPolling();
-                    console.log(`[TELEGRAM] Webhook detected (${info.url}) — stopped polling`);
-                } else if (!hasWebhook && !isPolling && !process.env.TELEGRAM_WEBHOOK_URL) {
-                    // Railway went down, webhook cleared — resume polling
-                    console.log('[TELEGRAM] No webhook detected — resuming polling');
-                    bot.startPolling();
+                // No webhook — try to claim lock if we're not polling
+                if (!bot.isPolling()) {
+                    const got = await tryAcquirePollLock();
+                    if (got) {
+                        bot.startPolling();
+                        console.log(`[TELEGRAM] Claimed polling lock (${INSTANCE_ID}) — resumed polling`);
+                        if (!pollLockInterval) {
+                            pollLockInterval = setInterval(async () => {
+                                const stillOwner = await refreshPollLock();
+                                if (!stillOwner && bot.isPolling()) {
+                                    bot.stopPolling();
+                                    console.log('[TELEGRAM] Lost polling lock — stopped polling');
+                                }
+                            }, POLL_LOCK_REFRESH);
+                        }
+                    }
                 }
-            } catch {
-                // Silent — don't spam logs on transient failures
-            }
+            } catch { /* silent */ }
         }, 300000); // 5 minutes
     }
 
@@ -5725,14 +5790,16 @@ async function gracefulShutdown(signal) {
     postDashboard('add_activity', { entry: `ALEX shutting down (${signal})` });
 
     try {
-        // Stop accepting new Telegram messages
+        // Stop accepting new Telegram messages + release polling lock
         if (bot) {
             if (process.env.TELEGRAM_WEBHOOK_URL) {
                 await bot.deleteWebHook().catch(() => {});
                 console.log('[SHUTDOWN] Webhook removed');
             } else {
-                bot.stopPolling();
-                console.log('[SHUTDOWN] Telegram polling stopped');
+                if (bot.isPolling()) bot.stopPolling();
+                await releasePollLock();
+                if (pollLockInterval) clearInterval(pollLockInterval);
+                console.log('[SHUTDOWN] Telegram polling stopped, lock released');
             }
         }
         // Disconnect local Redis
