@@ -1237,25 +1237,28 @@ export async function executeTool(name, input, { memory, skills, config, schedul
                 const taskFile = path.join(tasksDir, `${input.name}.json`);
                 await fs.writeFile(taskFile, JSON.stringify(input, null, 2));
 
-                // Update system cron file for user tasks
-                const cronFile = '/etc/cron.d/alex-tasks';
-                const cronLine = `# ${input.name}\n${input.cron_expression}  head  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"${input.name}"}' >> /home/head/.alex/logs/cron.log 2>&1\n`;
-                try {
-                    let existing = '';
-                    try { existing = await fs.readFile(cronFile, 'utf-8'); } catch {}
-                    // Remove old entry for this task if present
-                    const lines = existing.split('\n');
-                    const filtered = [];
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i] === `# ${input.name}`) { i++; continue; } // skip comment + cron line
-                        if (lines[i].trim()) filtered.push(lines[i]);
+                // Update system cron file for user tasks (Pi only — Railway uses internal scheduler)
+                const isRailway = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_SERVICE_NAME;
+                if (!isRailway) {
+                    const cronFile = '/etc/cron.d/alex-tasks';
+                    const cronUser = process.env.ALEX_CRON_USER || 'head';
+                    const logPath = path.join(WORKSPACE_PATH, 'logs', 'cron.log');
+                    const cronLine = `# ${input.name}\n${input.cron_expression}  ${cronUser}  curl -sf --retry 3 --retry-delay 30 --retry-connrefused -X POST http://127.0.0.1:9090/api/trigger -H 'Content-Type: application/json' -d '{"task":"${input.name}"}' >> ${logPath} 2>&1\n`;
+                    try {
+                        let existing = '';
+                        try { existing = await fs.readFile(cronFile, 'utf-8'); } catch {}
+                        const lines = existing.split('\n');
+                        const filtered = [];
+                        for (let i = 0; i < lines.length; i++) {
+                            if (lines[i] === `# ${input.name}`) { i++; continue; }
+                            if (lines[i].trim()) filtered.push(lines[i]);
+                        }
+                        const header = 'SHELL=/bin/bash\nPATH=/usr/local/bin:/usr/bin:/bin\n';
+                        const newContent = header + '\n' + filtered.filter(l => l !== 'SHELL=/bin/bash' && l !== 'PATH=/usr/local/bin:/usr/bin:/bin').join('\n') + '\n' + cronLine;
+                        await fs.writeFile(cronFile, newContent);
+                    } catch (cronErr) {
+                        console.error('[CRON] Failed to update cron file:', cronErr.message);
                     }
-                    const header = 'SHELL=/bin/bash\nPATH=/usr/local/bin:/usr/bin:/bin\n';
-                    const newContent = header + '\n' + filtered.filter(l => l !== 'SHELL=/bin/bash' && l !== 'PATH=/usr/local/bin:/usr/bin:/bin').join('\n') + '\n' + cronLine;
-                    await fs.writeFile(cronFile, newContent);
-                } catch (cronErr) {
-                    console.error('[CRON] Failed to update cron file:', cronErr.message);
-                    // Task JSON is saved, cron file update failed — not fatal
                 }
 
                 scheduledTasks.set(input.name, true);

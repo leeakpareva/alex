@@ -369,12 +369,19 @@ export async function runDashboardSync() {
         const { promisify } = await import('util');
         const execAsync = promisify(execCb);
 
-        // Services check
-        const alexActive = await execAsync('systemctl is-active alex.service').then(() => 'online').catch(() => 'offline');
+        // Services check — detect Railway vs Pi
+        const isRailway = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_SERVICE_NAME;
+        let alexActive;
+        if (isRailway) {
+            alexActive = 'online'; // If this code is running on Railway, we're online
+        } else {
+            alexActive = await execAsync('systemctl is-active alex.service').then(() => 'online').catch(() => 'offline');
+        }
+        const telegramMode = process.env.TELEGRAM_WEBHOOK_URL ? 'webhook' : 'polling';
         dashPost('update_services', { services: [
-            { name: 'ALEX Gateway', port: 'systemd', status: alexActive },
+            { name: 'ALEX Gateway', port: isRailway ? 'railway' : 'systemd', status: alexActive },
             { name: 'Upstash Redis', port: 'cloud', status: 'online' },
-            { name: 'Telegram Bot', port: 'polling', status: alexActive },
+            { name: 'Telegram Bot', port: telegramMode, status: alexActive },
         ]});
         dashPost('set_status', { status: alexActive });
 
@@ -448,7 +455,8 @@ export async function runDashboardSync() {
 
             // Git commits
             try {
-                const { stdout } = await execAsync('git log --max-count=30 --format="%H|%h|%s|%an|%aI|%D"', { cwd: '/home/head/navada-1' });
+                const repoPath = process.env.ALEX_REPO_PATH || process.cwd();
+                const { stdout } = await execAsync('git log --max-count=30 --format="%H|%h|%s|%an|%aI|%D"', { cwd: repoPath });
                 const commits = stdout.trim().split('\n').filter(l => l).map(line => {
                     const [hash, short_hash, message, author, date, refs] = line.split('|');
                     return { hash, short_hash, message, author, date, refs: refs || '' };
