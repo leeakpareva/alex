@@ -305,7 +305,7 @@ export async function runChurn(callAnthropicQueued) {
             const diaryContent = await fs.readFile(PROGRESS_FILE, 'utf-8');
             if (diaryContent.trim().length > 50) {
                 const result = await callAnthropicQueued({
-                    model: 'claude-3-5-haiku-20241022',
+                    model: 'claude-haiku-4-5-20251001',
                     max_tokens: 800,
                     messages: [{
                         role: 'user',

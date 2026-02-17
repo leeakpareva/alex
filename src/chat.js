@@ -40,7 +40,7 @@ export async function logTokenUsage(model, usage, context = {}) {
 
 // Pricing: USD per 1M tokens, converted to GBP at 0.79
 const MODEL_PRICING = {
-    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
     'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
     'deepseek-chat': { input: 0.14, output: 0.28 },
     'gpt-4o': { input: 2.50, output: 10.00 },
@@ -67,7 +67,7 @@ const USD_TO_GBP = 0.79;
 
 function getModelPricing(model) {
     if (MODEL_PRICING[model]) return MODEL_PRICING[model];
-    if (model.includes('haiku')) return MODEL_PRICING['claude-3-5-haiku-20241022'];
+    if (model.includes('haiku')) return MODEL_PRICING['claude-haiku-4-5-20251001'];
     if (model.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4-20250514'];
     if (model.includes('deepseek')) return MODEL_PRICING['deepseek-chat'];
     if (model.startsWith('kimi')) return MODEL_PRICING['kimi-k2'];
@@ -83,7 +83,7 @@ function getModelPricing(model) {
     if (model.includes('mistral')) return MODEL_PRICING['mistralai/mistral-large-2411'];
     if (model.includes('qwen')) return MODEL_PRICING['qwen/qwen-2.5-72b-instruct'];
     // Default to Haiku pricing for unknown models
-    return MODEL_PRICING['claude-3-5-haiku-20241022'];
+    return MODEL_PRICING['claude-haiku-4-5-20251001'];
 }
 
 function calcCostGbp(inputTokens, outputTokens, pricing) {
@@ -348,7 +348,7 @@ const DEEPSEEK_PATTERNS = [
 // Models with full tool/function calling support
 const TOOL_ENABLED_MODELS = new Set([
     'claude-sonnet-4-20250514',
-    'claude-3-5-haiku-20241022',
+    'claude-haiku-4-5-20251001',
     'claude-opus-4-5-20251101',
     'kimi-k2',
     'kimi-k2-thinking',
@@ -397,7 +397,7 @@ const EXPLICIT_OVERRIDES = [
     { pattern: /\buse deepseek\b/i, model: 'deepseek-chat', label: 'deepseek-chat (explicit)' },
     // Claude models
     { pattern: /\buse (claude|sonnet)\b/i, model: 'claude-sonnet-4-20250514', label: 'claude-sonnet-4 (explicit)' },
-    { pattern: /\buse haiku\b/i, model: 'claude-3-5-haiku-20241022', label: 'claude-3.5-haiku (explicit)' },
+    { pattern: /\buse haiku\b/i, model: 'claude-haiku-4-5-20251001', label: 'claude-haiku-4.5 (explicit)' },
     { pattern: /\buse opus\b/i, model: 'claude-opus-4-5-20251101', label: 'claude-opus-4.5 (explicit)' },
     // OpenRouter models
     { pattern: /\buse gemini[- ]?pro\b/i, model: 'google/gemini-2.5-pro', label: 'gemini-2.5-pro (explicit)' },
@@ -445,8 +445,8 @@ export function selectModel(userMessage) {
     if (msg.length < 80) {
         for (const pattern of HAIKU_PATTERNS) {
             if (pattern.test(msg)) {
-                console.log(`[MODEL] Selected claude-3.5-haiku for: "${msg.substring(0, 50)}"`);
-                return 'claude-3-5-haiku-20241022';
+                console.log(`[MODEL] Selected claude-haiku-4.5 for: "${msg.substring(0, 50)}"`);
+                return 'claude-haiku-4-5-20251001';
             }
         }
     }
@@ -458,8 +458,8 @@ export function selectModel(userMessage) {
     }
 
     // Default to Haiku (cost-efficient for simple/short messages)
-    console.log(`[MODEL] Selected claude-3.5-haiku (default) for: "${msg.substring(0, 50)}"`);
-    return 'claude-3-5-haiku-20241022';
+    console.log(`[MODEL] Selected claude-haiku-4.5 (default) for: "${msg.substring(0, 50)}"`);
+    return 'claude-haiku-4-5-20251001';
 }
 
 // ============================================================================
@@ -627,7 +627,7 @@ export function createChatSystem({ anthropic, openaiClient, deepseekClient, kimi
 
         try {
             const result = await callAnthropicQueued({
-                model: 'claude-3-5-haiku-20241022',
+                model: 'claude-haiku-4-5-20251001',
                 max_tokens: 800,
                 messages: [{ role: 'user', content: prompt }]
             }, 0); // lowest priority
@@ -1159,7 +1159,7 @@ ${contextBlock}`;
         let continueLoop = true;
         let currentResponse = response;
         const { messages } = chatId ? await memory.getConversation(chatId) : { messages: [] };
-        const model = modelId || 'claude-3-5-haiku-20241022';
+        const model = modelId || 'claude-haiku-4-5-20251001';
         const priority = isScheduled ? 1 : 10;
         let summary = existingSummary;
 
@@ -1382,7 +1382,7 @@ ${contextBlock}`;
                 return `${m.role}: ${t.substring(0, 200)}`;
             }).join('\n');
             callAnthropicQueued({
-                model: 'claude-3-5-haiku-20241022',
+                model: 'claude-haiku-4-5-20251001',
                 max_tokens: 400,
                 messages: [{ role: 'user', content: `Extract 2-5 novel, important facts from this conversation that are worth remembering long-term (user preferences, decisions, project details, key data). Return ONLY the facts as a bulleted list. If nothing notable, return "None".\n\n${recentText}` }]
             }, 0, { source: 'fact-extraction' }).then(async (result) => {

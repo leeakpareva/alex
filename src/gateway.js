@@ -4096,7 +4096,7 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
     const MODEL_OPTIONS = [
         { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing — Haiku default, Sonnet for complex tasks', price: '' },
         // Claude
-        { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast, cheap. Default for simple tasks', price: '$0.80/$4.00 per 1M' },
+        { key: 'haiku', label: 'Haiku', model: 'claude-haiku-4-5-20251001', desc: 'Fast, cheap. Default for simple tasks', price: '$0.80/$4.00 per 1M' },
         { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Best all-rounder. Research, reports, tool use', price: '$3.00/$15.00 per 1M' },
         { key: 'opus', label: 'Opus', model: 'claude-opus-4-5-20251101', desc: 'Maximum capability. Serious work only', price: '$15.00/$75.00 per 1M' },
         // OpenAI

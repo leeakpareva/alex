@@ -37,20 +37,20 @@ describe('maskSensitive', () => {
 
 describe('selectModel', () => {
     it('selects Haiku for greetings', () => {
-        expect(selectModel('hi')).toBe('claude-3-5-haiku-20241022');
-        expect(selectModel('hello')).toBe('claude-3-5-haiku-20241022');
-        expect(selectModel('thanks')).toBe('claude-3-5-haiku-20241022');
+        expect(selectModel('hi')).toBe('claude-haiku-4-5-20251001');
+        expect(selectModel('hello')).toBe('claude-haiku-4-5-20251001');
+        expect(selectModel('thanks')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('selects Haiku for confirmations (new patterns)', () => {
-        expect(selectModel('sounds good')).toBe('claude-3-5-haiku-20241022');
-        expect(selectModel('perfect')).toBe('claude-3-5-haiku-20241022');
-        expect(selectModel('noted')).toBe('claude-3-5-haiku-20241022');
+        expect(selectModel('sounds good')).toBe('claude-haiku-4-5-20251001');
+        expect(selectModel('perfect')).toBe('claude-haiku-4-5-20251001');
+        expect(selectModel('noted')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('selects Haiku for short simple questions (new patterns)', () => {
-        expect(selectModel('what time is it')).toBe('claude-3-5-haiku-20241022');
-        expect(selectModel('show me the tasks')).toBe('claude-3-5-haiku-20241022');
+        expect(selectModel('what time is it')).toBe('claude-haiku-4-5-20251001');
+        expect(selectModel('show me the tasks')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('selects DeepSeek for deep research', () => {
@@ -61,11 +61,11 @@ describe('selectModel', () => {
     it('respects explicit overrides', () => {
         expect(selectModel('use sonnet for this')).toBe('claude-sonnet-4-20250514');
         expect(selectModel('use gpt please')).toBe('gpt-5.2');
-        expect(selectModel('use haiku')).toBe('claude-3-5-haiku-20241022');
+        expect(selectModel('use haiku')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('defaults to Haiku for normal messages', () => {
-        expect(selectModel('what is the GDP of Nigeria this year and how does it compare')).toBe('claude-3-5-haiku-20241022');
+        expect(selectModel('what is the GDP of Nigeria this year and how does it compare')).toBe('claude-haiku-4-5-20251001');
     });
 });
 

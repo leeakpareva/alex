@@ -232,7 +232,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
 
         // Route to Haiku for simple tasks (stock checks, inbox review, followups) — 4x cheaper
         const useSonnet = SONNET_TASKS.has(task.name);
-        const model = useSonnet ? 'claude-sonnet-4-20250514' : 'claude-3-5-haiku-20241022';
+        const model = useSonnet ? 'claude-sonnet-4-20250514' : 'claude-haiku-4-5-20251001';
         const maxTokens = useSonnet ? 16384 : 8192;
 
         // Add cache_control to last tool for prompt caching
@@ -257,7 +257,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         if (finalText.length > 200) {
             try {
                 const factResult = await callAnthropicQueued({
-                    model: 'claude-3-5-haiku-20241022',
+                    model: 'claude-haiku-4-5-20251001',
                     max_tokens: 500,
                     messages: [{ role: 'user', content: `Extract the key data points from this AI agent output as a JSON array. Each item should have: topic (what it's about), value (the number/data), detail (brief context). Only include concrete facts with numbers or specific data. Return ONLY the JSON array, no explanation.\n\nOutput:\n${finalText.substring(0, 3000)}` }]
                 }, 0, { source: 'fact-extraction-cache' });
@@ -283,7 +283,7 @@ export async function handleScheduledTask(task, { callAnthropicQueued, processRe
         if (finalText.length > 200 && memory) {
             try {
                 const distillResult = await callAnthropicQueued({
-                    model: 'claude-3-5-haiku-20241022',
+                    model: 'claude-haiku-4-5-20251001',
                     max_tokens: 400,
                     messages: [{ role: 'user', content: `Extract 1-3 key learnings worth remembering long-term from this task output. Focus on facts, trends, or insights that would be useful weeks or months from now. If nothing is novel or worth long-term retention, return exactly "None".\n\nTask: ${task.name}\nOutput:\n${finalText.substring(0, 3000)}` }]
                 }, 0, { source: 'knowledge-distill' });

@@ -213,7 +213,7 @@ export async function runRalphReview(deps) {
         ).join('\n')}`
         : '\n\nNo user feedback available yet.';
 
-    const model = config?._yaml?.ralph?.model || 'claude-3-5-haiku-20241022';
+    const model = config?._yaml?.ralph?.model || 'claude-haiku-4-5-20251001';
     const maxTokens = config?._yaml?.ralph?.max_tokens || 4096;
     const maxFixes = config?._yaml?.ralph?.max_fixes_per_run || 3;
 

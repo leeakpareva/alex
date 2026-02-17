@@ -19,7 +19,7 @@ const awaitingSlackModelSelect = new Set();
 
 const SLACK_MODEL_OPTIONS = [
     { key: 'auto', label: 'Auto', model: null, desc: 'Smart routing (default)' },
-    { key: 'haiku', label: 'Haiku', model: 'claude-3-5-haiku-20241022', desc: 'Fast & cheap' },
+    { key: 'haiku', label: 'Haiku', model: 'claude-haiku-4-5-20251001', desc: 'Fast & cheap' },
     { key: 'sonnet', label: 'Sonnet', model: 'claude-sonnet-4-20250514', desc: 'Balanced' },
     { key: 'opus', label: 'Opus', model: 'claude-opus-4-5-20251101', desc: 'Maximum capability' },
     { key: 'deepseek', label: 'DeepSeek', model: 'deepseek-chat', desc: 'Deep research' },
