@@ -1,7 +1,7 @@
 ================================================================================
   ALEX JSON FILE INDEX
-  Auto-generated: Monday 16 February 2026, 23:00:01
-  Total JSON files: 445 (+14 since last scan)
+  Auto-generated: Tuesday 17 February 2026, 00:00:01
+  Total JSON files: 429 (+15 since last scan)
 ================================================================================
 
 This file is automatically updated every 30 minutes.
@@ -36,7 +36,7 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   CONVERSATIONS (~/.alex/conversations/)
 ────────────────────────────────────────────────────────────────────────
 
-  Active: 21  |  Archived: 343
+  Active: 21  |  Archived: 347
 
   FILE                                                    SIZE  LAST MODIFIED
   ────                                        ────  ─────────────
@@ -45,12 +45,12 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   1495502708.json                                         898B  2026-02-06 13:49
   5393434524.json                                         2.9K  2026-02-06 19:30
   6470673789.json                                           3B  2026-02-01 18:17
-  6920669447.json                                        94.9K  2026-02-16 22:46
+  6920669447.json                                        96.0K  2026-02-16 23:23
   7399112985.json                                       139.7K  2026-02-01 18:17
   7603217134.json                                         4.2K  2026-02-02 11:17
   7796797076.json                                           3B  2026-02-01 18:17
   8462512192.json                                       155.1K  2026-02-01 18:17
-  control-api.json                                      120.3K  2026-02-16 22:57
+  control-api.json                                      121.5K  2026-02-16 23:04
   email-action-e_1770069984033.json                       8.8K  2026-02-02 22:08
   email-action-e_1770197242243.json                       2.7K  2026-02-04 09:28
   kemet-6920669447.json                                   4.8K  2026-02-04 11:54
@@ -82,7 +82,7 @@ Run manually: bash Alex-Scripts/update-json-index.sh
   CONTENT CACHE (~/.alex/cache/content/)
 ────────────────────────────────────────────────────────────────────────
 
-  Files: 44  |  Total size: 180K
+  Files: 24  |  Total size: 100K
   (Auto-cleaned: 3-day TTL, 50-entry cap)
 
 ────────────────────────────────────────────────────────────────────────
@@ -105,5 +105,5 @@ Run manually: bash Alex-Scripts/update-json-index.sh
 
 ================================================================================
   END OF INDEX
-  Next auto-update: 23:30
+  Next auto-update: 00:30
 ================================================================================
