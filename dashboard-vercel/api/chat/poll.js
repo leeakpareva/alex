@@ -36,6 +36,8 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       response: parsed.response,
+      attachments: parsed.attachments || [],
+      tools_used: parsed.tools_used || [],
       timestamp: parsed.timestamp,
       pending: false,
       status: 'complete',

@@ -216,8 +216,8 @@ import { createWriteStream } from 'fs';
 import https from 'https';
 import { MemorySystem } from './memory.js';
 import { SkillsSystem } from './skills.js';
-import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost, FULL_ACCESS_USERS } from './tools.js';
-import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, setDashPost, setRedis } from './heartbeat.js';
+import { TOOLS, executeTool, checkRAG, indexRAG, isRAGAvailable, setToolsDashPost, FULL_ACCESS_USERS, ASK_TOOLS } from './tools.js';
+import { handleScheduledTask, BUILTIN_TASKS, runDashboardSync, runCleanup, runCostMonitor, setDashPost, setRedis } from './heartbeat.js';
 import { setupInbox, startInboxPolling, setInboxChatSystem } from './inbox.js';
 import { setupSlack, startSlackPolling } from './slack.js';
 import { setupEmailFiling, setEmailFilingChatSystem, getEmailsByStatus, getEmailByNumber, getEmailById, actionEmail, getInboxSummary, archiveOldDone, clearEmailsByStatus, bulkUpdateStatus, deleteEmailByNumber, updateEmailStatus } from './email-filing.js';
@@ -274,6 +274,27 @@ const awaitingModelSelect = new Set(); // Chats waiting for model selection repl
 const recentUploads = new Map(); // chatId → [{ path, filename, timestamp }]
 let lastOwnerMessageTime = Date.now(); // Track owner activity for idle starters
 
+// Ask-before-send: pending actions awaiting owner approval
+const pendingActions = new Map();
+const PENDING_ACTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+let pendingActionCounter = 0;
+
+function createPendingAction(toolName, input, chatId) {
+    const actionId = `ask_${++pendingActionCounter}`;
+    let resolve;
+    const promise = new Promise(r => { resolve = r; });
+    const entry = { actionId, toolName, input, chatId, resolve, createdAt: Date.now() };
+    pendingActions.set(actionId, entry);
+    // Auto-timeout
+    setTimeout(() => {
+        if (pendingActions.has(actionId)) {
+            pendingActions.delete(actionId);
+            resolve({ success: false, error: 'Action timed out waiting for approval (5 min)' });
+        }
+    }, PENDING_ACTION_TIMEOUT_MS);
+    return { actionId, promise };
+}
+
 // KEMET Automotive authorized users (Lee, Nissi, Chopstix)
 const KEMET_AUTHORIZED_USERS = new Set([
     '6920669447',   // Lee (owner)
@@ -324,8 +345,10 @@ function scheduleDashPush() {
 // Chat system functions (initialized in init())
 let chatSystem = null;
 
-// Pending chart images to send after chat() completes
-let pendingCharts = [];
+// Pending chart images to send after chat() completes — keyed by request ID to prevent cross-request leaks
+const pendingCharts = new Map();
+function getPendingFiles(id) { if (!pendingCharts.has(id)) pendingCharts.set(id, []); return pendingCharts.get(id); }
+function drainPendingFiles(id) { const f = pendingCharts.get(id) || []; pendingCharts.delete(id); return f; }
 
 // ============================================================================
 // TOOL EXECUTION WRAPPER (passes dependencies)
@@ -342,7 +365,49 @@ function getUploadedFiles(chatId) {
 // Track the current caller's userId for tool permission checks
 let currentCallerUserId = null;
 
+// Track the current request ID for scoping pendingCharts
+let currentRequestId = null;
+
 async function execToolWithDeps(name, input) {
+    // Ask-before-send: require owner approval for external actions (non-scheduled only)
+    if (ASK_TOOLS.has(name) && currentCallerUserId && bot && config.telegram_owner_id) {
+        const preview = name === 'send_email'
+            ? `To: ${input.to || 'default'}\nSubject: ${input.subject || '(none)'}\nBody: ${(input.body || '').substring(0, 200)}...`
+            : `${name}: ${JSON.stringify(input).substring(0, 300)}`;
+
+        const { actionId, promise } = createPendingAction(name, input, config.telegram_owner_id);
+
+        try {
+            await bot.sendMessage(config.telegram_owner_id,
+                `<b>Confirm action: ${name}</b>\n\n<pre>${preview}</pre>`,
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: 'Approve', callback_data: `ask_approve_${actionId}` },
+                            { text: 'Deny', callback_data: `ask_deny_${actionId}` },
+                        ]]
+                    }
+                }
+            );
+        } catch (err) {
+            console.error('[ASK] Failed to send approval request:', err.message);
+            pendingActions.delete(actionId);
+            // Fall through to execute without approval
+        }
+
+        if (pendingActions.has(actionId)) {
+            const decision = await promise;
+            if (decision && decision.denied) {
+                return { success: false, error: 'Action denied by owner' };
+            }
+            if (decision && decision.error) {
+                return { success: false, error: decision.error };
+            }
+            // Approved or timed out with error — continue with execution
+        }
+    }
+
     const toolStart = Date.now();
     let result, toolError;
     try {
@@ -369,14 +434,27 @@ async function execToolWithDeps(name, input) {
             success: !toolError && !(result && result.success === false),
             error: toolError ? toolError.message : (result && result.success === false ? result.error : undefined),
         }).catch(() => {});
+
+        // Track tool usage for web chat requests
+        if (currentRequestId && currentRequestId.startsWith('web-') && !toolError) {
+            const webTracker = pendingCharts._toolTracker;
+            // Use a side-channel on the poller's requestToolsUsed map (set by the poller)
+            try {
+                const reqTools = globalThis.__webChatToolsUsed;
+                if (reqTools && reqTools.has(currentRequestId)) {
+                    reqTools.get(currentRequestId).push(name);
+                }
+            } catch {}
+        }
     }
-    // Queue files for sending after response completes
+    // Queue files for sending after response completes — scoped to current request
+    const fileQueue = getPendingFiles(currentRequestId || '_orphan');
     if (result && result.send_photo && result.path) {
-        pendingCharts.push({ type: 'photo', path: result.path, caption: result.caption || '' });
+        fileQueue.push({ type: 'photo', path: result.path, caption: result.caption || '' });
     } else if (result && result.send_voice && result.path) {
-        pendingCharts.push({ type: 'voice', path: result.path });
+        fileQueue.push({ type: 'voice', path: result.path });
     } else if (result && result.send_document && result.path) {
-        pendingCharts.push({ type: 'document', path: result.path, caption: result.caption || '' });
+        fileQueue.push({ type: 'document', path: result.path, caption: result.caption || '' });
     }
     return result;
 }
@@ -403,7 +481,23 @@ async function auditLog(entry) {
         const logDir = path.join(WORKSPACE_PATH, 'logs', 'audit');
         await mkdir(logDir, { recursive: true });
         const logFile = path.join(logDir, `audit_${date}.jsonl`);
-        await appendFile(logFile, JSON.stringify({ ...entry, timestamp: new Date().toISOString() }) + '\n');
+        const ts = new Date().toISOString();
+        await appendFile(logFile, JSON.stringify({ ...entry, timestamp: ts }) + '\n');
+
+        // Push to Redis for unified cross-channel audit view
+        if (redis) {
+            const auditEntry = {
+                channel: entry.channel || 'telegram',
+                type: entry.type,
+                user: entry.user || `${entry.first_name || 'Unknown'} (${entry.user_id || ''})`,
+                message: (entry.message || entry.response || '').slice(0, 200),
+                model: entry.model || null,
+                timestamp: ts,
+                meta: { chat_id: entry.chat_id, user_id: entry.user_id },
+            };
+            redis.lpush('audit:log', JSON.stringify(auditEntry)).catch(() => {});
+            redis.ltrim('audit:log', 0, 499).catch(() => {});
+        }
     } catch (err) {
         console.error('[AUDIT] Log error:', err.message);
     }
@@ -593,15 +687,14 @@ async function setupTelegram() {
                 bot = new TelegramBot(config.telegram_bot_token, { polling: true });
                 console.log(`[TELEGRAM] Polling lock acquired (${INSTANCE_ID}) — polling mode`);
 
-                // On ANY 409 → immediately stop polling and release lock
-                // (means another instance or webhook took over)
+                // On 409 → stop polling, log, and rely on failover timer to reclaim later
                 bot.on('polling_error', async (err) => {
                     if (err?.message?.includes('409 Conflict')) {
                         if (bot.isPolling()) {
                             bot.stopPolling();
                             await releasePollLock();
                             if (pollLockInterval) { clearInterval(pollLockInterval); pollLockInterval = null; }
-                            console.log('[TELEGRAM] 409 detected — stopped polling, released lock');
+                            console.log('[TELEGRAM] 409 detected — another instance is polling. Will retry via failover timer (5min).');
                         }
                         return;
                     }
@@ -1894,12 +1987,14 @@ Just message me naturally for anything else.`;
             let response;
             try {
                 currentCallerUserId = msg.from.id;
+                currentRequestId = 'test-' + chatId;
                 response = await chatSystem.chat(chatId,
                     'Generate a concise system test report covering: 1) System health (CPU, memory, disk, temp), 2) Service status (all running services), 3) Recent activity summary, 4) Tool availability check (test that bash, read_file, web_lookup, and fetch_url work), 5) API connectivity. Format as a clean status report. Be thorough but concise.',
                     msg.from
                 );
             } finally {
                 currentCallerUserId = null;
+                currentRequestId = null;
                 clearInterval(typingInterval);
             }
 
@@ -1908,8 +2003,8 @@ Just message me naturally for anything else.`;
                 await sendMarkdown(chatId, part);
             }
 
-            // Send any queued files
-            const files = pendingCharts.splice(0);
+            // Send any queued files — scoped to this test request
+            const files = drainPendingFiles('test-' + chatId);
             for (const file of files) {
                 try {
                     if (file.type === 'photo') await bot.sendPhoto(chatId, file.path, { caption: file.caption || undefined });
@@ -1952,14 +2047,16 @@ Just message me naturally for anything else.`;
         }
         await bot.sendMessage(chatId, `*Research task queued.*\n\nTopic: ${topic}\n\nI'll run a deep research pass and send findings when done.`, { parse_mode: 'Markdown' });
         // Fire research through the chat system asynchronously
+        currentRequestId = 'research-' + chatId;
         chatSystem.chat(`research-${chatId}`, `[RESEARCH REQUEST from Lee]\n\nConduct thorough research on: ${topic}\n\nSearch the web, analyse findings, save key facts to memory, and provide a comprehensive summary. Use charts or data tables where helpful.`, msg.from, { modelOverride: modelOverrides.get(chatId) })
             .then(async (response) => {
+                currentRequestId = null;
                 const parts = smartSplit(response, 4000);
                 for (const part of parts) {
                     await sendMarkdown(chatId, part);
                 }
-                // Send any queued files
-                const files = pendingCharts.splice(0);
+                // Send any queued files — scoped to this research request
+                const files = drainPendingFiles('research-' + chatId);
                 for (const file of files) {
                     try {
                         if (file.type === 'document') await bot.sendDocument(chatId, file.path, { caption: file.caption || undefined });
@@ -3585,6 +3682,28 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
             return;
         }
 
+        // Handle ask-before-send approval/denial buttons
+        if (data?.startsWith('ask_approve_') || data?.startsWith('ask_deny_')) {
+            const isApprove = data.startsWith('ask_approve_');
+            const actionId = data.replace(/^ask_(approve|deny)_/, '');
+            const pending = pendingActions.get(actionId);
+            if (pending) {
+                pendingActions.delete(actionId);
+                if (isApprove) {
+                    pending.resolve({ approved: true });
+                    await bot.answerCallbackQuery(query.id, { text: 'Approved — executing now' });
+                    console.log(`[ASK] Action ${actionId} (${pending.toolName}) approved by owner`);
+                } else {
+                    pending.resolve({ denied: true });
+                    await bot.answerCallbackQuery(query.id, { text: 'Denied — action cancelled' });
+                    console.log(`[ASK] Action ${actionId} (${pending.toolName}) denied by owner`);
+                }
+            } else {
+                await bot.answerCallbackQuery(query.id, { text: 'Action expired or already handled' });
+            }
+            return;
+        }
+
         if (!data?.startsWith('em_')) return;
 
         await bot.answerCallbackQuery(query.id);
@@ -4171,19 +4290,38 @@ _Raw logs: ~/.alex/logs/audit/ & tokens/_`;
         }
     }, 300000);
 
-    // Main message handler — with dedup to prevent double-processing
-    const processedMessages = new Set();
+    // Main message handler — with Redis-backed dedup to survive restarts
+    const processedMessagesLocal = new Set();
+
+    async function isMessageProcessed(msgId) {
+        if (processedMessagesLocal.has(msgId)) return true;
+        if (localRedis) {
+            try {
+                const exists = await localRedis.get(`msg:dedup:${msgId}`);
+                if (exists) return true;
+            } catch { /* Redis down — fall through to local Set */ }
+        }
+        return false;
+    }
+
+    async function markMessageProcessed(msgId) {
+        processedMessagesLocal.add(msgId);
+        // Prune local Set to prevent memory growth
+        if (processedMessagesLocal.size > 500) {
+            const entries = [...processedMessagesLocal];
+            entries.slice(0, 250).forEach(id => processedMessagesLocal.delete(id));
+        }
+        if (localRedis) {
+            try { await localRedis.set(`msg:dedup:${msgId}`, '1', { ex: 3600 }); } catch { /* best effort */ }
+        }
+    }
+
     bot.on('message', async (msg) => {
         if (msg.text && msg.text.startsWith('/')) return;
 
-        // Dedup: skip if we've already seen this message_id
-        if (processedMessages.has(msg.message_id)) return;
-        processedMessages.add(msg.message_id);
-        // Keep set from growing forever — prune old entries periodically
-        if (processedMessages.size > 200) {
-            const entries = [...processedMessages];
-            entries.slice(0, 100).forEach(id => processedMessages.delete(id));
-        }
+        // Dedup: skip if we've already seen this message_id (survives restart via Redis)
+        if (await isMessageProcessed(msg.message_id)) return;
+        await markMessageProcessed(msg.message_id);
 
         const chatId = msg.chat.id;
         const userId = msg.from.id;
@@ -4405,6 +4543,8 @@ Call the send_email tool now with exactly these parameters.`;
             console.log(`[INPUT] ${timestamp} | User: ${msg.from.first_name} (${userId}) | Message: ${userMessage.substring(0, 200)}`);
             await auditLog({
                 type: 'user_message',
+                channel: 'telegram',
+                user: `${msg.from.first_name} (${userId})`,
                 user_id: userId,
                 username: msg.from.username || null,
                 first_name: msg.from.first_name,
@@ -4593,14 +4733,17 @@ Rules for Python Mode:
             let response;
             try {
                 currentCallerUserId = userId;
+                currentRequestId = 'tg-' + chatId;
                 response = await chatSystem.chat(chatId, chatInput, msg.from, { modelOverride: modelOverrides.get(chatId) }, { chatId, source: 'telegram' });
             } finally {
                 currentCallerUserId = null;
+                currentRequestId = null;
                 clearInterval(typingInterval);
             }
 
             await auditLog({
-                type: 'alex_response',
+                type: 'bot_response',
+                channel: 'telegram',
                 user_id: userId,
                 chat_id: chatId,
                 response: response.substring(0, 5000),
@@ -4630,8 +4773,8 @@ Rules for Python Mode:
                 userName: msg.from.first_name || 'Leslie',
             }).catch(err => console.error('[JOURNAL]', err.message));
 
-            // Send any queued files (photos + documents)
-            const files = pendingCharts.splice(0);
+            // Send any queued files (photos + documents) — scoped to this request
+            const files = drainPendingFiles('tg-' + chatId);
             for (const file of files) {
                 try {
                     if (file.type === 'voice') {
@@ -4661,8 +4804,10 @@ Rules for Python Mode:
             console.error('[ERROR]', error);
             auditLog({
                 type: 'error',
+                channel: 'telegram',
                 user_id: userId,
                 chat_id: chatId,
+                message: `Error: ${(error.message || String(error)).slice(0, 200)}`,
                 error: error.message || String(error),
                 status: error?.status,
             }).catch(() => {});
@@ -4752,6 +4897,12 @@ Rules for Python Mode:
 // ============================================================================
 // CONTROL API (port 9090) — allows Claude Code to send commands to ALEX
 // ============================================================================
+
+// Curated subset of tools exposed via MCP
+function getMcpToolList() {
+    const MCP_TOOL_NAMES = new Set(['web_lookup', 'memory_recall', 'memory_save', 'generate_chart', 'stock_quote']);
+    return TOOLS.filter(t => MCP_TOOL_NAMES.has(t.name));
+}
 
 function setupControlAPI() {
     const CONTROL_PORT = parseInt(process.env.ALEX_PORT || '9090', 10);
@@ -4857,8 +5008,16 @@ function setupControlAPI() {
                         return;
                     }
 
+                    const isTerminalReq = req.headers['x-terminal'] === 'true';
+                    const controlChannel = isTerminalReq ? 'terminal' : 'control';
                     console.log(`[CONTROL] Command: ${message.substring(0, 100)}`);
                     postDashboard('add_activity', { entry: `Control API: ${message.substring(0, 80)}` });
+                    auditLog({
+                        type: 'user_message',
+                        channel: controlChannel,
+                        user: isTerminalReq ? 'Terminal' : 'Control API',
+                        message: message.slice(0, 200),
+                    }).catch(() => {});
 
                     // Build user message — include image reference if provided
                     let userMessage = message;
@@ -4921,8 +5080,10 @@ Call the send_email tool now with exactly these parameters.`;
                     }
 
                     currentCallerUserId = config.telegram_owner_id || null;
+                    currentRequestId = 'ctrl';
                     const response = await chatSystem.chat(chatId, userMessage, { first_name: userName, username: isTerminal ? 'terminal' : 'claude_code' }, {}, { source: 'api' });
                     currentCallerUserId = null;
+                    currentRequestId = null;
 
                     // Journal: append control API exchange
                     appendExchange({
@@ -4933,8 +5094,8 @@ Call the send_email tool now with exactly these parameters.`;
                         userName: isTerminal ? 'Leslie (Terminal)' : 'Leslie (API)',
                     }).catch(err => console.error('[JOURNAL]', err.message));
 
-                    // Send queued files
-                    const files = pendingCharts.splice(0);
+                    // Send queued files — scoped to this control request
+                    const files = drainPendingFiles('ctrl');
 
                     // Optionally forward response + files to Telegram
                     if (send_to_telegram !== false && config.telegram_owner_id) {
@@ -5114,6 +5275,12 @@ Call the send_email tool now with exactly these parameters.`;
                         res.end(JSON.stringify({ success: true, task: taskName }));
                         return;
                     }
+                    if (taskName === 'cost-monitor') {
+                        await runCostMonitor(bot, config);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, task: taskName }));
+                        return;
+                    }
                     if (taskName === 'file-received') {
                         const parsed = JSON.parse(body);
                         if (parsed.file) {
@@ -5250,11 +5417,32 @@ Call the send_email tool now with exactly these parameters.`;
 
                     // Scheduled tasks are system-level — grant owner permissions
                     currentCallerUserId = config.telegram_owner_id || null;
+                    currentRequestId = 'hb-' + taskName;
 
                     // Run asynchronously so we can respond immediately
-                    // Scheduled tasks are system-level — grant owner permissions
-                    currentCallerUserId = config.telegram_owner_id || null;
-                    handleScheduledTask(taskDef, heartbeatDeps()).catch(err => {
+                    handleScheduledTask(taskDef, heartbeatDeps()).then(async () => {
+                        // Drain any files generated by this heartbeat and send to owner
+                        const files = drainPendingFiles('hb-' + taskName);
+                        if (files.length > 0 && bot && config.telegram_owner_id) {
+                            for (const file of files) {
+                                try {
+                                    if (file.type === 'voice') {
+                                        await bot.sendVoice(config.telegram_owner_id, file.path);
+                                        unlink(file.path).catch(() => {});
+                                    } else if (file.type === 'document') {
+                                        await bot.sendDocument(config.telegram_owner_id, file.path, { caption: file.caption || undefined });
+                                    } else {
+                                        await bot.sendPhoto(config.telegram_owner_id, file.path, { caption: file.caption || undefined });
+                                    }
+                                } catch (fileErr) {
+                                    console.error(`[HEARTBEAT] Failed to send file for ${taskName}:`, fileErr.message);
+                                }
+                            }
+                        }
+                        currentRequestId = null;
+                    }).catch(err => {
+                        currentRequestId = null;
+                        drainPendingFiles('hb-' + taskName); // Clean up orphaned files
                         console.error(`[TRIGGER] ${taskName} failed:`, err.message);
                     });
 
@@ -5358,9 +5546,79 @@ Call the send_email tool now with exactly these parameters.`;
                 }
             });
 
+        // ================================================================
+        // MCP SERVER MODE — SSE + JSON-RPC for Claude Desktop/Code
+        // ================================================================
+
+        } else if (req.method === 'GET' && req.url === '/mcp/sse') {
+            // SSE connection — keepalive, sends server_info on connect
+            res.writeHead(200, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            });
+            const serverInfo = {
+                jsonrpc: '2.0',
+                method: 'notifications/initialized',
+                params: {
+                    serverInfo: { name: 'alex-mcp', version: '1.0.0' },
+                    capabilities: { tools: {} },
+                },
+            };
+            res.write(`data: ${JSON.stringify(serverInfo)}\n\n`);
+            const keepalive = setInterval(() => {
+                try { res.write(': keepalive\n\n'); } catch { clearInterval(keepalive); }
+            }, 30000);
+            req.on('close', () => clearInterval(keepalive));
+
+        } else if (req.method === 'POST' && req.url === '/mcp/messages') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const rpc = JSON.parse(body);
+                    const mcpTools = getMcpToolList();
+
+                    if (rpc.method === 'tools/list') {
+                        writeJson(res, 200, {
+                            jsonrpc: '2.0',
+                            id: rpc.id,
+                            result: { tools: mcpTools },
+                        });
+                    } else if (rpc.method === 'tools/call') {
+                        const { name: toolName, arguments: toolArgs } = rpc.params || {};
+                        const allowed = mcpTools.find(t => t.name === toolName);
+                        if (!allowed) {
+                            writeJson(res, 200, {
+                                jsonrpc: '2.0', id: rpc.id,
+                                error: { code: -32601, message: `Tool '${toolName}' not available via MCP` },
+                            });
+                            return;
+                        }
+                        currentCallerUserId = config.telegram_owner_id; // MCP auth inherits owner
+                        const result = await execToolWithDeps(toolName, toolArgs || {});
+                        currentCallerUserId = null;
+                        writeJson(res, 200, {
+                            jsonrpc: '2.0', id: rpc.id,
+                            result: { content: [{ type: 'text', text: JSON.stringify(result) }] },
+                        });
+                    } else {
+                        writeJson(res, 200, {
+                            jsonrpc: '2.0', id: rpc.id,
+                            error: { code: -32601, message: `Unknown method: ${rpc.method}` },
+                        });
+                    }
+                } catch (err) {
+                    writeJson(res, 200, {
+                        jsonrpc: '2.0', id: null,
+                        error: { code: -32700, message: err.message },
+                    });
+                }
+            });
+
         } else {
             res.writeHead(404);
-            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger, GET /api/health, GET /api/terminal-messages' }));
+            res.end(JSON.stringify({ error: 'Endpoints: POST /api/command, POST /api/send, GET /api/users, POST /api/broadcast, POST /api/trigger, GET /api/health, GET /api/terminal-messages, GET /mcp/sse, POST /mcp/messages' }));
         }
     });
 
@@ -5379,35 +5637,67 @@ Call the send_email tool now with exactly these parameters.`;
 
     // ── Web chat poller — checks Upstash Redis for incoming web chat messages ──
     if (redis) {
+        // Track tools used per web chat request (shared via globalThis for execToolWithDeps access)
+        if (!globalThis.__webChatToolsUsed) globalThis.__webChatToolsUsed = new Map();
+        const requestToolsUsed = globalThis.__webChatToolsUsed;
         const webChatInterval = setInterval(async () => {
             try {
                 const raw = await redis.lpop('web:chat:in');
                 if (!raw) return;
-                const { text, sessionId } = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const { text, sessionId, isMaster } = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (!text || !sessionId) return;
                 const webChatId = `web-${sessionId}`;
+                const reqId = 'web-' + sessionId;
 
-                const webMessage = `[WEB CONTEXT: User is chatting via the alexnavada.xyz website. Rules for this channel:
+                // Set up tool tracking for this request
+                requestToolsUsed.set(reqId, []);
+
+                const webMessage = isMaster
+                    ? `[WEB CONTEXT: Master user (Lee) is chatting via the alexnavada.xyz website. Rules for this channel:
+1. You have FULL tool access — all tools are available
+2. You CAN generate charts, diagrams, mindmaps — they will be sent as images
+3. Use markdown formatting — the web UI renders it properly
+4. No word limit — be as detailed as the question demands]\n\n${text}`
+                    : `[WEB CONTEXT: Public user is chatting via the alexnavada.xyz website. Rules for this channel:
 1. Be concise — web users expect quick, focused answers
-2. You CANNOT send files, images, charts, or diagrams — text only
-3. Do NOT use bash, write_file, or other system tools — this is a public-facing chat
-4. You CAN use web_search, web_lookup, stock_quote, crypto_rate, and other read-only tools
-5. Keep responses under 500 words unless asked for detail]\n\n${text}`;
+2. You CAN use: web_search, web_lookup, stock_quote, crypto_rate, memory_recall, generate_chart, generate_diagram, generate_mindmap
+3. Do NOT use bash, write_file, send_email, or other system/owner tools — this is a public-facing chat
+4. You CAN generate charts and diagrams — they will be sent as images
+5. Use markdown formatting — the web UI renders it properly
+6. Keep responses under 500 words unless asked for detail]\n\n${text}`;
 
-                currentCallerUserId = null; // Web users have no owner permissions
-                const response = await chatSystem.chat(webChatId, webMessage, { first_name: 'Web User', username: 'web' }, {}, { source: 'web' });
+                currentCallerUserId = isMaster ? (config.telegram_owner_id || null) : null;
+                currentRequestId = reqId;
+                const response = await chatSystem.chat(webChatId, webMessage, { first_name: isMaster ? 'Lee' : 'Web User', username: isMaster ? 'master_web' : 'web' }, {}, { source: 'web' });
                 currentCallerUserId = null;
+                currentRequestId = null;
+
+                // Drain any files generated during this request and convert to base64 attachments
+                const files = drainPendingFiles(reqId);
+                const attachments = [];
+                for (const file of files) {
+                    try {
+                        const data = await readFile(file.path);
+                        const base64 = data.toString('base64');
+                        const ext = file.path.split('.').pop().toLowerCase();
+                        const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : ext === 'pdf' ? 'application/pdf' : 'application/octet-stream';
+                        attachments.push({ type: file.type, data: base64, caption: file.caption || '', mimeType });
+                    } catch {}
+                }
+
+                const toolsUsed = requestToolsUsed.get(reqId) || [];
+                requestToolsUsed.delete(reqId);
 
                 appendExchange({
                     question: text.substring(0, 500),
                     answer: response.substring(0, 1500),
                     source: 'web',
                     modelLabel: journalModelLabel(selectModel(text)),
-                    userName: 'Web User',
+                    userName: isMaster ? 'Lee (Web)' : 'Web User',
                 }).catch(() => {});
 
                 await redis.set(`web:chat:out:${sessionId}`, JSON.stringify({
-                    response, timestamp: Date.now()
+                    response, attachments, tools_used: toolsUsed, timestamp: Date.now()
                 }), { ex: 3600 });
             } catch (e) {
                 // Silent fail — non-critical
@@ -5689,7 +5979,7 @@ async function init() {
     startInboxPolling();
 
     // Start Slack polling
-    await setupSlack({ config, chatSystem, postDashboard, smartSplit, learnModeChats, modelOverrides });
+    await setupSlack({ config, chatSystem, postDashboard, smartSplit, learnModeChats, modelOverrides, auditLog });
     startSlackPolling();
 
     // Initialize Railway-compatible scheduler

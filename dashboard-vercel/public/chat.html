@@ -10,6 +10,11 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/theme.css">
+  <!-- Markdown + syntax highlighting + diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -41,7 +46,95 @@
       overflow: hidden;
     }
 
-    /* Chat container fills remaining space below nav */
+    /* ── Passcode Screen ── */
+    #passcode-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    #passcode-screen.hidden { display: none; }
+
+    .passcode-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .passcode-card h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .passcode-card p {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .passcode-card input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.7rem 1rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      text-align: center;
+      transition: border-color 0.2s;
+      margin-bottom: 1rem;
+    }
+
+    .passcode-card input:focus { border-color: var(--blue); }
+
+    .passcode-card button {
+      width: 100%;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.7rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s;
+    }
+
+    .passcode-card button:hover { opacity: 0.9; }
+
+    .passcode-error {
+      color: #ef4444;
+      font-size: 0.8rem;
+      margin-top: 0.75rem;
+      display: none;
+    }
+
+    .passcode-error.visible { display: block; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+
+    .shake { animation: shake 0.3s ease-in-out; }
+
+    /* ── Chat container ── */
+    #chat-app { display: none; flex-direction: column; height: 100%; }
+    #chat-app.visible { display: flex; }
+
     .chat-container {
       flex: 1;
       display: flex;
@@ -52,7 +145,6 @@
       overflow: hidden;
     }
 
-    /* Chat header */
     .chat-header {
       padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border);
@@ -62,10 +154,47 @@
       flex-shrink: 0;
     }
 
-    .chat-header h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
+    .chat-header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
     }
+
+    .chat-header h1 { font-size: 1.1rem; font-weight: 600; }
+
+    .master-badge {
+      display: none;
+      font-size: 0.6rem;
+      background: #f59e0b;
+      color: #000;
+      padding: 0.15rem 0.45rem;
+      border-radius: 6px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .master-badge.visible { display: inline-block; }
+
+    .chat-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .new-chat-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .new-chat-btn:hover { color: var(--text); border-color: var(--text); }
 
     .chat-status {
       display: inline-flex;
@@ -93,11 +222,7 @@
       50% { opacity: 0.3; }
     }
 
-    .chat-status-text {
-      white-space: nowrap;
-    }
-
-    /* Messages area */
+    /* ── Messages area ── */
     .messages-area {
       flex: 1;
       overflow-y: auto;
@@ -110,7 +235,6 @@
       overscroll-behavior: contain;
     }
 
-    /* Message bubbles */
     .message {
       display: flex;
       flex-direction: column;
@@ -123,35 +247,163 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .message.user {
-      align-self: flex-end;
-      align-items: flex-end;
-    }
-
-    .message.alex {
-      align-self: flex-start;
-      align-items: flex-start;
-    }
+    .message.user { align-self: flex-end; align-items: flex-end; }
+    .message.alex { align-self: flex-start; align-items: flex-start; }
 
     .message-bubble {
       padding: 0.6rem 0.9rem;
       border-radius: 14px;
       font-size: 0.875rem;
-      line-height: 1.5;
+      line-height: 1.6;
       word-wrap: break-word;
-      white-space: pre-wrap;
+      overflow-wrap: break-word;
     }
 
     .message.user .message-bubble {
       background: var(--blue);
       color: #fff;
       border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
     }
 
     .message.alex .message-bubble {
       background: var(--border);
       color: var(--text);
       border-bottom-left-radius: 4px;
+    }
+
+    /* ── Markdown content styling ── */
+    .message.alex .message-bubble p { margin: 0.4em 0; }
+    .message.alex .message-bubble p:first-child { margin-top: 0; }
+    .message.alex .message-bubble p:last-child { margin-bottom: 0; }
+
+    .message.alex .message-bubble h1,
+    .message.alex .message-bubble h2,
+    .message.alex .message-bubble h3,
+    .message.alex .message-bubble h4 {
+      margin: 0.8em 0 0.3em;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .message.alex .message-bubble h1 { font-size: 1.15em; }
+    .message.alex .message-bubble h2 { font-size: 1.05em; }
+    .message.alex .message-bubble h3 { font-size: 0.95em; }
+
+    .message.alex .message-bubble ul,
+    .message.alex .message-bubble ol {
+      padding-left: 1.4em;
+      margin: 0.4em 0;
+    }
+
+    .message.alex .message-bubble li { margin: 0.2em 0; }
+
+    .message.alex .message-bubble blockquote {
+      border-left: 3px solid var(--blue);
+      padding: 0.3em 0.8em;
+      margin: 0.5em 0;
+      color: #aaa;
+      background: rgba(255,255,255,0.03);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .message.alex .message-bubble table {
+      border-collapse: collapse;
+      margin: 0.5em 0;
+      width: 100%;
+      font-size: 0.85em;
+    }
+
+    .message.alex .message-bubble th,
+    .message.alex .message-bubble td {
+      border: 1px solid var(--border);
+      padding: 0.35em 0.6em;
+      text-align: left;
+    }
+
+    .message.alex .message-bubble th {
+      background: rgba(255,255,255,0.05);
+      font-weight: 600;
+    }
+
+    .message.alex .message-bubble code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+      font-size: 0.85em;
+      background: rgba(0,0,0,0.3);
+      padding: 0.15em 0.35em;
+      border-radius: 4px;
+    }
+
+    .message.alex .message-bubble pre {
+      background: #1a1b26;
+      border-radius: 8px;
+      padding: 0.8em 1em;
+      margin: 0.5em 0;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .message.alex .message-bubble pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.82em;
+      line-height: 1.5;
+    }
+
+    .message.alex .message-bubble a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .message.alex .message-bubble a:hover { text-decoration: underline; }
+
+    .message.alex .message-bubble strong { font-weight: 700; }
+
+    .message.alex .message-bubble hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0.6em 0;
+    }
+
+    /* ── Chat images ── */
+    .chat-image {
+      max-width: 100%;
+      border-radius: 8px;
+      margin: 0.5em 0;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .chat-image:hover { opacity: 0.9; }
+
+    /* ── Mermaid diagrams ── */
+    .mermaid-container {
+      background: #1a1b26;
+      border-radius: 8px;
+      padding: 1em;
+      margin: 0.5em 0;
+      overflow-x: auto;
+    }
+
+    .mermaid-container svg { max-width: 100%; height: auto; }
+
+    /* ── Tool badges ── */
+    .tool-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.4rem;
+      padding: 0 0.2rem;
+    }
+
+    .tool-badge {
+      font-size: 0.65rem;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 0.1rem 0.45rem;
+      border-radius: 10px;
+      white-space: nowrap;
     }
 
     .message-time {
@@ -161,7 +413,7 @@
       padding: 0 0.25rem;
     }
 
-    /* Typing indicator */
+    /* ── Typing indicator ── */
     .typing-indicator {
       display: none;
       align-self: flex-start;
@@ -201,7 +453,7 @@
       40% { transform: scale(1); opacity: 1; }
     }
 
-    /* Input area */
+    /* ── Input area ── */
     .input-area {
       padding: 0.75rem 1rem;
       border-top: 1px solid var(--border);
@@ -213,7 +465,6 @@
       display: flex;
       gap: 0.5rem;
       align-items: flex-end;
-      max-width: 100%;
     }
 
     .input-row input {
@@ -229,18 +480,9 @@
       transition: border-color 0.2s;
     }
 
-    .input-row input::placeholder {
-      color: var(--muted);
-    }
-
-    .input-row input:focus {
-      border-color: var(--blue);
-    }
-
-    .input-row input:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    .input-row input::placeholder { color: var(--muted); }
+    .input-row input:focus { border-color: var(--blue); }
+    .input-row input:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .send-btn {
       background: var(--blue);
@@ -256,20 +498,10 @@
       font-family: inherit;
     }
 
-    .send-btn:hover:not(:disabled) {
-      opacity: 0.9;
-    }
+    .send-btn:hover:not(:disabled) { opacity: 0.9; }
+    .send-btn:active:not(:disabled) { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .send-btn:active:not(:disabled) {
-      transform: scale(0.97);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* Footer */
     .chat-footer {
       text-align: center;
       padding: 0.4rem;
@@ -279,88 +511,145 @@
       border-top: 1px solid var(--border);
     }
 
-    /* Mobile adjustments */
+    /* ── Mobile ── */
     @media (max-width: 768px) {
-      .chat-header {
-        padding: 0.6rem 0.75rem;
-      }
-
-      .chat-header h1 {
-        font-size: 1rem;
-      }
-
-      .messages-area {
-        padding: 0.75rem;
-        gap: 0.6rem;
-      }
-
-      .message {
-        max-width: 88%;
-      }
-
-      .input-area {
-        padding: 0.6rem 0.75rem;
-      }
-
-      .message-bubble {
-        font-size: 0.825rem;
-      }
+      .chat-header { padding: 0.6rem 0.75rem; }
+      .chat-header h1 { font-size: 1rem; }
+      .messages-area { padding: 0.75rem; gap: 0.6rem; }
+      .message { max-width: 88%; }
+      .input-area { padding: 0.6rem 0.75rem; }
+      .message-bubble { font-size: 0.825rem; }
     }
 
     @media (max-width: 480px) {
-      .chat-header h1 {
-        font-size: 0.9rem;
-      }
-
-      .chat-status {
-        font-size: 0.7rem;
-      }
-
-      .message {
-        max-width: 92%;
-      }
-
-      .input-row input {
-        padding: 0.55rem 0.75rem;
-        font-size: 0.8rem;
-      }
-
-      .send-btn {
-        padding: 0.55rem 0.8rem;
-        font-size: 0.8rem;
-      }
+      .chat-header h1 { font-size: 0.9rem; }
+      .chat-status { font-size: 0.7rem; }
+      .message { max-width: 92%; }
+      .input-row input { padding: 0.55rem 0.75rem; font-size: 0.8rem; }
+      .send-btn { padding: 0.55rem 0.8rem; font-size: 0.8rem; }
     }
   </style>
 </head>
 <body>
 
-  <div class="chat-container">
-    <div class="chat-header">
-      <h1>Chat with ALEX</h1>
-      <div class="chat-status">
-        <span class="chat-status-dot" id="status-dot"></span>
-        <span class="chat-status-text" id="status-text">Online</span>
-      </div>
+  <!-- Passcode Screen -->
+  <div id="passcode-screen">
+    <div class="passcode-card">
+      <h2>ALEX</h2>
+      <p>Enter passcode to start chatting</p>
+      <input type="password" id="passcode-input" placeholder="Passcode" autocomplete="off" />
+      <button id="passcode-btn">Connect</button>
+      <div class="passcode-error" id="passcode-error">Incorrect passcode. Try again.</div>
     </div>
+  </div>
 
-    <div class="messages-area" id="messages-area">
-      <div class="typing-indicator" id="typing-indicator">
-        ALEX is thinking<span class="typing-dots"><span></span><span></span><span></span></span>
+  <!-- Chat App -->
+  <div id="chat-app">
+    <div class="chat-container">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <h1>Chat with ALEX</h1>
+          <span class="master-badge" id="master-badge">MASTER</span>
+        </div>
+        <div class="chat-header-right">
+          <button class="new-chat-btn" id="new-chat-btn">New Chat</button>
+          <div class="chat-status">
+            <span class="chat-status-dot" id="status-dot"></span>
+            <span class="chat-status-text" id="status-text">Online</span>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="input-area">
-      <div class="input-row">
-        <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
-        <button class="send-btn" id="send-btn">Send</button>
+      <div class="messages-area" id="messages-area">
+        <div class="typing-indicator" id="typing-indicator">
+          <span id="typing-text">ALEX is thinking</span><span class="typing-dots"><span></span><span></span><span></span></span>
+        </div>
       </div>
-    </div>
 
-    <div class="chat-footer">Powered by ALEX &mdash; Global Economist</div>
+      <div class="input-area">
+        <div class="input-row">
+          <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
+          <button class="send-btn" id="send-btn">Send</button>
+        </div>
+      </div>
+
+      <div class="chat-footer">Powered by ALEX &mdash; Global Economist</div>
+    </div>
   </div>
 
   <script>
-    // --- Session & Storage ---
+    // ── Mermaid init ──
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+
+    // ── Marked config ──
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          try { return hljs.highlight(code, { language: lang }).value; } catch {}
+        }
+        return hljs.highlightAuto(code).value;
+      }
+    });
+
+    // ── Auth & Session ──
+    const VALID_PASSCODES = ['ALEX_NAVADA', 'Hey Alex, its Lee!'];
+
+    let isMaster = false;
+
+    function checkAuth() {
+      const auth = sessionStorage.getItem('alex-chat-auth');
+      if (auth) {
+        isMaster = sessionStorage.getItem('alex-chat-master') === '1';
+        showChat();
+        return true;
+      }
+      return false;
+    }
+
+    function showChat() {
+      document.getElementById('passcode-screen').classList.add('hidden');
+      const chatApp = document.getElementById('chat-app');
+      chatApp.classList.add('visible');
+      if (isMaster) document.getElementById('master-badge').classList.add('visible');
+      chatInput.focus();
+    }
+
+    // ── Passcode handling ──
+    const passcodeInput = document.getElementById('passcode-input');
+    const passcodeBtn = document.getElementById('passcode-btn');
+    const passcodeError = document.getElementById('passcode-error');
+
+    function submitPasscode() {
+      const val = passcodeInput.value.trim();
+      if (val === 'Hey Alex, its Lee!') {
+        isMaster = true;
+        sessionStorage.setItem('alex-chat-auth', '1');
+        sessionStorage.setItem('alex-chat-master', '1');
+        showChat();
+        initChat();
+      } else if (val === 'ALEX_NAVADA') {
+        isMaster = false;
+        sessionStorage.setItem('alex-chat-auth', '1');
+        sessionStorage.setItem('alex-chat-master', '0');
+        showChat();
+        initChat();
+      } else {
+        passcodeError.classList.add('visible');
+        const card = document.querySelector('.passcode-card');
+        card.classList.add('shake');
+        setTimeout(() => card.classList.remove('shake'), 300);
+      }
+    }
+
+    passcodeBtn.addEventListener('click', submitPasscode);
+    passcodeInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitPasscode();
+      passcodeError.classList.remove('visible');
+    });
+
+    // ── Session ID ──
     function getSessionId() {
       let sid = localStorage.getItem('alex-chat-session');
       if (!sid) {
@@ -370,72 +659,139 @@
       return sid;
     }
 
-    const sessionId = getSessionId();
+    let sessionId = getSessionId();
 
+    // ── Message storage ──
     function loadMessages() {
       try {
         const stored = localStorage.getItem('alex-chat-messages');
         return stored ? JSON.parse(stored) : [];
-      } catch (e) {
-        return [];
-      }
+      } catch { return []; }
     }
 
-    function saveMessages(messages) {
-      try {
-        localStorage.setItem('alex-chat-messages', JSON.stringify(messages));
-      } catch (e) {}
+    function saveMessages(msgs) {
+      try { localStorage.setItem('alex-chat-messages', JSON.stringify(msgs)); } catch {}
     }
 
     let messages = loadMessages();
 
-    // --- DOM refs ---
+    // ── DOM refs ──
     const messagesArea = document.getElementById('messages-area');
     const typingIndicator = document.getElementById('typing-indicator');
+    const typingText = document.getElementById('typing-text');
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
 
-    // --- Time formatting ---
+    // ── Time formatting ──
     function formatTime(ts) {
-      const d = new Date(ts);
-      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // --- Render a single message to DOM ---
+    // ── Render markdown with mermaid support ──
+    let mermaidCounter = 0;
+
+    function renderMarkdown(text) {
+      // Extract mermaid blocks before marked processes them
+      const mermaidBlocks = [];
+      const textWithPlaceholders = text.replace(/```mermaid\n([\s\S]*?)```/g, (_, code) => {
+        const id = `mermaid-${mermaidCounter++}`;
+        mermaidBlocks.push({ id, code: code.trim() });
+        return `<div class="mermaid-container" id="${id}"></div>`;
+      });
+
+      let html = marked.parse(textWithPlaceholders);
+
+      // Schedule mermaid rendering
+      if (mermaidBlocks.length > 0) {
+        requestAnimationFrame(() => {
+          for (const block of mermaidBlocks) {
+            const el = document.getElementById(block.id);
+            if (el) {
+              try {
+                mermaid.render(block.id + '-svg', block.code).then(({ svg }) => {
+                  el.innerHTML = svg;
+                }).catch(() => {
+                  el.innerHTML = `<pre><code>${block.code}</code></pre>`;
+                });
+              } catch {
+                el.innerHTML = `<pre><code>${block.code}</code></pre>`;
+              }
+            }
+          }
+        });
+      }
+
+      return html;
+    }
+
+    // ── Create message element ──
     function createMessageEl(msg) {
       const wrapper = document.createElement('div');
       wrapper.className = 'message ' + (msg.role === 'user' ? 'user' : 'alex');
 
       const bubble = document.createElement('div');
       bubble.className = 'message-bubble';
-      bubble.textContent = msg.text;
+
+      if (msg.role === 'user') {
+        bubble.textContent = msg.text;
+      } else {
+        bubble.innerHTML = renderMarkdown(msg.text);
+        // Highlight code blocks
+        bubble.querySelectorAll('pre code').forEach(block => {
+          try { hljs.highlightElement(block); } catch {}
+        });
+      }
+
+      wrapper.appendChild(bubble);
+
+      // Attachments (images)
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const att of msg.attachments) {
+          if (att.mimeType && att.mimeType.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.className = 'chat-image';
+            img.src = `data:${att.mimeType};base64,${att.data}`;
+            img.alt = att.caption || 'Image from ALEX';
+            if (att.caption) img.title = att.caption;
+            wrapper.appendChild(img);
+          }
+        }
+      }
+
+      // Tool badges
+      if (msg.tools_used && msg.tools_used.length > 0) {
+        const badgeContainer = document.createElement('div');
+        badgeContainer.className = 'tool-badges';
+        // Deduplicate
+        const unique = [...new Set(msg.tools_used)];
+        for (const tool of unique) {
+          const badge = document.createElement('span');
+          badge.className = 'tool-badge';
+          badge.textContent = tool.replace(/_/g, ' ');
+          badgeContainer.appendChild(badge);
+        }
+        wrapper.appendChild(badgeContainer);
+      }
 
       const time = document.createElement('div');
       time.className = 'message-time';
       time.textContent = formatTime(msg.timestamp);
-
-      wrapper.appendChild(bubble);
       wrapper.appendChild(time);
+
       return wrapper;
     }
 
-    // --- Render all messages ---
+    // ── Render all messages ──
     function renderMessages() {
-      // Remove all messages (keep typing indicator)
       const children = Array.from(messagesArea.children);
       children.forEach(child => {
-        if (child !== typingIndicator) {
-          messagesArea.removeChild(child);
-        }
+        if (child !== typingIndicator) messagesArea.removeChild(child);
       });
-
-      // Add messages before the typing indicator
       messages.forEach(msg => {
         messagesArea.insertBefore(createMessageEl(msg), typingIndicator);
       });
-
       scrollToBottom();
     }
 
@@ -445,13 +801,13 @@
     }
 
     function scrollToBottom() {
-      requestAnimationFrame(() => {
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-      });
+      requestAnimationFrame(() => { messagesArea.scrollTop = messagesArea.scrollHeight; });
     }
 
-    // --- Status ---
+    // ── Status / typing ──
     let isWaiting = false;
+    let typingPhase = 0;
+    let typingTimer = null;
 
     function setWaiting(waiting) {
       isWaiting = waiting;
@@ -462,22 +818,29 @@
         statusDot.classList.add('waiting');
         statusText.textContent = 'Waiting...';
         typingIndicator.classList.add('visible');
+        typingText.textContent = 'ALEX is thinking';
+        typingPhase = 0;
+        // Dynamic typing phases
+        typingTimer = setInterval(() => {
+          typingPhase++;
+          if (typingPhase === 4) typingText.textContent = 'ALEX is using tools';
+          else if (typingPhase === 10) typingText.textContent = 'Working on detailed response';
+        }, 2000);
       } else {
         statusDot.classList.remove('waiting');
         statusText.textContent = 'Online';
         typingIndicator.classList.remove('visible');
+        if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
       }
-
       scrollToBottom();
     }
 
-    // --- Send message ---
+    // ── Send message ──
     async function sendMessage() {
       const text = chatInput.value.trim();
       if (!text || isWaiting) return;
 
-      // Add user message
-      const userMsg = { role: 'user', text: text, timestamp: Date.now() };
+      const userMsg = { role: 'user', text, timestamp: Date.now() };
       messages.push(userMsg);
       saveMessages(messages);
       appendMessage(userMsg);
@@ -489,16 +852,12 @@
         const res = await fetch('/api/chat/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, sessionId: sessionId })
+          body: JSON.stringify({ message: text, sessionId, isMaster })
         });
 
-        if (!res.ok) {
-          throw new Error('Failed to send message');
-        }
-
-        // Start polling for response
+        if (!res.ok) throw new Error('Failed to send');
         pollForResponse();
-      } catch (e) {
+      } catch {
         const errMsg = { role: 'alex', text: 'Sorry, I could not connect to the server. Please try again.', timestamp: Date.now() };
         messages.push(errMsg);
         saveMessages(messages);
@@ -507,9 +866,9 @@
       }
     }
 
-    // --- Poll for response ---
+    // ── Poll for response ──
     let pollCount = 0;
-    const MAX_POLL_ATTEMPTS = 90;
+    const MAX_POLL = 90;
 
     function pollForResponse() {
       pollCount = 0;
@@ -517,11 +876,11 @@
     }
 
     async function doPoll() {
-      if (pollCount >= MAX_POLL_ATTEMPTS) {
-        const timeoutMsg = { role: 'alex', text: 'Sorry, the request timed out. Please try again.', timestamp: Date.now() };
-        messages.push(timeoutMsg);
+      if (pollCount >= MAX_POLL) {
+        const tm = { role: 'alex', text: 'Sorry, the request timed out. Please try again.', timestamp: Date.now() };
+        messages.push(tm);
         saveMessages(messages);
-        appendMessage(timeoutMsg);
+        appendMessage(tm);
         setWaiting(false);
         return;
       }
@@ -531,15 +890,18 @@
 
       try {
         const res = await fetch('/api/chat/poll?sessionId=' + encodeURIComponent(sessionId) + '&_=' + Date.now());
-
-        if (!res.ok) {
-          throw new Error('Poll error');
-        }
+        if (!res.ok) throw new Error('Poll error');
 
         const data = await res.json();
 
         if (data.status === 'complete' && data.response) {
-          const alexMsg = { role: 'alex', text: data.response, timestamp: Date.now() };
+          const alexMsg = {
+            role: 'alex',
+            text: data.response,
+            attachments: data.attachments || [],
+            tools_used: data.tools_used || [],
+            timestamp: data.timestamp || Date.now()
+          };
           messages.push(alexMsg);
           saveMessages(messages);
           appendMessage(alexMsg);
@@ -547,27 +909,21 @@
           return;
         }
 
-        // Still pending, poll again
         setTimeout(doPoll, delay);
-      } catch (e) {
-        // Retry polling on error
+      } catch {
         setTimeout(doPoll, delay);
       }
     }
 
-    // --- Event listeners ---
-    sendBtn.addEventListener('click', sendMessage);
-
-    chatInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    // --- Init ---
-    // Show welcome message if no history
-    if (messages.length === 0) {
+    // ── New conversation ──
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+      messages = [];
+      saveMessages(messages);
+      // New session ID
+      sessionId = crypto.randomUUID ? crypto.randomUUID() : 'xxxx-xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+      localStorage.setItem('alex-chat-session', sessionId);
+      renderMessages();
+      // Add welcome
       const welcome = {
         role: 'alex',
         text: "Hello! I'm ALEX, a global economist and AI assistant. How can I help you today?",
@@ -575,10 +931,36 @@
       };
       messages.push(welcome);
       saveMessages(messages);
+      appendMessage(welcome);
+    });
+
+    // ── Event listeners ──
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    // ── Init ──
+    function initChat() {
+      if (messages.length === 0) {
+        const welcome = {
+          role: 'alex',
+          text: "Hello! I'm ALEX, a global economist and AI assistant. How can I help you today?",
+          timestamp: Date.now()
+        };
+        messages.push(welcome);
+        saveMessages(messages);
+      }
+      renderMessages();
+      chatInput.focus();
     }
 
-    renderMessages();
-    chatInput.focus();
+    // Check if already authenticated
+    if (checkAuth()) {
+      initChat();
+    } else {
+      passcodeInput.focus();
+    }
   </script>
 
   <script src="/nav.js"></script>
